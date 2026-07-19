@@ -1,0 +1,110 @@
+// Prisma schema — the single source of truth for the database.
+// Edit this file, then run `npm run prisma:migrate` to update the DB and
+// regenerate the type-safe client.
+//
+// Docs: https://www.prisma.io/docs
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// A seller on the marketplace. Owned by one Clerk user (clerkUserId).
+model Vendor {
+  id          String   @id @default(cuid())
+  clerkUserId String   @unique // links this storefront to a signed-in user
+  name        String
+  slug        String   @unique // used in the URL: /vendors/{slug}
+  description String?
+  imageUrl    String? // Cloudinary URL for a banner/logo
+  phone       String? // vendor contact number
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products    Product[]
+  orders      Order[]
+  pickupSlots PickupSlot[]
+}
+
+// Something a vendor sells. Price is stored in cents to avoid float rounding.
+model Product {
+  id           String   @id @default(cuid())
+  vendorId     String
+  name         String
+  description  String?
+  priceCents   Int // e.g. 1250 == $12.50
+  imageUrl     String? // Cloudinary URL
+  isAvailable  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+}
+
+// A window during which customers can pick up their orders.
+model PickupSlot {
+  id        String   @id @default(cuid())
+  vendorId  String
+  startsAt  DateTime
+  endsAt    DateTime
+  capacity  Int      @default(20) // max orders for this window
+  location  String?
+  createdAt DateTime @default(now())
+
+  vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([vendorId])
+}
+
+// One customer purchase. Moves through the OrderStatus lifecycle.
+model Order {
+  id                String      @id @default(cuid())
+  vendorId          String
+  pickupSlotId      String?
+  customerName      String
+  customerPhone     String // used for the Twilio SMS confirmation
+  status            OrderStatus @default(PENDING)
+  totalCents        Int
+  stripeSessionId   String?     @unique // links back to Stripe Checkout
+  smsNotified       Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  pickupSlot PickupSlot? @relation(fields: [pickupSlotId], references: [id])
+  items      OrderItem[]
+
+  @@index([vendorId])
+  @@index([status])
+}
+
+// A line item on an order. quantity x unitPriceCents.
+model OrderItem {
+  id             String @id @default(cuid())
+  orderId        String
+  productId      String
+  quantity       Int    @default(1)
+  unitPriceCents Int // price captured at time of order
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+enum OrderStatus {
+  PENDING // created, awaiting payment
+  PAID // Stripe webhook confirmed payment
+  READY // vendor marked it ready for pickup
+  COMPLETED // picked up
+  CANCELLED
+}

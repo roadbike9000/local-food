@@ -1,0 +1,49 @@
+/**
+ * Products API for the signed-in vendor.
+ *
+ *   GET  /api/products         -> list this vendor's products
+ *   POST /api/products         -> create a product
+ *
+ * Auth is enforced by loading the vendor tied to the current Clerk user.
+ */
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { getCurrentVendor } from "@/lib/vendor";
+
+export async function GET() {
+  const vendor = await getCurrentVendor();
+  if (!vendor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const products = await prisma.product.findMany({
+    where: { vendorId: vendor.id },
+    orderBy: { createdAt: "desc" },
+  });
+  return NextResponse.json({ products });
+}
+
+const CreateProductSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  priceCents: z.number().int().positive(),
+  imageUrl: z.string().url().optional(),
+});
+
+export async function POST(req: Request) {
+  const vendor = await getCurrentVendor();
+  if (!vendor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const parsed = CreateProductSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const product = await prisma.product.create({
+    data: { ...parsed.data, vendorId: vendor.id },
+  });
+  return NextResponse.json({ product }, { status: 201 });
+}

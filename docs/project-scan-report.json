@@ -1,0 +1,39 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {"started": "2026-07-19T00:00:00Z", "last_updated": "2026-07-19T00:00:00Z", "completed": "2026-07-19T00:00:00Z"},
+  "mode": "initial_scan",
+  "scan_level": "deep",
+  "project_root": "/Users/jeffsmathers/Projects/local-food",
+  "project_knowledge": "/Users/jeffsmathers/Projects/local-food/docs",
+  "completed_steps": [
+    {"step": "step_1", "status": "completed", "summary": "Classified as monolith, 1 part, project_type_id=web (Next.js 14 App Router)"},
+    {"step": "step_2", "status": "completed", "summary": "Found 2 existing docs: README.md, _bmad-output/project-context.md"},
+    {"step": "step_3", "status": "completed", "summary": "Tech stack: Next.js 14 / TypeScript / Prisma+Postgres / Clerk / Stripe / Twilio / Cloudinary / Sentry / Tailwind / Playwright"},
+    {"step": "step_4", "status": "completed", "summary": "API scan: 5 route handlers. Data model scan: 5 tables + 1 enum. UI scan: 4 components, 11 pages. Read all 28 source files (deep scan)."},
+    {"step": "step_5", "status": "completed", "summary": "Source tree documented with annotations, 1 discrepancy noted (duplicate formatPrice)"},
+    {"step": "step_6", "status": "completed", "summary": "Dev/deployment guides written; no deploy config found in repo"},
+    {"step": "step_8", "status": "completed", "summary": "architecture.md written for single part"},
+    {"step": "step_9", "status": "completed", "summary": "All supporting docs written: project-overview, source-tree-analysis, component-inventory, development-guide, deployment-guide, api-contracts, data-models"},
+    {"step": "step_10", "status": "completed", "summary": "Master index.md generated, no (To be generated) markers - all docs complete"},
+    {"step": "step_12", "status": "completed", "summary": "Workflow complete"}
+  ],
+  "current_step": "completed",
+  "findings": {
+    "project_classification": "monolith, 1 part, web/Next.js",
+    "technology_stack": "Next.js 14.2.13, TypeScript strict, React 18.3.1, Prisma 5.20, PostgreSQL/Neon, Clerk 5.7, Stripe 16.12, Twilio 5.3, Cloudinary 2.5, Sentry 8.30, Tailwind 3.4, Playwright 1.47"
+  },
+  "project_types": [{"part_id": "root", "project_type_id": "web", "display_name": "Next.js web app"}],
+  "outputs_generated": [
+    "project-scan-report.json",
+    "index.md",
+    "project-overview.md",
+    "architecture.md",
+    "source-tree-analysis.md",
+    "component-inventory.md",
+    "development-guide.md",
+    "deployment-guide.md",
+    "api-contracts.md",
+    "data-models.md"
+  ],
+  "resume_instructions": "Workflow completed - no resume needed"
+}
