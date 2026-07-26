@@ -16,10 +16,14 @@ export function AddProductForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Capture the form element now — event.currentTarget becomes null after
+    // the `await` below, since React only keeps it valid during the
+    // synchronous dispatch of the event.
+    const form = event.currentTarget;
     setSubmitting(true);
     setError(null);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const name = String(formData.get("name") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
     const priceDollars = String(formData.get("priceDollars") ?? "");
@@ -52,7 +56,7 @@ export function AddProductForm() {
         return;
       }
 
-      event.currentTarget.reset();
+      form.reset();
       setOpen(false);
       router.refresh();
     } catch {
