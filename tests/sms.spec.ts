@@ -6,7 +6,9 @@ test.describe("sms / contact fields", () => {
   test("cart requires a mobile number before checkout", async ({ page }) => {
     await page.goto("/vendors/corner-sourdough");
     await page.getByRole("button", { name: "Add" }).first().click();
-    await page.goto("/cart");
+    // Client-side nav — page.goto would hard-reload and wipe the in-memory
+    // cart state before this test ever sees the added item.
+    await page.getByRole("link", { name: "Cart" }).click();
 
     const checkout = page.getByRole("button", { name: /checkout/i });
 

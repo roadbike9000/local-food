@@ -8,7 +8,10 @@ test.describe("payment flow", () => {
     await page.goto("/vendors/corner-sourdough");
     await page.getByRole("button", { name: "Add" }).first().click();
 
-    await page.goto("/cart");
+    // Use a client-side nav (not page.goto) — the cart lives in in-memory
+    // React state only, and a hard navigation would reload the page and
+    // wipe it before this test ever sees the item.
+    await page.getByRole("link", { name: "Cart" }).click();
     await page.getByPlaceholder(/your name/i).fill("Test Customer");
     await page.getByPlaceholder(/mobile number/i).fill("+15005550006");
 
