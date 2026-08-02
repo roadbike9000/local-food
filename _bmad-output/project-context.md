@@ -54,6 +54,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Cart is single-vendor by design (`CartProvider.tsx`) — adding an item from a different vendor **replaces** the cart, it doesn't merge. Don't "fix" this as a bug
 - Providers (`ClerkProvider`, `CartProvider`) live in root `layout.tsx`, wrapping everything — new app-wide providers go here, not in individual pages
 - Tailwind only — no CSS modules/styled-components; utility classes inline in JSX (e.g. `className="mt-1 text-stone-600"`)
+- `middleware.ts` lives in `src/` (`src/middleware.ts`), not the project root — this app uses the `src/` directory convention, and Next.js/Clerk won't detect middleware placed at the root. A root-level copy previously caused `auth()` to fail silently on `/dashboard`; don't reintroduce one
 
 ### Testing Rules
 
