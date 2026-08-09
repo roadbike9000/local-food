@@ -14,7 +14,8 @@
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:auth": "tsx playwright/support/generate-vendor-auth.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

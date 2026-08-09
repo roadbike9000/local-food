@@ -16,6 +16,7 @@ next-env.d.ts
 /test-results/
 /blob-report/
 /playwright/.cache/
+/playwright/.auth/
 
 # prisma
 # (keep schema + migrations in git; ignore local sqlite if any)
