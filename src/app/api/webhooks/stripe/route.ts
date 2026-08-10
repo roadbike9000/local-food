@@ -14,7 +14,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
-import { sendSms, orderConfirmedMessage } from "@/lib/twilio";
+import { sendSms, orderConfirmedMessage } from "@/lib/sms";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 

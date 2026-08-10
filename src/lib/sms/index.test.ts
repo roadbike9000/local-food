@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderConfirmedMessage } from "./twilio";
+import { orderConfirmedMessage } from "./index";
 
 describe("orderConfirmedMessage", () => {
   it("includes the vendor name and the last 6 characters of the order id", () => {

@@ -20,4 +20,19 @@ test.describe("sms / contact fields", () => {
     await page.getByPlaceholder(/mobile number/i).fill("+15005550006");
     await expect(checkout).toBeEnabled();
   });
+
+  // NOTE: this only checks the debug endpoint's wiring/shape. Asserting an
+  // actual order-confirmation message was recorded (phone + content) needs a
+  // signed Stripe webhook to drive checkout.session.completed end to end, and
+  // this branch has no such test helper yet — see payment.spec.ts, which
+  // stops at the redirect to Stripe for the same reason.
+  test("debug SMS endpoint exposes mock-sent messages outside production", async ({
+    request,
+  }) => {
+    const response = await request.get("/api/debug/sms");
+    expect(response.ok()).toBeTruthy();
+
+    const body = await response.json();
+    expect(Array.isArray(body.messages)).toBe(true);
+  });
 });
