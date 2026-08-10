@@ -15,4 +15,11 @@ test.describe("auth", () => {
     // Clerk middleware should bounce us to the sign-in flow.
     await expect(page).toHaveURL(/sign-in/);
   });
+
+  test("sign-up page renders", async ({ page }) => {
+    await page.goto("/sign-up");
+    // Same shallow "URL held" pattern as the sign-in test — Clerk owns the
+    // widget internals.
+    await expect(page).toHaveURL(/sign-up/);
+  });
 });

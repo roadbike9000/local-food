@@ -16,10 +16,14 @@ export function AddSlotForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Capture the form element now — event.currentTarget becomes null after
+    // the `await` below, since React only keeps it valid during the
+    // synchronous dispatch of the event.
+    const form = event.currentTarget;
     setSubmitting(true);
     setError(null);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const startsAtLocal = String(formData.get("startsAt") ?? "");
     const endsAtLocal = String(formData.get("endsAt") ?? "");
     const capacity = Number(formData.get("capacity"));
@@ -61,7 +65,7 @@ export function AddSlotForm() {
         return;
       }
 
-      event.currentTarget.reset();
+      form.reset();
       setOpen(false);
       router.refresh();
     } catch {

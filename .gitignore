@@ -40,3 +40,6 @@ tsconfig.tsbuildinfo
 
 # claude code local settings (per-machine, not shared)
 .claude/settings.local.json
+
+# local scratch notes
+/status.md

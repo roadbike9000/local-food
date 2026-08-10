@@ -30,4 +30,17 @@ test.describe("payment flow", () => {
     await page.waitForURL(/checkout\.stripe\.com/, { timeout: 15_000 });
     await expect(page).toHaveURL(/stripe\.com/);
   });
+
+  test("checkout success page renders", async ({ page }) => {
+    // The page itself is static (order confirmation happens server-side via
+    // the webhook, not by reading a query param here) — no order fixture
+    // needed, just confirm Stripe's success_url target renders correctly.
+    await page.goto("/checkout/success");
+    await expect(
+      page.getByRole("heading", { name: /thank you/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/we'll text you when it's ready for pickup/i),
+    ).toBeVisible();
+  });
 });

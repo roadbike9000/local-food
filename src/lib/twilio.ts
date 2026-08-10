@@ -14,17 +14,25 @@ const fromNumber = process.env.TWILIO_FROM_NUMBER;
 const client =
   accountSid && authToken ? twilio(accountSid, authToken) : null;
 
-export async function sendSms(to: string, body: string): Promise<void> {
+/**
+ * Returns whether the SMS was actually sent (or intentionally skipped in
+ * dev-mode without credentials). Callers that gate state on delivery — e.g.
+ * the Stripe webhook's `smsNotified` flag — must check this rather than
+ * assuming success, since a Twilio failure must not be treated as sent.
+ */
+export async function sendSms(to: string, body: string): Promise<boolean> {
   if (!client || !fromNumber) {
     console.log(`[twilio:disabled] would send to ${to}: ${body}`);
-    return;
+    return true;
   }
 
   try {
     await client.messages.create({ to, from: fromNumber, body });
+    return true;
   } catch (err) {
     // Don't let an SMS failure break the order flow — just report it.
     console.error("[twilio] failed to send SMS", err);
+    return false;
   }
 }
 

@@ -5,9 +5,9 @@
  *   POST /api/pickup-slots     -> create a slot
  */
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVendor } from "@/lib/vendor";
+import { CreateSlotSchema } from "./schema";
 
 export async function GET() {
   const vendor = await getCurrentVendor();
@@ -21,17 +21,6 @@ export async function GET() {
   });
   return NextResponse.json({ slots });
 }
-
-const CreateSlotSchema = z
-  .object({
-    startsAt: z.string().datetime(),
-    endsAt: z.string().datetime(),
-    capacity: z.number().int().positive().default(20),
-    location: z.string().optional(),
-  })
-  .refine((d) => new Date(d.endsAt) > new Date(d.startsAt), {
-    message: "endsAt must be after startsAt",
-  });
 
 export async function POST(req: Request) {
   const vendor = await getCurrentVendor();

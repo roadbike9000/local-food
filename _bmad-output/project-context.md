@@ -58,8 +58,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 ### Testing Rules
 
-- Playwright e2e only — **no unit test runner is configured** (no Jest/Vitest). Don't invent unit test files unless explicitly asked to add that infra
-- Tests live flat in `tests/*.spec.ts`, one file per feature area (`auth`, `payment`, `sms`, `dashboard`, `homepage`, `storefront-cart`) — not mirrored to `src/` structure
+- Playwright for e2e/API-level specs, Vitest for unit tests (added 2026-08-09) — the two are kept fully separate (see below), never both scanning the same files
+- E2E tests live flat in `tests/*.spec.ts`, one file per feature area (`auth`, `payment`, `sms`, `dashboard`, `homepage`, `storefront-cart`, `checkout-api`, `webhooks`) — not mirrored to `src/` structure. `tests/helpers/` holds shared Prisma/Stripe-webhook test utilities
+- Unit tests are co-located next to their source as `src/**/*.test.ts` (e.g. `src/lib/utils.test.ts`) — reserved for pure functions/helpers (formatting, message builders); anything needing Prisma/Clerk/a running server belongs in the Playwright suite instead. `vitest.config.mts` scopes Vitest to `src/**/*.test.ts` only, so it never touches `tests/`; Playwright's `testDir` is `./tests` only, so it never touches `src/`. Run with `npm run test:unit`
 - Tests assume seeded data exists (`npm run db:seed`) — e.g. `payment.spec.ts` navigates to `/vendors/corner-sourdough`, a seeded vendor slug
 - No mocking of Stripe/Clerk/Twilio — tests hit real dev-mode services and gracefully `test.skip()` when required env keys aren't configured (see `payment.spec.ts`), rather than mocking the response
 - Assert on URL/behavior, not third-party widget internals — e.g. auth test checks `toHaveURL(/sign-in/)`, not Clerk's form DOM (survives Clerk version bumps)

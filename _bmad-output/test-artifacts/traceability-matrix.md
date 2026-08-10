@@ -29,6 +29,8 @@ tempCoverageMatrixPath: 'n/a — computed inline, no formal requirements exist t
 
 Note: This workflow does not generate tests. If gaps exist, run `bmad-testarch-atdd` or `bmad-testarch-automate` to create coverage.
 
+> **2026-08-09, later same day — `automate` run closed all 15 remaining items** in the table below (10 P0 + 5 P1: J-04, J-05, J-07, J-08, J-09, J-10, J-11, J-12). Full details, including two real production bugs the new tests caught and fixed, are in [automation-summary.md](automation-summary.md)'s "Run 2" section. The coverage numbers and gate decision on this page are **not yet refreshed** — they still reflect the pre-automate state. Re-run `bmad-testarch-trace` for an authoritative updated Phase 1/Phase 2 result.
+
 ## Oracle Resolution
 
 No formal requirements exist for this project (no story files, PRD, test-design doc, or OpenAPI/contract spec under `_bmad-output/`). Per the resolution order (formal requirements → contract/spec → external pointers → synthetic), I inferred **12 user journeys** directly from the route tree (`src/app/**`), the auth matcher (`src/middleware.ts`), and the explicit business rules in `project-context.md` ("Critical Don't-Miss Rules" section in particular — those map almost one-to-one onto real coverage gaps below).

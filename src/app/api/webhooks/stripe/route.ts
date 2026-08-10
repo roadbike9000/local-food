@@ -49,16 +49,20 @@ export async function POST(req: Request) {
         include: { vendor: true },
       });
 
-      // Notify the customer once.
+      // Notify the customer once. Only record it as notified if the SMS
+      // actually sent — a Twilio failure must not mark this done, or the
+      // customer never gets retried.
       if (!order.smsNotified) {
-        await sendSms(
+        const sent = await sendSms(
           order.customerPhone,
           orderConfirmedMessage(order.vendor.name, order.id),
         );
-        await prisma.order.update({
-          where: { id: order.id },
-          data: { smsNotified: true },
-        });
+        if (sent) {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: { smsNotified: true },
+          });
+        }
       }
     }
   }

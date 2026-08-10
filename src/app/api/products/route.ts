@@ -7,9 +7,9 @@
  * Auth is enforced by loading the vendor tied to the current Clerk user.
  */
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVendor } from "@/lib/vendor";
+import { CreateProductSchema } from "./schema";
 
 export async function GET() {
   const vendor = await getCurrentVendor();
@@ -23,13 +23,6 @@ export async function GET() {
   });
   return NextResponse.json({ products });
 }
-
-const CreateProductSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  priceCents: z.number().int().positive(),
-  imageUrl: z.string().url().optional(),
-});
 
 export async function POST(req: Request) {
   const vendor = await getCurrentVendor();

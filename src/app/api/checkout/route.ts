@@ -8,24 +8,9 @@
  * We look up prices from OUR database (never trust prices sent by the browser).
  */
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
-
-// Validate the request body shape. If it doesn't match, we reject early.
-const CheckoutSchema = z.object({
-  vendorId: z.string().min(1),
-  customerName: z.string().min(1),
-  customerPhone: z.string().min(5),
-  items: z
-    .array(
-      z.object({
-        productId: z.string().min(1),
-        quantity: z.number().int().positive(),
-      }),
-    )
-    .min(1),
-});
+import { CheckoutSchema } from "./schema";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);

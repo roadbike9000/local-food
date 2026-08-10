@@ -1,6 +1,11 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "@playwright/test";
+import {
+  getVendorBySlug,
+  deleteProductByName,
+  deletePickupSlotByLocation,
+} from "./helpers/db";
 
 // The dashboard is auth-protected. Without a session, all tabs redirect to
 // sign-in.
@@ -75,5 +80,88 @@ test.describe("vendor dashboard (authenticated)", () => {
     const names = products.map((p: { name: string }) => p.name);
     expect(names).not.toContain("Heirloom Tomato Box");
     expect(names).not.toContain("Salad Greens Bag");
+  });
+
+  test("vendor's pickup-slots API never returns another vendor's slots", async ({
+    page,
+  }) => {
+    await page.goto("/dashboard");
+    const response = await page.request.get("/api/pickup-slots");
+    expect(response.status()).toBe(200);
+
+    const { slots } = await response.json();
+    const locations = slots.map((s: { location: string | null }) => s.location);
+    // Green Valley Produce's seeded slot (prisma/seed.ts) must never leak here.
+    expect(locations).not.toContain("Farmers Market, Stall 7");
+  });
+
+  test("vendor sees their own orders tab", async ({ page }) => {
+    await page.goto("/dashboard/orders");
+    await expect(page.getByRole("heading", { name: "Orders" })).toBeVisible();
+  });
+
+  test("vendor sees their own pickups tab", async ({ page }) => {
+    await page.goto("/dashboard/pickups");
+    await expect(
+      page.getByRole("heading", { name: "Pickup slots" }),
+    ).toBeVisible();
+    // Seeded slot for Corner Sourdough (prisma/seed.ts).
+    await expect(page.getByText("12 Market St")).toBeVisible();
+  });
+
+  test("vendor can add a new product", async ({ page }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const productName = `Playwright Product ${Date.now()}`;
+
+    try {
+      await page.goto("/dashboard/products");
+      await page.getByRole("button", { name: "Add product" }).click();
+
+      await page.getByLabel("Name").fill(productName);
+      await page.getByLabel("Price (USD)").fill("4.50");
+
+      // Network-first: register the response listener before the click that
+      // triggers it, then wait on the create request itself. A second,
+      // unawaited round trip follows (the form's router.refresh() re-fetching
+      // the server component), so the final assertion still needs a longer
+      // timeout than the default under parallel test-run load.
+      await Promise.all([
+        page.waitForResponse("**/api/products"),
+        page.getByRole("button", { name: "Save product" }).click(),
+      ]);
+
+      await expect(page.getByText(productName)).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await deleteProductByName(vendor.id, productName);
+    }
+  });
+
+  test("vendor can add a new pickup slot", async ({ page }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const location = `Playwright Dock ${Date.now()}`;
+
+    try {
+      await page.goto("/dashboard/pickups");
+      await page.getByRole("button", { name: "Add slot" }).click();
+
+      const starts = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const ends = new Date(starts.getTime() + 60 * 60 * 1000);
+      const toLocal = (d: Date) => d.toISOString().slice(0, 16);
+
+      await page.locator("#startsAt").fill(toLocal(starts));
+      await page.locator("#endsAt").fill(toLocal(ends));
+      await page.getByLabel("Location").fill(location);
+
+      // Network-first (see the analogous product-creation test above, same
+      // reasoning for the longer timeout on the final assertion).
+      await Promise.all([
+        page.waitForResponse("**/api/pickup-slots"),
+        page.getByRole("button", { name: "Save slot" }).click(),
+      ]);
+
+      await expect(page.getByText(location)).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await deletePickupSlotByLocation(vendor.id, location);
+    }
   });
 });
