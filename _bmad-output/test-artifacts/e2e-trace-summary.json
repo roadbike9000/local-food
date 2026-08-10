@@ -1,0 +1,85 @@
+{
+  "schema_version": "0.1.0",
+  "snapshot_at": "2026-08-10T00:00:00.000Z",
+  "repo": "local-food",
+  "collection_mode": "executed",
+  "collection_status": "COLLECTED",
+  "inventory_basis": "user_journeys",
+  "gate_basis": "priority_thresholds",
+  "source_sha": "",
+  "target": { "type": "release", "id": null, "label": "local-food (suite-wide, synthetic oracle)" },
+  "decision_mode": "deterministic",
+  "evaluator": "Jeff",
+  "confidence": "medium",
+  "oracle": {
+    "resolution_mode": "synthetic_source",
+    "confidence": "medium",
+    "sources": ["_bmad-output/project-context.md", "src/app route tree", "src/middleware.ts"],
+    "external_pointer_status": "not_used",
+    "synthetic": true
+  },
+  "coverage": {
+    "inventory": { "covered": 12, "total": 12, "pct": 100 },
+    "priority_breakdown": {
+      "P0": { "total": 5, "covered": 5, "pct": 100 },
+      "P1": { "total": 7, "covered": 7, "pct": 100 },
+      "P2": { "total": 0, "covered": 0, "pct": 100 },
+      "P3": { "total": 0, "covered": 0, "pct": 100 }
+    },
+    "by_level": {
+      "e2e": { "tests": 24, "criteria_covered": 11 },
+      "api": { "tests": 8, "criteria_covered": 4 },
+      "component": { "tests": 0, "criteria_covered": 0 },
+      "unit": { "tests": 28, "criteria_covered": 0 },
+      "other": { "tests": 0, "criteria_covered": 0 }
+    }
+  },
+  "tests": { "files": 13, "cases": 60, "skipped_cases": 0, "fixme_cases": 0, "pending_cases": 0 },
+  "risk_summary": { "critical_open": 0, "high_open": 0, "medium_open": 0, "low_open": 0 },
+  "heuristics": {
+    "endpoint_gaps": 0,
+    "auth_negative_path_status": "present",
+    "error_path_status": "present",
+    "ui_journey_status": "present",
+    "ui_state_status": "present"
+  },
+  "blockers": [],
+  "execution_evidence": {
+    "unit_run": { "command": "npm run test:unit", "result": "28/28 passed" },
+    "e2e_run": {
+      "command": "npx playwright test",
+      "result": "31/32 passed, 1 skipped (env-gated: Twilio not configured in this dev environment)",
+      "flake_found_and_fixed": "tests/storefront-cart.spec.ts:7 — /cart first-hit route-compile race under parallel load; extended assertion timeout to 15s",
+      "heuristic_gaps_closed": [
+        "tests/storefront-cart.spec.ts:50 — cart-side error state (J-02): checkout against an item that went unavailable after being added to the cart",
+        "tests/dashboard.spec.ts:188 — AddSlotForm validation-error state (endsAt before startsAt)",
+        "tests/dashboard.spec.ts:217 — AddProductForm error state (401/session-expired, via route interception)"
+      ],
+      "dead_code_finding": "AddProductForm's client-side price guard (priceCents <= 0) was unreachable via real UI interaction — native required/min=\"0.01\" constraints on the input already blocked submission for any value that would trip it. Removed at user's request; no test covered it, so none needed removal."
+    }
+  },
+  "recommendations": [
+    { "priority": "MEDIUM", "action": "Have the 12 inferred journeys confirmed by a PM/team member to raise oracle confidence to high and unlock PASS", "requirements": ["J-01","J-02","J-03","J-04","J-05","J-06","J-07","J-08","J-09","J-10","J-11","J-12"] },
+    { "priority": "MEDIUM", "action": "Burn-in the suite (repeat runs) before treating it as CI-gate-ready — only limited execution's worth of flakiness data exists", "requirements": [] },
+    { "priority": "LOW", "action": "Run /bmad:tea:test-review to assess test quality of the tests added since the last review", "requirements": [] }
+  ],
+  "links": {
+    "trace_report_path": "_bmad-output/test-artifacts/traceability-matrix.md",
+    "trace_report_url": "",
+    "artifact_url": "",
+    "journey_evidence_url": ""
+  },
+  "gate_status": "CONCERNS",
+  "gate_criteria": {
+    "p0_coverage_required": "100%",
+    "p0_coverage_actual": "100%",
+    "p0_status": "MET",
+    "p1_coverage_target": "90%",
+    "p1_coverage_minimum": "80%",
+    "p1_coverage_actual": "100%",
+    "p1_status": "MET",
+    "overall_coverage_minimum": "80%",
+    "overall_coverage_actual": "100%",
+    "overall_status": "MET"
+  }
+}

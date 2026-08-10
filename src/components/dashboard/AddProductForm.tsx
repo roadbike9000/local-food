@@ -29,12 +29,6 @@ export function AddProductForm() {
     const priceDollars = String(formData.get("priceDollars") ?? "");
     const priceCents = Math.round(Number(priceDollars) * 100);
 
-    if (!Number.isFinite(priceCents) || priceCents <= 0) {
-      setError("Enter a valid price.");
-      setSubmitting(false);
-      return;
-    }
-
     try {
       const res = await fetch("/api/products", {
         method: "POST",

@@ -5,6 +5,8 @@ import {
   getVendorBySlug,
   deleteProductByName,
   deletePickupSlotByLocation,
+  createTestOrder,
+  deleteOrder,
 } from "./helpers/db";
 
 // The dashboard is auth-protected. Without a session, all tabs redirect to
@@ -100,6 +102,24 @@ test.describe("vendor dashboard (authenticated)", () => {
     await expect(page.getByRole("heading", { name: "Orders" })).toBeVisible();
   });
 
+  test("vendor sees their own orders, never another vendor's", async ({
+    page,
+  }) => {
+    const otherVendor = await getVendorBySlug("green-valley-produce");
+    const otherCustomerName = `Isolation Check Customer ${Date.now()}`;
+    const order = await createTestOrder(otherVendor.id, {
+      customerName: otherCustomerName,
+    });
+
+    try {
+      await page.goto("/dashboard/orders");
+      await expect(page.getByRole("heading", { name: "Orders" })).toBeVisible();
+      await expect(page.getByText(otherCustomerName)).not.toBeVisible();
+    } finally {
+      await deleteOrder(order.id);
+    }
+  });
+
   test("vendor sees their own pickups tab", async ({ page }) => {
     await page.goto("/dashboard/pickups");
     await expect(
@@ -163,5 +183,64 @@ test.describe("vendor dashboard (authenticated)", () => {
     } finally {
       await deletePickupSlotByLocation(vendor.id, location);
     }
+  });
+
+  test("add-slot form shows a validation error when the end time is before the start time", async ({
+    page,
+  }) => {
+    await page.goto("/dashboard/pickups");
+    await page.getByRole("button", { name: "Add slot" }).click();
+
+    // endsAt <= startsAt has no native HTML constraint on datetime-local
+    // inputs, so this is a real client-side validation branch (unlike
+    // AddProductForm's price check, which native `min`/`required` already
+    // blocks before the JS handler ever runs).
+    const starts = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const ends = new Date(starts.getTime() - 60 * 60 * 1000); // 1h before starts
+    const toLocal = (d: Date) => d.toISOString().slice(0, 16);
+
+    await page.locator("#startsAt").fill(toLocal(starts));
+    await page.locator("#endsAt").fill(toLocal(ends));
+    await page.getByRole("button", { name: "Save slot" }).click();
+
+    await expect(
+      page.getByText("End time must be after start time."),
+    ).toBeVisible();
+    // The form never submitted, so it's still showing "Save slot", not
+    // "Saving…" — confirms the client-side guard short-circuited before the
+    // network call.
+    await expect(
+      page.getByRole("button", { name: "Save slot" }),
+    ).toBeVisible();
+  });
+
+  test("add-product form shows an error when the session has expired", async ({
+    page,
+  }) => {
+    // AddProductForm's own client-side price guard is unreachable through
+    // real UI interaction (the input's native `required`/`min="0.01"`
+    // constraints already block submission for any value that would trip
+    // it), so the 401 branch is the meaningful, reachable error-state path
+    // for this form — and a realistic one (session expiring mid-form-fill).
+    await page.route("**/api/products", (route) => {
+      if (route.request().method() === "POST") {
+        return route.fulfill({
+          status: 401,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Unauthorized" }),
+        });
+      }
+      return route.continue();
+    });
+
+    await page.goto("/dashboard/products");
+    await page.getByRole("button", { name: "Add product" }).click();
+    await page.getByLabel("Name").fill("Session Expiry Check");
+    await page.getByLabel("Price (USD)").fill("4.50");
+    await page.getByRole("button", { name: "Save product" }).click();
+
+    await expect(
+      page.getByText("Your session expired. Sign in again."),
+    ).toBeVisible();
   });
 });

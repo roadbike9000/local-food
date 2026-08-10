@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.1.0",
+  "evaluated_at": "2026-08-10T00:00:00.000Z",
+  "repo": "local-food",
+  "target": { "type": "release", "id": null, "label": "local-food (suite-wide, synthetic oracle)" },
+  "collection_status": "COLLECTED",
+  "gate_basis": "priority_thresholds",
+  "gate_status": "CONCERNS",
+  "rationale": "P0 100%, P1 100%, overall 100% — all coverage thresholds meet PASS criteria. Capped at CONCERNS because the oracle is synthetic (inferred journeys, not team-confirmed) at medium confidence. This is a confidence statement, not a coverage gap: 0 P0/P1 journeys are uncovered or partial.",
+  "p0_status": "MET",
+  "p1_status": "MET",
+  "overall_status": "MET",
+  "critical_open": 0,
+  "links": {
+    "trace_report_path": "_bmad-output/test-artifacts/traceability-matrix.md",
+    "trace_report_url": "",
+    "artifact_url": "",
+    "journey_evidence_url": ""
+  }
+}
