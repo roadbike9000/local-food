@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2]
+stepsCompleted: [1, 2, "3-epic1"]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-local-food-2026-08-10/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-local-food-2026-08-10/ARCHITECTURE-SPINE.md
@@ -79,3 +79,102 @@ Admin can onboard and deactivate vendors on the platform without touching the da
 ### Epic 3: Admin Inventory Oversight
 Admin can see stock levels across all vendors on demand and gets an SMS alert before something sells out. Builds on Epic 1 (needs `stockQuantity` to exist) and Epic 2 (needs Admin identity/gating) — both prior epics.
 **FRs covered:** FR9, FR10
+
+## Epic 1: Accurate Stock & Cart
+
+Customers only see and buy what's actually in stock, cart totals are always right, and vendors are told when their stock number is still a migration placeholder. Standalone — no admin dependency.
+
+### Story 1.1: Verify cart line removal and total accuracy
+
+As a customer,
+I want to remove an item from my cart and see the total update correctly,
+So that I only pay for what I actually want.
+
+**Acceptance Criteria:**
+
+**Given** a cart with 2+ line items
+**When** I remove one line
+**Then** it disappears immediately and the total recalculates to the sum of remaining lines (no tax/shipping)
+**And** removing the last item returns the cart to its empty state
+
+*(Verification/regression task — `CartProvider.removeItem` already implements this; no new code expected, write the test. FR1.)*
+
+### Story 1.2: Stock Quantity captured at creation, backfilled for existing products
+
+As a vendor,
+I want to set how many units of a product I have,
+So that the system knows my real stock.
+
+**Acceptance Criteria:**
+
+**Given** the vendor's `AddProductForm`
+**When** they create a new product
+**Then** Stock Quantity is a required field — no product can be created without one
+**And** on migration, every existing product with `isAvailable: true` is backfilled to 100, every `isAvailable: false` product to 0 (`PLACEHOLDER_STOCK_QUANTITY` constant, AD-9)
+**And** Low-Stock Threshold is likewise captured per-product at creation
+
+*(FR12.)*
+
+### Story 1.3: Out-of-stock products are marked and blocked
+
+As a customer,
+I want to see when something's sold out and be stopped from ordering it,
+So that I never pay for something unavailable.
+
+**Acceptance Criteria:**
+
+**Given** a product with Stock Quantity 0
+**When** it's shown on the storefront (listing or detail)
+**Then** a visible out-of-stock badge renders and "add to cart" is disabled
+**And** `isAvailable` is dropped from the schema — availability is computed as `stockQuantity > 0` at every read site, including `src/app/dashboard/products/page.tsx`
+**And** checkout re-validates `stockQuantity >= requestedQuantity` per line server-side and rejects the whole order if any line is short, regardless of client state
+
+*(FR6, FR7, AD-2.)*
+
+### Story 1.4: Inventory decrements immediately on sale completion
+
+As the platform,
+I want stock to drop the moment a sale is confirmed,
+So that inventory never says "in stock" when it isn't.
+
+**Acceptance Criteria:**
+
+**Given** a Stripe webhook confirms payment
+**When** the order is marked paid
+**Then** each line item's Stock Quantity decrements through `adjustStock()` (conditional update, never negative)
+**And** a multi-item order's decrements happen inside one transaction — all succeed or none do
+**And** two customers racing for the last unit resolve to exactly one success, one rejection
+**And** stock never decrements at checkout-session creation — only on confirmed payment
+
+*(FR8, AD-3, NFR1.)*
+
+### Story 1.5: Cart quantity stepper
+
+As a customer,
+I want to bump a cart line's quantity up or down directly,
+So that I don't have to remove and re-add it.
+
+**Acceptance Criteria:**
+
+**Given** a cart line
+**When** I use the stepper
+**Then** quantity moves between a floor of 1 and a ceiling of that product's Stock Quantity, and the total recalculates on every change
+**And** the client-side ceiling is a UX hint only — checkout's server-side sufficiency check (Story 1.3) is still the sole enforcement point
+
+*(FR11.)*
+
+### Story 1.6: Vendor notified of placeholder Stock Quantity
+
+As a vendor,
+I want to know which of my products still has a migration-placeholder count,
+So that I can enter the real number.
+
+**Acceptance Criteria:**
+
+**Given** a product whose Stock Quantity still equals `PLACEHOLDER_STOCK_QUANTITY`
+**When** the vendor views `/dashboard/products`
+**Then** a banner/badge flags that row
+**And** the banner disappears the moment the vendor edits that product's Stock Quantity to any value
+**And** no SMS/email is sent — dashboard-only
+
+*(FR13, AD-9.)*
