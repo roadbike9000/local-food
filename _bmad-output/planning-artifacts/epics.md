@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, "3-epic1"]
+stepsCompleted: [1, 2, "3-epic1", "3-epic2"]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-local-food-2026-08-10/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-local-food-2026-08-10/ARCHITECTURE-SPINE.md
@@ -178,3 +178,55 @@ So that I can enter the real number.
 **And** no SMS/email is sent — dashboard-only
 
 *(FR13, AD-9.)*
+
+## Epic 2: Admin Vendor Lifecycle
+
+Admin can onboard and deactivate vendors on the platform without touching the database directly.
+
+### Story 2.1: Admin identity and access gating
+
+As the platform,
+I want a distinct Admin identity that gates admin-only routes and actions,
+So that only trusted operators can manage vendors and inventory.
+
+**Acceptance Criteria:**
+
+**Given** a new `Admin` table keyed by `clerkUserId`
+**When** a request hits any `/admin/*` route
+**Then** `getCurrentAdmin()` resolves identity via the `Admin` table only — never a Clerk session claim — and the route is registered in `middleware.ts`'s `isProtectedRoute` matcher
+**And** a signed-in user who is not in the `Admin` table is denied when hitting an `/admin/*` route or calling an admin action
+
+*(FR2, AD-1, AD-6.)*
+
+### Story 2.2: Admin adds a vendor
+
+As an admin,
+I want to onboard a new vendor onto the platform,
+So that they can start selling without self-registering.
+
+**Acceptance Criteria:**
+
+**Given** the admin vendor-creation form (`/admin/vendors`)
+**When** admin submits name, slug, and contact info
+**Then** a new `Vendor` record is created with `clerkUserId: null` (unbound until claimed, AD-8) and `createdByAdminId` set to the acting admin
+**And** a slug that collides with an existing vendor is rejected with a friendly error via `resolveVendorSlug()`, not a raw DB constraint failure
+**And** the new vendor gets a live storefront at `/vendors/{slug}`
+
+*(FR3, AD-5, AD-7, AD-8.)*
+
+### Story 2.3: Admin deactivates a vendor
+
+As an admin,
+I want to deactivate a vendor,
+So that they stop being orderable while their order history and fulfillment are preserved.
+
+**Acceptance Criteria:**
+
+**Given** an active vendor
+**When** admin deactivates them
+**Then** `Vendor.deletedAt` is set and `deletedByAdminId` records the acting admin, enforced through the shared `assertVendorActive()` guard (throws, never returns a boolean)
+**And** a customer visiting that vendor's storefront sees a "no longer available" message instead of listings, and checkout rejects any new order for that vendor's products
+**And** orders placed before deactivation, in any non-terminal status, continue their normal fulfillment lifecycle unchanged (pickup, SMS, status updates)
+**And** the vendor's Products remain queryable (not deleted) for order history and fulfillment — `onDelete: Cascade` is removed from `Vendor → Product` and `Vendor → Order`
+
+*(FR4, AD-4.)*
