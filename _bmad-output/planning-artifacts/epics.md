@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1]
+stepsCompleted: [1, 2]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-local-food-2026-08-10/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-local-food-2026-08-10/ARCHITECTURE-SPINE.md
@@ -53,8 +53,29 @@ None — no UX design contract exists for this feature set.
 
 ### FR Coverage Map
 
-{{requirements_coverage_map}}
+FR1: Epic 1 — cart line removal (verify, already implemented)
+FR6: Epic 1 — out-of-stock UI marking
+FR7: Epic 1 — out-of-stock blocks cart/checkout
+FR8: Epic 1 — post-sale stock decrement
+FR11: Epic 1 — cart quantity stepper
+FR12: Epic 1 — Stock Quantity creation + backfill
+FR13: Epic 1 — vendor placeholder-count notification
+FR2: Epic 2 — Admin identity/gating
+FR3: Epic 2 — admin adds vendor
+FR4: Epic 2 — admin deactivates vendor
+FR9: Epic 3 — admin inventory dashboard
+FR10: Epic 3 — low-stock SMS alert
 
 ## Epic List
 
-{{epics_list}}
+### Epic 1: Accurate Stock & Cart
+Customers only see and buy what's actually in stock, cart totals are always right, and vendors are told when their stock number is still a migration placeholder. Standalone — no admin dependency. FRs consolidated into one epic because they're tightly file-coupled around `Product.stockQuantity` / `adjustStock()` / checkout / cart / storefront.
+**FRs covered:** FR1, FR6, FR7, FR8, FR11, FR12, FR13
+
+### Epic 2: Admin Vendor Lifecycle
+Admin can onboard and deactivate vendors on the platform without touching the database directly. Includes the foundational Admin-identity/gating work as its first story.
+**FRs covered:** FR2, FR3, FR4
+
+### Epic 3: Admin Inventory Oversight
+Admin can see stock levels across all vendors on demand and gets an SMS alert before something sells out. Builds on Epic 1 (needs `stockQuantity` to exist) and Epic 2 (needs Admin identity/gating) — both prior epics.
+**FRs covered:** FR9, FR10
