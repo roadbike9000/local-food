@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, "3-epic1", "3-epic2"]
+stepsCompleted: [1, 2, "3-epic1", "3-epic2", "3-epic3"]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-local-food-2026-08-10/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-local-food-2026-08-10/ARCHITECTURE-SPINE.md
@@ -230,3 +230,41 @@ So that they stop being orderable while their order history and fulfillment are 
 **And** the vendor's Products remain queryable (not deleted) for order history and fulfillment — `onDelete: Cascade` is removed from `Vendor → Product` and `Vendor → Order`
 
 *(FR4, AD-4.)*
+
+## Epic 3: Admin Inventory Oversight
+
+Admin can see stock levels across all vendors on demand and gets an SMS alert before something sells out. Builds on Epic 1 (`stockQuantity` must exist) and Epic 2 (Admin identity/gating must exist).
+
+### Story 3.1: Admin inventory dashboard
+
+As an admin,
+I want to see current stock levels across all vendors,
+So that I can spot problems without asking each vendor.
+
+**Acceptance Criteria:**
+
+**Given** an admin is signed in
+**When** they visit `/admin/inventory`
+**Then** the page shows current Stock Quantity per product across all vendors, computed live at request time (Server Component fetch, no caching staleness)
+**And** any product at or below its Low-Stock Threshold, or at 0, is visually flagged
+**And** a non-admin visiting `/admin/inventory` is denied (reuses Story 2.1's `getCurrentAdmin()` gate)
+
+*(FR9, AD-1, AD-6.)*
+
+### Story 3.2: Low-stock SMS alert to admin
+
+As an admin,
+I want a text when a product's stock crosses its low-stock threshold,
+So that I can act before it sells out.
+
+**Acceptance Criteria:**
+
+**Given** `Admin` gains a `phone` field (mirrors `Vendor.phone`) — required to actually deliver this story, missing from the original schema
+**And** a product's Stock Quantity crosses at or below its Low-Stock Threshold as part of a Story 1.4 decrement
+**When** `adjustStock()` reports the crossing as newly detected
+**Then** the caller sends an SMS to the admin's phone via the existing `sendSms` module
+**And** `lowStockAlerted` is set true only after the send succeeds — never before, mirroring the existing `smsNotified` pattern
+**And** a failed send leaves `lowStockAlerted` false — it is never marked delivered
+**And** further sales while stock stays below threshold do not trigger repeat alerts, until stock is restocked above threshold and crosses again
+
+*(FR10, AD-3, NFR3.)*

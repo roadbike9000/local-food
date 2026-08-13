@@ -113,6 +113,7 @@ erDiagram
 
     Admin {
         string clerkUserId UK
+        string phone "required for FR-10 SMS delivery, mirrors Vendor.phone"
     }
     Vendor {
         string clerkUserId UK "nullable - unbound until claimed, AD-8"
