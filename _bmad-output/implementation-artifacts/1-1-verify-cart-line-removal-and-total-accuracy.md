@@ -58,6 +58,13 @@ so that I only pay for what I actually want.
 - **No mocking:** this codebase's discipline (per `project-context.md`) is to hit real dev-mode services, never mock Stripe/Clerk/Twilio responses. This story doesn't touch any of those, but stay consistent with that principle if the test needs any setup.
 - **Cleanup:** this test shouldn't need any `try/finally` DB cleanup at all — cart state is client-side only, and it only *reads* the two pre-seeded products (via `getVendorBySlug`) without creating or mutating anything. That's simpler than the "unavailable products" test above it (which creates a fixture product and must `deleteProduct` it) or the "checkout shows an error" test (which mutates then restores `isAvailable` via `prisma.product.update`) — neither pattern is needed here.
 
+### ATDD Artifacts
+
+- Checklist: `_bmad-output/test-artifacts/atdd-checklist-1-1-verify-cart-line-removal-and-total-accuracy.md`
+- E2E tests: `tests/storefront-cart.spec.ts` (new `[P0] removing cart lines recalculates the total and empties the cart` test, currently `test.skip()` — red phase)
+- API tests: none (no API surface for this story)
+- Component tests: none (no component-testing infra in this repo)
+
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 1.1] — story definition, ACs, FR1 traceability.

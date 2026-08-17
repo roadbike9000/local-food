@@ -86,4 +86,104 @@ test.describe("storefront and cart", () => {
       });
     }
   });
+
+  test.skip("[P0] removing cart lines recalculates the total and empties the cart", async ({
+    page,
+  }) => {
+    // Red phase: this test doesn't exist yet, so per the ATDD workflow it
+    // ships skipped. Unlike a typical red phase, the underlying feature
+    // (Story 1.1) is already fully implemented (CartProvider.removeItem /
+    // cart/page.tsx) — once this skip is removed during dev-story, the test
+    // is expected to go green immediately against the current
+    // implementation. A red result after that point means a real
+    // regression, not a missing feature (see story Dev Notes: stop and
+    // report, don't patch around it).
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const productA = vendor.products.find(
+      (p) => p.name === "Classic Sourdough Loaf",
+    );
+    const productB = vendor.products.find((p) => p.name === "Seeded Rye");
+    if (!productA || !productB) {
+      throw new Error(
+        "Seed data missing 'Classic Sourdough Loaf' and/or 'Seeded Rye'",
+      );
+    }
+
+    const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+    // Every product card's "Add" button shares the accessible name "Add",
+    // so scope each click to the specific card: the div containing both
+    // this product's heading and an "Add" button, narrowed to the
+    // innermost match via .last() — ancestor wrapper divs also contain the
+    // same heading text and *some* "Add" button (just not necessarily this
+    // product's), so they'd otherwise stay in the candidate set too.
+    const productCard = (name: string) =>
+      page
+        .locator("div")
+        .filter({ has: page.getByRole("heading", { name, exact: true }) })
+        .filter({ has: page.getByRole("button", { name: "Add" }) })
+        .last();
+
+    // Cart lines render as <li> elements (implicit "listitem" role), so
+    // they can be scoped directly by role + text without the same
+    // disambiguation dance the storefront cards need.
+    const cartLine = (name: string) =>
+      page.getByRole("listitem").filter({ hasText: name });
+
+    // "Total" only appears in the cart summary row; .last() narrows to that
+    // specific div rather than the page-level wrapper div that also
+    // contains it transitively.
+    const totalRow = () =>
+      page.locator("div").filter({ hasText: "Total" }).last();
+
+    await page.goto("/vendors/corner-sourdough");
+    await expect(
+      page.getByRole("heading", { name: /corner sourdough/i }),
+    ).toBeVisible();
+
+    await productCard(productA.name)
+      .getByRole("button", { name: "Add" })
+      .click();
+    await productCard(productB.name)
+      .getByRole("button", { name: "Add" })
+      .click();
+
+    // /cart's first hit can lose the race against Next.js's on-demand route
+    // compile under parallel test load — same reasoning as the extended
+    // timeout on the other tests in this file.
+    await page.getByRole("link", { name: /cart/i }).click();
+    await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+
+    // AC #1 (setup): both lines present, total is the sum of both fetched
+    // seed prices — never hardcoded, so this can't drift from seed data.
+    await expect(page.getByText(productA.name)).toBeVisible();
+    await expect(page.getByText(productB.name)).toBeVisible();
+    await expect(
+      totalRow().getByText(
+        dollars(productA.priceCents + productB.priceCents),
+        { exact: true },
+      ),
+    ).toBeVisible();
+
+    // AC #1: remove one line via its "remove" button (a <button>, not a
+    // link) — it disappears immediately and the total recalculates to the
+    // sum of the remaining line only.
+    await cartLine(productA.name)
+      .getByRole("button", { name: "remove" })
+      .click();
+
+    await expect(page.getByText(productA.name)).not.toBeVisible();
+    await expect(page.getByText(productB.name)).toBeVisible();
+    await expect(
+      totalRow().getByText(dollars(productB.priceCents), { exact: true }),
+    ).toBeVisible();
+
+    // AC #2: remove the last remaining line — the cart returns to its
+    // empty state.
+    await cartLine(productB.name)
+      .getByRole("button", { name: "remove" })
+      .click();
+
+    await expect(page.getByText("Your cart is empty.")).toBeVisible();
+  });
 });
