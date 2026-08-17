@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1, 2, "3-epic1", "3-epic2", "3-epic3"]
+stepsCompleted: [1, 2, "3-epic1", "3-epic2", "3-epic3", 4]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-local-food-2026-08-10/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-local-food-2026-08-10/ARCHITECTURE-SPINE.md
@@ -146,7 +146,7 @@ So that inventory never says "in stock" when it isn't.
 **And** a multi-item order's decrements happen inside one transaction — all succeed or none do
 **And** two customers racing for the last unit resolve to exactly one success, one rejection
 **And** stock never decrements at checkout-session creation — only on confirmed payment
-**And** a post-payment shortfall (money captured, stock insufficient under a race) sends an SMS to the admin's phone via the same mechanism as Story 3.2's low-stock alert — no auto-refund, but the admin actually finds out, not just a silent flag nobody's watching
+**And** `decrementStock()` returns a shortfall result when a post-payment race leaves the order short (money captured, stock insufficient) — it never silently over-decrements or auto-refunds; actually notifying anyone about it is out of Epic 1's scope (no Admin exists yet at this point) and is completed by Story 3.2 once it does
 
 *(FR8, AD-3, NFR1.)*
 
@@ -268,5 +268,6 @@ So that I can act before it sells out.
 **And** `lowStockAlerted` is set true only after the send succeeds — never before, mirroring the existing `smsNotified` pattern
 **And** a failed send leaves `lowStockAlerted` false — it is never marked delivered
 **And** further sales while stock stays below threshold do not trigger repeat alerts, until stock is restocked above threshold and crosses again
+**And** a post-payment shortfall result from Story 1.4's `decrementStock()` (money captured, stock insufficient under a race) also triggers this same SMS mechanism to the admin's phone — closing the loop Epic 1 intentionally left open since Admin didn't exist yet at that point
 
-*(FR10, AD-3, NFR3.)*
+*(FR10, FR8's shortfall consequence, AD-3, NFR3.)*
