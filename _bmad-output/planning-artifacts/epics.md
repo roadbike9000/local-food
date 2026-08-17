@@ -42,9 +42,9 @@ NFR4: No new external dependency is introduced — Admin auth reuses Clerk, stoc
 - No starter template applies — brownfield app, existing Next.js 14 App Router codebase ratified as-is (Architecture Design Paradigm).
 - Prisma schema changes: new `Admin` model (`clerkUserId` unique); `Vendor` gains `deletedAt`, `createdByAdminId`, `deletedByAdminId`, and `clerkUserId` becomes nullable; `Product` gains `stockQuantity`, `lowStockThreshold`, `lowStockAlerted` and drops `isAvailable`; `Vendor → Product` and `Vendor → Order` drop `onDelete: Cascade` (AD-1, AD-2, AD-4, AD-5, AD-8).
 - Migration ordering constraint: `stockQuantity` must be backfilled for every existing Product *before* `isAvailable` is dropped (AD-2).
-- New `src/lib` service functions: `getCurrentAdmin()` (AD-1/AD-6), `adjustStock()` + `PLACEHOLDER_STOCK_QUANTITY` constant (AD-3/AD-9), `assertVendorActive()` (AD-4, throws `VendorDeactivatedError`), `resolveVendorSlug()` (AD-7).
+- New `src/lib` service functions: `getCurrentAdmin()` (AD-1/AD-6), `decrementStock()` + `setStock()` + `PLACEHOLDER_STOCK_QUANTITY` constant (AD-3/AD-9), `assertVendorActive()` (AD-4, throws `VendorDeactivatedError`), `resolveVendorSlug()` (AD-7).
 - New route tree `src/app/admin/**` (`vendors/`, `inventory/`), separate from vendor's `src/app/dashboard/**`; every new admin route must be added to `middleware.ts`'s `isProtectedRoute` matcher (AD-6).
-- Existing routes requiring modification: `src/app/api/checkout/route.ts` (stock sufficiency check, `assertVendorActive()`), `src/app/api/webhooks/*` (call `adjustStock()` on payment confirmation), `src/app/dashboard/products/page.tsx` (drop direct `isAvailable` read, add FR-13 banner), storefront listing/detail pages (availability display).
+- Existing routes requiring modification: `src/app/api/checkout/route.ts` (stock sufficiency check, `assertVendorActive()`), `src/app/api/webhooks/*` (call `decrementStock()` on payment confirmation), `src/app/dashboard/products/page.tsx` (drop direct `isAvailable` read, add FR-13 banner, route stock edits through `setStock()`), storefront listing/detail pages (availability display).
 - Multi-item order stock decrements run inside one DB transaction — all lines succeed or none do; a post-payment shortfall is flagged for manual admin review, not auto-resolved (AD-3, Deferred: auto-refund out of scope).
 
 ### UX Design Requirements
@@ -69,7 +69,7 @@ FR10: Epic 3 — low-stock SMS alert
 ## Epic List
 
 ### Epic 1: Accurate Stock & Cart
-Customers only see and buy what's actually in stock, cart totals are always right, and vendors are told when their stock number is still a migration placeholder. Standalone — no admin dependency. FRs consolidated into one epic because they're tightly file-coupled around `Product.stockQuantity` / `adjustStock()` / checkout / cart / storefront.
+Customers only see and buy what's actually in stock, cart totals are always right, and vendors are told when their stock number is still a migration placeholder. Standalone — no admin dependency. FRs consolidated into one epic because they're tightly file-coupled around `Product.stockQuantity` / `src/lib/inventory.ts` / checkout / cart / storefront.
 **FRs covered:** FR1, FR6, FR7, FR8, FR11, FR12, FR13
 
 ### Epic 2: Admin Vendor Lifecycle
@@ -112,8 +112,9 @@ So that the system knows my real stock.
 **Then** Stock Quantity is a required field — no product can be created without one
 **And** on migration, every existing product with `isAvailable: true` is backfilled to 100, every `isAvailable: false` product to 0 (`PLACEHOLDER_STOCK_QUANTITY` constant, AD-9)
 **And** Low-Stock Threshold is likewise captured per-product at creation
+**And** the vendor editing an existing product's Stock Quantity goes through `setStock()` — a conditional update guarded against the value the form last loaded, never a bare write — so a concurrent sale decrementing the same product can't be silently clobbered by the vendor's edit
 
-*(FR12.)*
+*(FR12, AD-3.)*
 
 ### Story 1.3: Out-of-stock products are marked and blocked
 
@@ -141,10 +142,11 @@ So that inventory never says "in stock" when it isn't.
 
 **Given** a Stripe webhook confirms payment
 **When** the order is marked paid
-**Then** each line item's Stock Quantity decrements through `adjustStock()` (conditional update, never negative)
+**Then** each line item's Stock Quantity decrements through `decrementStock()` (conditional update, never negative)
 **And** a multi-item order's decrements happen inside one transaction — all succeed or none do
 **And** two customers racing for the last unit resolve to exactly one success, one rejection
 **And** stock never decrements at checkout-session creation — only on confirmed payment
+**And** a post-payment shortfall (money captured, stock insufficient under a race) sends an SMS to the admin's phone via the same mechanism as Story 3.2's low-stock alert — no auto-refund, but the admin actually finds out, not just a silent flag nobody's watching
 
 *(FR8, AD-3, NFR1.)*
 
@@ -174,7 +176,7 @@ So that I can enter the real number.
 **Given** a product whose Stock Quantity still equals `PLACEHOLDER_STOCK_QUANTITY`
 **When** the vendor views `/dashboard/products`
 **Then** a banner/badge flags that row
-**And** the banner disappears the moment the vendor edits that product's Stock Quantity to any value
+**And** the banner disappears the moment the vendor edits that product's Stock Quantity to any value — via Story 1.2's `setStock()` path, same as any other vendor edit, no separate write mechanism for clearing this flag
 **And** no SMS/email is sent — dashboard-only
 
 *(FR13, AD-9.)*
@@ -261,7 +263,7 @@ So that I can act before it sells out.
 
 **Given** `Admin` gains a `phone` field (mirrors `Vendor.phone`) — required to actually deliver this story, missing from the original schema
 **And** a product's Stock Quantity crosses at or below its Low-Stock Threshold as part of a Story 1.4 decrement
-**When** `adjustStock()` reports the crossing as newly detected
+**When** `decrementStock()` reports the crossing as newly detected
 **Then** the caller sends an SMS to the admin's phone via the existing `sendSms` module
 **And** `lowStockAlerted` is set true only after the send succeeds — never before, mirroring the existing `smsNotified` pattern
 **And** a failed send leaves `lowStockAlerted` false — it is never marked delivered
