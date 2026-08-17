@@ -1,6 +1,10 @@
+---
+baseline_commit: b581db2eedb96c889cc0c95de798b7c92f85a594
+---
+
 # Story 1.1: Verify cart line removal and total accuracy
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -18,19 +22,19 @@ so that I only pay for what I actually want.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add a Playwright test proving line removal + total recalculation (AC: #1, #2)
-  - [ ] Add a new test to `tests/storefront-cart.spec.ts` (do not create a new spec file — this file already owns storefront/cart coverage)
-  - [ ] Fetch the seeded vendor's real products via `getVendorBySlug("corner-sourdough")` (same helper the "checkout shows an error" test above already uses) rather than hardcoding dollar amounts — read `priceCents` from the returned products so the total assertion can't drift from actual seed data
-  - [ ] Add 2 distinct products to cart — every product's "Add" button shares the accessible name "Add" (no per-product distinction by role/name), so scope each click to its product card, e.g. `page.locator(...).filter({ hasText: productName }).getByRole("button", { name: "Add" })`, not `.first()`/`.nth()` alone
-  - [ ] Assert the displayed total equals the sum of both fetched `priceCents` values
-  - [ ] Remove one line via its "remove" **button** (it's a `<button>` in `cart/page.tsx`, not a link — do not query `getByRole("link", ...)` for it)
-  - [ ] Assert that line is gone and the total now equals only the remaining item's price
-  - [ ] Remove the remaining line
-  - [ ] Assert the cart shows its empty state
-- [ ] Task 2: Confirm no source changes are needed (AC: #3)
-  - [ ] Run the new test against the current `CartProvider.removeItem` / `/cart` implementation, unmodified
-  - [ ] If it passes with zero source changes, the story is done — do not touch `CartProvider.tsx` or `cart/page.tsx`
-  - [ ] If it fails, treat that as a real regression bug (not expected) and stop — report the failure rather than silently patching around it, since this story's scope is verification only
+- [x] Task 1: Add a Playwright test proving line removal + total recalculation (AC: #1, #2)
+  - [x] Add a new test to `tests/storefront-cart.spec.ts` (do not create a new spec file — this file already owns storefront/cart coverage)
+  - [x] Fetch the seeded vendor's real products via `getVendorBySlug("corner-sourdough")` (same helper the "checkout shows an error" test above already uses) rather than hardcoding dollar amounts — read `priceCents` from the returned products so the total assertion can't drift from actual seed data
+  - [x] Add 2 distinct products to cart — every product's "Add" button shares the accessible name "Add" (no per-product distinction by role/name), so scope each click to its product card, e.g. `page.locator(...).filter({ hasText: productName }).getByRole("button", { name: "Add" })`, not `.first()`/`.nth()` alone
+  - [x] Assert the displayed total equals the sum of both fetched `priceCents` values
+  - [x] Remove one line via its "remove" **button** (it's a `<button>` in `cart/page.tsx`, not a link — do not query `getByRole("link", ...)` for it)
+  - [x] Assert that line is gone and the total now equals only the remaining item's price
+  - [x] Remove the remaining line
+  - [x] Assert the cart shows its empty state
+- [x] Task 2: Confirm no source changes are needed (AC: #3)
+  - [x] Run the new test against the current `CartProvider.removeItem` / `/cart` implementation, unmodified
+  - [x] If it passes with zero source changes, the story is done — do not touch `CartProvider.tsx` or `cart/page.tsx`
+  - [x] If it fails, treat that as a real regression bug (not expected) and stop — report the failure rather than silently patching around it, since this story's scope is verification only
 
 ## Dev Notes
 
@@ -77,8 +81,25 @@ so that I only pay for what I actually want.
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- Activated red-phase test (removed `test.skip()`) and ran solo: `npx playwright test tests/storefront-cart.spec.ts -g "removing cart lines"` → passed in 9.6s, first run, no source changes. Confirms the story's core premise (already-implemented, verification-only).
+- Ran full `storefront-cart.spec.ts` file (all 4 tests) → all pass, no regressions in the file this story touched.
+- `npm run typecheck` → clean. `npm run lint` → clean.
+- `npm run test:e2e` (full suite, 34 tests) → 24 passed, 10 failed. All 10 failures are in `tests/dashboard.spec.ts`'s `vendor dashboard (authenticated)` suite — a file this story never touches. Diagnosed root cause: `playwright/.auth/vendor.json` (Clerk vendor session storage state) is stale/expired (dated 2026-08-07). Attempted `npm run test:e2e:auth` to regenerate it — failed with `ERR_CONNECTION_REFUSED` because that script requires a dev server already running standalone (Playwright's `webServer` auto-start only applies inside `playwright test` runs, not this separate script). This is a pre-existing environment-setup gap, not a code regression: confirmed via `git diff --stat {baseline_commit}` that this story's entire diff is 2 files of documentation/tracking plus a 1-line change in `tests/storefront-cart.spec.ts` (`test.skip` → `test`) — nothing that could affect Clerk auth or the dashboard.
 
 ### Completion Notes List
 
+- Story confirmed its own premise: cart line removal and total recalculation were already fully implemented (`CartProvider.removeItem`, `totalCents` useMemo) — zero production code changed, exactly as scoped.
+- New Playwright test added to `tests/storefront-cart.spec.ts`, activated (skip removed), passes on first run against the existing implementation.
+- Full regression run surfaced 10 pre-existing failures unrelated to this story (stale vendor auth session in `dashboard.spec.ts`) — documented above, flagged to user, **not fixed here** since it's outside this story's scope and touches a different feature area (vendor dashboard auth) than what this story owns (cart). Recommend a follow-up story/task to regenerate/automate the vendor auth fixture.
+
 ### File List
+
+- `tests/storefront-cart.spec.ts` (modified — added and activated one test)
+
+## Change Log
+
+- 2026-08-18: Added `[P0] removing cart lines recalculates the total and empties the cart` to `tests/storefront-cart.spec.ts`, activated it, confirmed green on first run against the existing implementation. No production code changed. Full regression run surfaced 10 pre-existing, unrelated failures (stale vendor auth session in `dashboard.spec.ts`) — documented in Dev Agent Record, not addressed here (out of scope for this story).

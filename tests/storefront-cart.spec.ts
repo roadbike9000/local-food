@@ -87,7 +87,7 @@ test.describe("storefront and cart", () => {
     }
   });
 
-  test.skip("[P0] removing cart lines recalculates the total and empties the cart", async ({
+  test("[P0] removing cart lines recalculates the total and empties the cart", async ({
     page,
   }) => {
     // Red phase: this test doesn't exist yet, so per the ATDD workflow it
