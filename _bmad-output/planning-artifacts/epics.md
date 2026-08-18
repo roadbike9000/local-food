@@ -99,11 +99,11 @@ So that I only pay for what I actually want.
 
 *(Verification/regression task — `CartProvider.removeItem` already implements this; no new code expected, write the test. FR1.)*
 
-### Story 1.2: Stock Quantity captured at creation, backfilled for existing products
+### Story 1.2: Stock Quantity captured at creation, backfilled for existing products, and editable
 
 As a vendor,
-I want to set how many units of a product I have,
-So that the system knows my real stock.
+I want to set how many units of a product I have, and correct that number later,
+So that the system knows my real stock, on an ongoing basis — not just once.
 
 **Acceptance Criteria:**
 
@@ -112,7 +112,8 @@ So that the system knows my real stock.
 **Then** Stock Quantity and Low-Stock Threshold are both required fields — no product can be created without them, no default offered for either (vendor owns their own stock, per explicit product direction)
 **And** on migration, every existing product's Stock Quantity is backfilled per `isAvailable` (`true` → 100, `false` → 0) and every existing product's Low-Stock Threshold is backfilled to 0 — both are named constants (`PLACEHOLDER_STOCK_QUANTITY`, `PLACEHOLDER_LOW_STOCK_THRESHOLD`, AD-9), never hardcoded at the call site
 **And** the Low-Stock Threshold backfill of 0 is a neutral sentinel, not a real business number — a 0 threshold means the low-stock alert (FR-10) never fires until the vendor sets a real positive value themselves
-**And** the vendor editing an existing product's Stock Quantity or Low-Stock Threshold goes through `setStock()` — a conditional update guarded against the value the form last loaded, never a bare write — so a concurrent sale decrementing the same product can't be silently clobbered by the vendor's edit
+**And** the vendor can edit an existing product's Stock Quantity and Low-Stock Threshold via a minimal inline control on `/dashboard/products` (not a full product-edit form — name/price/description editing is out of scope here) — this is the only way to correct either value after creation, and the only caller `setStock()` has
+**And** the edit goes through `setStock()` — a conditional update guarded against the value the form last loaded, never a bare write — so a concurrent sale decrementing the same product can't be silently clobbered by the vendor's edit
 
 *(FR12, AD-3, AD-9.)*
 
