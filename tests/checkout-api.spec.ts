@@ -49,13 +49,9 @@ test.describe("checkout API", () => {
     }
   });
 
-  test.skip(
+  test(
     "rejects a cart requesting more than the available stock (400)",
     async ({ request }) => {
-      // RED PHASE (Story 1.3, AC #3): checkout's product lookup still
-      // filters by isAvailable:true, not stockQuantity sufficiency - a
-      // stockQuantity:0 product is still found and the order still
-      // succeeds today. Fails until Task 5's per-line check lands.
       const vendor = await getVendorBySlug("corner-sourdough");
       const outOfStock = await createTestProduct(vendor.id, {
         name: "Insufficient Stock Test Product",

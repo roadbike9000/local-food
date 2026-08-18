@@ -27,11 +27,9 @@ test.describe("storefront and cart", () => {
     await expect(page.getByText(/total/i)).toBeVisible();
   });
 
-  test.skip(
+  test(
     "out-of-stock products show a badge and a disabled Add button",
     async ({ page }) => {
-      // RED PHASE (Story 1.3, AC #1): ProductCard doesn't render an
-      // out-of-stock badge or disable "Add" yet - un-skip once Task 3 lands.
       const vendor = await getVendorBySlug("corner-sourdough");
       const soldOut = await createTestProduct(vendor.id, {
         name: "Playwright Sold Out Product",
@@ -52,8 +50,12 @@ test.describe("storefront and cart", () => {
         await expect(productHeading).toBeVisible();
 
         // Scope to the product's own card so the badge/button assertions
-        // can't accidentally match a different row.
-        const card = productHeading.locator("..");
+        // can't accidentally match a different row. Two levels up: the
+        // heading's immediate parent only wraps the name/description/price/
+        // badge column; the Add button is a sibling of that column, both
+        // children of the outer card div (ProductCard.tsx's outer
+        // flex container).
+        const card = productHeading.locator("../..");
         await expect(card.getByText(/out of stock/i)).toBeVisible();
         await expect(card.getByRole("button", { name: "Add" })).toBeDisabled();
       } finally {
@@ -62,13 +64,9 @@ test.describe("storefront and cart", () => {
     },
   );
 
-  test.skip(
+  test(
     "checkout shows an error when a cart item's stock drops below the cart quantity before submitting",
     async ({ page }) => {
-      // RED PHASE (Story 1.3, AC #3): checkout's product lookup still
-      // filters by isAvailable:true (not stockQuantity sufficiency), so a
-      // product with stockQuantity:0 is still found and the order still
-      // succeeds today - fails until Task 5's per-line check lands.
       const vendor = await getVendorBySlug("corner-sourdough");
       // Storefront lists products alphabetically (vendors/[slug]/page.tsx), so
       // "Cinnamon Morning Bun" is the same product the "Add" .first() click

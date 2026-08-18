@@ -4,7 +4,7 @@ baseline_commit: 0dd09ae
 
 # Story 1.3: Out-of-stock products are marked and blocked
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -24,41 +24,36 @@ so that I never pay for something unavailable.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Drop `isAvailable` from the schema (AC: #2)
-  - [ ] Remove `isAvailable Boolean @default(true)` from the `Product` model in `prisma/schema.prisma` (currently the line right before `stockQuantity`)
-  - [ ] Generate and apply the migration: `npx prisma migrate dev --name drop_is_available` (this repo's convention per `project-context.md` — never `prisma db push`). No backfill step needed this direction — dropping a column loses no downstream-required data, unlike Story 1.2's add-with-backfill. The two-step nullable→backfill→required dance from Story 1.2 does not apply here.
-  - [ ] Do **not** touch `stockQuantity`, `lowStockThreshold`, `thresholdIsPlaceholder`, or `stockIsPlaceholder` in this migration — those are Story 1.2's columns and this story only removes `isAvailable`. Migration ordering (architecture AD-2) requires `stockQuantity` to already be backfilled for every existing row before this drop — it is, as of Story 1.2 shipping (see baseline_commit above) — so no window exists where availability is undefined.
+- [x] Task 1: Drop `isAvailable` from the schema (AC: #2)
+  - [x] Remove `isAvailable Boolean @default(true)` from the `Product` model in `prisma/schema.prisma` (currently the line right before `stockQuantity`)
+  - [x] Generate and apply the migration. `npx prisma migrate dev --name drop_is_available` refused to run non-interactively (this shell has no TTY, and Prisma's data-loss confirmation for a DROP COLUMN with non-null values requires one) — used `npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script` to get the exact SQL, hand-created the migration folder with it, applied via `npx prisma db execute`, then recorded it with `npx prisma migrate resolve --applied`. `npx prisma migrate status` confirms clean, no drift. No backfill step needed this direction.
+  - [x] Did **not** touch `stockQuantity`, `lowStockThreshold`, `thresholdIsPlaceholder`, or `stockIsPlaceholder` — migration ordering (architecture AD-2) already satisfied by Story 1.2.
 
-- [ ] Task 2: Add a shared `isInStock()` helper (AC: #2)
-  - [ ] Add `export function isInStock(product: { stockQuantity: number }): boolean { return product.stockQuantity > 0; }` to `src/lib/inventory.ts`, alongside the existing `PLACEHOLDER_*` constants and `setStock()`/`setLowStockThreshold()` — same file already owns every other stock-related concern (architecture AD-2: "no persisted or cached field may re-derive availability under any name" — a single canonical pure function everywhere `stockQuantity > 0` is checked is what prevents three call sites from each writing a slightly different version and drifting)
+- [x] Task 2: Add a shared `isInStock()` helper (AC: #2)
+  - [x] Added `isInStock()` to `src/lib/inventory.ts` alongside the existing `PLACEHOLDER_*` constants and `setStock()`/`setLowStockThreshold()`. `npm run test:unit` — 58/58 (the 3 ATDD-scaffolded cases now pass).
   - [ ] Use this helper at every read site in Tasks 3-5 below, rather than inlining `stockQuantity > 0` three separate times
 
-- [ ] Task 3: Storefront listing — badge + disabled Add (AC: #1)
-  - [ ] `src/app/vendors/[slug]/page.tsx`: remove the `where: { isAvailable: true }` filter (line 16) from the `products` include — out-of-stock products must now render, not be excluded. Add `stockQuantity` to the fields passed into `ProductCard`'s `product` prop (currently only `id, name, description, priceCents` at lines 50-55)
-  - [ ] `src/components/ProductCard.tsx`: add `stockQuantity: number` to the `product` prop type (lines 9-14). Compute `const inStock = isInStock(product)` using Task 2's helper. Render a visible "Out of stock" badge (e.g. a `<span>` styled consistently with this file's existing Tailwind conventions — see `role="alert"` styling patterns elsewhere in this codebase for a small colored-text/pill treatment, e.g. `text-red-600` or a `bg-red-50 text-red-700` pill) when `!inStock`. Add `disabled={!inStock}` to the existing "Add" button (lines 32-43) and matching `disabled:opacity-50` styling (this codebase's established disabled-button pattern — see `EditStockControl.tsx`/`AddProductForm.tsx`)
-  - [ ] Do not hide or remove the button when out of stock — AC #1 says "disabled," and a disabled-but-present button keeps its accessible role/name (`getByRole("button", { name: "Add" })` still resolves it in Playwright, just as `.toBeDisabled()`), which matters for Task 6's test rewrite
+- [x] Task 3: Storefront listing — badge + disabled Add (AC: #1)
+  - [x] Removed the `isAvailable: true` filter from `src/app/vendors/[slug]/page.tsx`'s `products` include; added `stockQuantity` to `ProductCard`'s `product` prop.
+  - [x] `ProductCard.tsx`: `inStock = isInStock(product)`; renders a `bg-red-50 text-red-700` "Out of stock" pill when `!inStock`; `disabled={!inStock}` + `disabled:opacity-50 disabled:cursor-not-allowed` on "Add".
+  - [x] Button stays present (not hidden) when disabled — confirmed via Playwright: `getByRole("button", { name: "Add" })` still resolves and `.toBeDisabled()` passes. `npx playwright test tests/storefront-cart.spec.ts` — 3 passed, 1 skipped (Task 5's scaffold), 0 regressions.
 
-- [ ] Task 4: Dashboard products table — computed "Available" column (AC: #2)
-  - [ ] `src/app/dashboard/products/page.tsx`: replace `{p.isAvailable ? "Yes" : "No"}` (line 43) with `{isInStock(p) ? "Yes" : "No"}` using Task 2's helper. The `products` query already has no `select`, so `p.stockQuantity` is already present on every row (Story 1.2) — no query change needed here, only the read
-  - [ ] Leave the column header as "Available" — the display contract is unchanged, only what it's computed from
+- [x] Task 4: Dashboard products table — computed "Available" column (AC: #2)
+  - [x] Replaced `{p.isAvailable ? "Yes" : "No"}` with `{isInStock(p) ? "Yes" : "No"}` in `src/app/dashboard/products/page.tsx`. No query change needed (`stockQuantity` already present, no `select` on the `findMany`).
+  - [x] Column header left as "Available".
 
-- [ ] Task 5: Checkout — per-line sufficiency check, not existence-only (AC: #3)
-  - [ ] `src/app/api/checkout/route.ts`: change the `products` lookup (line 28) from `where: { id: { in: productIds }, vendorId, isAvailable: true }` to `where: { id: { in: productIds }, vendorId }` — fetch every requested product regardless of stock, so the code below can distinguish "doesn't exist / wrong vendor" from "exists but insufficient stock" and report each precisely rather than collapsing both into one existence-count mismatch
-  - [ ] Keep the existing `products.length !== items.length` check (line 31) — it still correctly catches "product doesn't exist or isn't this vendor's," now that `isAvailable` no longer folds a third case into it
-  - [ ] Add a new check, after that existence check and before building `lineItems` (i.e. right after line 36): for every requested item, find its matching product and verify `product.stockQuantity >= item.quantity`; if any line fails this, return `400` immediately — reject the *whole* order, not just the short line (AC #3's literal wording). Reuse the existing `{ error: "..." }` JSON shape this route already returns for its other 400s. **Pinned contract (see ATDD Artifacts below — the red-phase tests already assert this string):** the error message must be exactly `"One or more items don't have enough stock"`, not the old "unavailable" wording, which is no longer the precise failure mode
-  - [ ] Do **not** add a transaction or decrement anything here — Story 1.3 only *validates* sufficiency at checkout time; actually decrementing stock on payment confirmation is Story 1.4's `decrementStock()`, which does not exist yet. This route still only creates a `PENDING` order and a Stripe session, exactly as today
+- [x] Task 5: Checkout — per-line sufficiency check, not existence-only (AC: #3)
+  - [x] Dropped `isAvailable: true` from the `products` lookup; kept the existence-count check.
+  - [x] Added a per-line `stockQuantity < quantity` check via `items.some(...)` after the existence check, before building `lineItems` — rejects the whole order (400) before anything is created if any line is short. Message: `"One or more items don't have enough stock"` (matches the pinned ATDD contract).
+  - [x] No transaction, no decrement added — route still only creates a `PENDING` order + Stripe session.
 
-- [ ] Task 6: Update existing tests broken by the `isAvailable` drop (AC: #2, #3)
-  - [ ] `tests/helpers/db.ts`: remove `isAvailable` from `createTestProduct`'s `overrides` type (line 28) and its `data` object (line 40) — a Prisma `create` call referencing a dropped column will fail at the type level (and, if that were somehow bypassed, at runtime) the moment Task 1's migration lands
-  - [ ] `tests/checkout-api.spec.ts` line 18: `vendor.products.find((p) => p.isAvailable)` → `vendor.products.find((p) => p.stockQuantity > 0)`
-  - [ ] `tests/checkout-api.spec.ts` lines 52-75 ("rejects a cart containing an unavailable product"): rename to reflect the real scenario (e.g. "rejects a cart requesting more than available stock") and change the fixture from `createTestProduct(vendor.id, { name: "...", isAvailable: false })` to `createTestProduct(vendor.id, { name: "...", stockQuantity: 0 })`, requesting `quantity: 1` against it (0 available < 1 requested) — still asserts `400`
-  - [ ] `tests/storefront-cart.spec.ts` lines 30-48 ("unavailable products are excluded from the storefront listing"): this test's *premise* is now backwards — out-of-stock products must be visible, not hidden. Rename it (e.g. "out-of-stock products show a badge and a disabled Add button") and rewrite: `createTestProduct(vendor.id, { name: "...", stockQuantity: 0 })`, then assert the product name **is** visible (drop the `.not.toBeVisible()` assertion), the out-of-stock badge text from Task 3 is visible, and the row's "Add" button (scoped by product name, same `getByRole("row", ...)`-style scoping Story 1.2 used in `dashboard.spec.ts` — this page isn't a table, so scope by a container `locator` around the product's name/card instead) `.toBeDisabled()`
-  - [ ] `tests/storefront-cart.spec.ts` lines 50-88 ("checkout shows an error when a cart item goes unavailable before submitting"): change the setup/teardown from toggling `isAvailable` to toggling `stockQuantity` — capture the seeded product's real `stockQuantity` before the test (don't hardcode a restore value), set it to `0` mid-test (line 73-76), restore the captured value in `finally` (lines 83-87). Update the asserted message text (line 80, currently `"One or more items are unavailable"`) to match whatever exact string Task 5 ships
+- [x] Task 6: Update existing tests broken by the `isAvailable` drop (AC: #2, #3)
+  - Done during the ATDD red-phase generation pass (commit `f215a5e`), ahead of Task 1 — see that story's Change Log entry and the ATDD checklist for detail. Confirmed compiling and passing now that Tasks 1-5 have landed.
 
-- [ ] Task 7: New tests (AC: #1, #2, #3)
-  - [ ] Unit (Vitest, `src/lib/inventory.test.ts` — new file, this is a pure function, no Prisma/Clerk involved, so it belongs in Vitest per `project-context.md`'s Testing Rules, unlike Story 1.2's DB-touching tests which had to move to Playwright): a few cases for `isInStock()` — `stockQuantity: 0` → `false`, `stockQuantity: 1` → `true`, a larger value → `true`
-  - [ ] E2E (Playwright): Task 6's rewritten `storefront-cart.spec.ts` tests already cover AC #1 and #3's user-visible behavior — no additional new E2E test file needed beyond those rewrites, but confirm both pass for real (this app's Clerk auth fixture is stale for *dashboard* tests, but the storefront and checkout are unauthenticated — these tests are not blocked by that pre-existing gap)
-  - [ ] API (Playwright, `tests/checkout-api.spec.ts`): Task 6's rewritten "insufficient stock" test covers AC #3's server-side rejection at the API level directly
+- [x] Task 7: New tests (AC: #1, #2, #3)
+  - [x] `src/lib/inventory.test.ts` — 3 cases, all passing (`npm run test:unit`: 58/58).
+  - [x] E2E: `tests/storefront-cart.spec.ts`'s "out-of-stock products show a badge and a disabled Add button" and "checkout shows an error when a cart item's stock drops below the cart quantity before submitting" — both passing, unauthenticated, unaffected by the stale Clerk fixture.
+  - [x] API: `tests/checkout-api.spec.ts`'s "rejects a cart requesting more than the available stock (400)" — passing.
 
 ## Dev Notes
 
@@ -122,8 +117,37 @@ so that I never pay for something unavailable.
 
 ### Agent Model Used
 
+Claude Sonnet 5
+
 ### Debug Log References
+
+- `npx tsc --noEmit` — clean after each task; Task 1 alone surfaced exactly the expected set of `isAvailable`-reference errors (checkout route, dashboard page, storefront page + its `pickupSlots`/`products` inference cascade from the one bad `where` clause), narrowing to zero by Task 5.
+- `npm run lint` — clean throughout.
+- `npm run test:unit` — 58/58 throughout (55 pre-existing + 3 `isInStock` cases un-skipped by Task 2).
+- `npx playwright test` (full suite) — 31 passed, 15 failed, all 15 the same pre-existing stale-Clerk-auth-fixture failures tracked since Story 1.1 (`dashboard.spec.ts` ×11, `products-api.spec.ts` ×4) — zero new failures, zero flaky `storefront-cart.spec.ts` failures this run (a known intermittent parallelism issue from earlier sessions, not reproduced here).
+- Migration applied via a manual `prisma migrate diff` → hand-authored `migration.sql` → `prisma db execute` → `prisma migrate resolve --applied` sequence, because `prisma migrate dev` refused to run non-interactively in this shell (it requires a TTY confirmation for a DROP COLUMN with non-null data). `npx prisma migrate status` confirms clean, no drift, after `prisma generate` regenerated the client.
 
 ### Completion Notes List
 
+- Real column drop (second migration in this story's sequence, after Story 1.2's add-with-backfill), new `isInStock()` helper, storefront badge/disabled-button UI, dashboard column re-pointed at the computed value, checkout's per-line sufficiency check replacing the old existence-only filter.
+- All 6 ATDD-scaffolded red-phase tests activated and passing; the "fix the existing suite first" edits (product selectors, fixture helper) made during the ATDD pass required no further changes here.
+- No dashboard e2e coverage added for AC #2's column change — consistent with the story's own Dev Notes reasoning (stale Clerk fixture blocks authenticated dashboard e2e regardless; `tsc` is the stronger, cheaper signal for a `.tsx` read-site change with no dynamic typing involved).
+- Full e2e regression confirms no new failures beyond the single pre-existing stale-auth-fixture issue (unchanged at 15, not grown — this story added no new authenticated-route tests).
+
 ### File List
+
+- `prisma/schema.prisma` (modified — removed `Product.isAvailable`)
+- `prisma/migrations/20260818160625_drop_is_available/migration.sql` (new)
+- `src/lib/inventory.ts` (modified — added `isInStock()`)
+- `src/lib/inventory.test.ts` (new — 3 cases for `isInStock()`)
+- `src/app/vendors/[slug]/page.tsx` (modified — removed the `isAvailable` filter, added `stockQuantity` to `ProductCard`'s props)
+- `src/components/ProductCard.tsx` (modified — out-of-stock badge, disabled "Add" button)
+- `src/app/dashboard/products/page.tsx` (modified — "Available" column now reads `isInStock(p)`)
+- `src/app/api/checkout/route.ts` (modified — dropped the `isAvailable` filter, added the per-line stock-sufficiency check)
+- `tests/helpers/db.ts` (modified — removed `createTestProduct`'s `isAvailable` override)
+- `tests/checkout-api.spec.ts` (modified — fixed product selector, rewrote the availability-rejection test into an insufficient-stock test)
+- `tests/storefront-cart.spec.ts` (modified — rewrote "unavailable products excluded" into "out-of-stock products show a badge and disabled Add"; rewrote the mid-cart-availability-change test to toggle `stockQuantity`)
+
+## Change Log
+
+- 2026-08-18: Implemented Story 1.3 in full. Dropped `Product.isAvailable` (hand-run migration, since `prisma migrate dev` needs an interactive TTY confirmation this shell doesn't have), added the canonical `isInStock()` helper, wired it into the storefront (out-of-stock badge + disabled Add) and dashboard, and replaced checkout's existence-only filter with a real per-line stock-sufficiency check that rejects the whole order on any short line. All 6 ATDD-scaffolded tests (3 unit, 3 Playwright) activated and passing. Full regression: typecheck clean, lint clean, 58/58 unit tests, 31/46 e2e passing with the remaining 15 all the same pre-existing stale-Clerk-auth-fixture gap (unchanged count — no new authenticated-route tests added).

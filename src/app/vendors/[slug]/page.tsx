@@ -13,7 +13,7 @@ export default async function StorefrontPage({
   const vendor = await prisma.vendor.findUnique({
     where: { slug: params.slug },
     include: {
-      products: { where: { isAvailable: true }, orderBy: { name: "asc" } },
+      products: { orderBy: { name: "asc" } },
       pickupSlots: { orderBy: { startsAt: "asc" } },
     },
   });
@@ -52,6 +52,7 @@ export default async function StorefrontPage({
               name: p.name,
               description: p.description,
               priceCents: p.priceCents,
+              stockQuantity: p.stockQuantity,
             }}
           />
         ))}

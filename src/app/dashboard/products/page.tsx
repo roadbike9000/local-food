@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentVendor } from "@/lib/vendor";
 import { formatPrice } from "@/lib/utils";
+import { isInStock } from "@/lib/inventory";
 import { AddProductForm } from "@/components/dashboard/AddProductForm";
 import { EditStockControl } from "@/components/dashboard/EditStockControl";
 
@@ -40,7 +41,7 @@ export default async function DashboardProductsPage() {
               <tr key={p.id} className="border-b border-stone-100">
                 <td className="py-2">{p.name}</td>
                 <td className="py-2">{formatPrice(p.priceCents)}</td>
-                <td className="py-2">{p.isAvailable ? "Yes" : "No"}</td>
+                <td className="py-2">{isInStock(p) ? "Yes" : "No"}</td>
                 <EditStockControl
                   productId={p.id}
                   productName={p.name}

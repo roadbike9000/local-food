@@ -12,6 +12,17 @@ export const PLACEHOLDER_STOCK_QUANTITY = 100;
 export const PLACEHOLDER_LOW_STOCK_THRESHOLD = 0;
 
 /**
+ * The single, canonical availability check (architecture AD-2). No boolean
+ * or cached field re-derives this under any other name - every read site
+ * (storefront, dashboard, checkout's sufficiency check) computes it here,
+ * so it can never drift out of sync with stockQuantity the way the old
+ * Product.isAvailable column could.
+ */
+export function isInStock(product: { stockQuantity: number }): boolean {
+  return product.stockQuantity > 0;
+}
+
+/**
  * Conditional update: only writes if the row's current stockQuantity still
  * matches expectedCurrentValue. Returns false (not an error) when it
  * doesn't — someone/something else changed it first, e.g. a concurrent

@@ -22,15 +22,30 @@ export async function POST(req: Request) {
 
   const { vendorId, customerName, customerPhone, items } = parsed.data;
 
-  // Load the real products so we control the prices.
+  // Load the real products so we control the prices. Fetched regardless of
+  // stock so the checks below can tell "doesn't exist / wrong vendor" apart
+  // from "exists but insufficient stock" (architecture AD-2).
   const productIds = items.map((i) => i.productId);
   const products = await prisma.product.findMany({
-    where: { id: { in: productIds }, vendorId, isAvailable: true },
+    where: { id: { in: productIds }, vendorId },
   });
 
   if (products.length !== items.length) {
     return NextResponse.json(
       { error: "One or more items are unavailable" },
+      { status: 400 },
+    );
+  }
+
+  // Per-line stock sufficiency, not just existence (AD-2) - reject the
+  // whole order if any line is short, before creating anything.
+  const hasInsufficientStock = items.some((i) => {
+    const product = products.find((p) => p.id === i.productId)!;
+    return product.stockQuantity < i.quantity;
+  });
+  if (hasInsufficientStock) {
+    return NextResponse.json(
+      { error: "One or more items don't have enough stock" },
       { status: 400 },
     );
   }
