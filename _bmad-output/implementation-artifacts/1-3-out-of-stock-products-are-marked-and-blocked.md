@@ -4,7 +4,7 @@ baseline_commit: 0dd09ae
 
 # Story 1.3: Out-of-stock products are marked and blocked
 
-Status: review
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -113,7 +113,20 @@ so that I never pay for something unavailable.
 - [Source: tests/helpers/db.ts, tests/checkout-api.spec.ts, tests/storefront-cart.spec.ts] — every existing test referencing `isAvailable` (read in full for this story; exhaustive as of `baseline_commit`).
 - [Source: _bmad-output/implementation-artifacts/1-2-stock-quantity-captured-at-creation-backfilled-for-existing-products.md] — previous story; establishes the migration-ordering dependency this story completes, and the `isInStock`-style single-source-of-truth reasoning behind Task 2.
 
-## Dev Agent Record
+### Review Findings (2026-08-18, Opus, reviewing commit `b3c52c0`)
+
+_Reviewer independently ran `npx tsc --noEmit` (clean), `npm run lint` (clean), `npm run test:unit` (58/58), `npx playwright test tests/storefront-cart.spec.ts tests/checkout-api.spec.ts tests/inventory.spec.ts` (13/13), `npm run build` (succeeds), and `npx prisma migrate status` against the live Neon DB (up to date). Also diffed the live `Product` table's actual columns against `schema.prisma` and verified all four migrations' file checksums match `_prisma_migrations` byte-for-byte._
+
+**Verified-good (no action):** migration history is genuinely clean, no drift, file content matches what was executed and what the DB reflects; no missed `isAvailable` reference anywhere in application code (only the two historical, correctly-untouched migration SQLs and the drift-guard test that deliberately reads them remain); checkout's whole-order rejection is genuinely atomic — the sufficiency check returns before any `Order`/Stripe session is created; the `!` non-null assertions in the checkout route are safe given the existence-count check above them; the disabled "Add" button breaks no existing test (confirmed by execution — `getByRole` still matches a disabled button).
+
+- [ ] [Review][Decision] The hand-created migration folder `prisma/migrations/20260818160625_drop_is_available/` is named in local (EDT) time, not UTC like every Prisma-generated migration in this repo — its on-disk sort order (before `…170751_add_threshold_placeholder_marker`) doesn't match its actual apply order (~3h after, confirmed via `_prisma_migrations.finished_at`). Currently harmless (the two migrations don't touch overlapping columns, so either order reaches the same end state) but untested and asymmetric with the rest of the migration history. Options: rename the folder to its UTC timestamp + update `_prisma_migrations.migration_name` to match (cheap now, one dev DB, migration is one commit old — same reasoning Story 1.2's own D1 finding used), or leave it and accept the documented hazard.
+- [ ] [Review][Patch] `isInStock()` pulls the entire Prisma Client browser shim into the public storefront's client bundle. `ProductCard.tsx` (`"use client"`) imports `@/lib/inventory`, which imports `@/lib/prisma`, which does module-scope `new PrismaClient()` — measured: the `/vendors/[slug]` route's client JS grew from 2,445 B to 43,290 B in this commit, the only route chunk containing the "PrismaClient is unable to run in this browser environment" string. Not a runtime crash (everything still works), but dead weight shipped to every shopper on the highest-traffic public page, and violates `project-context.md`'s "use client" boundary rule plus AD-3's framing of `src/lib/inventory.ts` as server-only. Fix: split the pure helper (and the `PLACEHOLDER_*` constants, which have the same problem if ever imported client-side) into a Prisma-free module, re-exported from `inventory.ts` so AD-2's single-canonical-check still holds for server callers.
+- [ ] [Review][Patch] `tests/storefront-cart.spec.ts`'s "can add a product to the cart" test clicks `.first()` on the "Add" button, which is now racy against the sibling "out-of-stock" test's fixture setup — verified live: corner-sourdough's alphabetically-first product ("Cinnamon Morning Bun") is not what `.first()` was assumed to target once a same-named/earlier-sorting fixture briefly zeroes stock elsewhere in a parallel run. Before this story, a hidden `isAvailable:false` product simply vanished from `.first()`'s consideration; now it renders disabled and the click hangs to timeout. Fix: use the file's own `productCard(name)`-style helper or target a named product instead of `.first()`.
+- [ ] [Review][Patch] Four documentation sites still instruct filtering on the now-dropped `isAvailable` column and weren't caught by this story's otherwise-exhaustive code grep: `_bmad-output/project-context.md` (a "Critical Don't-Miss Rule" telling future agents to filter `isAvailable: true` in new product queries — the exact drift AD-2 exists to prevent), `docs/data-models.md`, `docs/api-contracts.md` (also missing the new 400 sufficiency-check response shape), and `docs/index.md`. None were in this story's Tasks or File List.
+- [ ] [Review][Patch] Task 2's subtask "Use this helper at every read site in Tasks 3-5" (line 34 above) is still `[ ]` while its parent Task 2 and Tasks 3-5 themselves are all `[x]`, even though the work described was in fact done — bookkeeping oversight, not a functional gap.
+
+**Dismissed as noise:** the dashboard's "Available" column being redundant with the adjacent "Stock" column is a deliberate, already-documented Task 4 decision, not a defect.
+
 
 ### Agent Model Used
 
