@@ -27,65 +27,87 @@ test.describe("storefront and cart", () => {
     await expect(page.getByText(/total/i)).toBeVisible();
   });
 
-  test("unavailable products are excluded from the storefront listing", async ({
-    page,
-  }) => {
-    const vendor = await getVendorBySlug("corner-sourdough");
-    const hidden = await createTestProduct(vendor.id, {
-      name: "Playwright Hidden Product",
-      isAvailable: false,
-    });
-
-    try {
-      await page.goto("/vendors/corner-sourdough");
-      await expect(
-        page.getByRole("heading", { name: /corner sourdough/i }),
-      ).toBeVisible();
-      await expect(page.getByText("Playwright Hidden Product")).not.toBeVisible();
-    } finally {
-      await deleteProduct(hidden.id);
-    }
-  });
-
-  test("checkout shows an error when a cart item goes unavailable before submitting", async ({
-    page,
-  }) => {
-    const vendor = await getVendorBySlug("corner-sourdough");
-    // Storefront lists products alphabetically (vendors/[slug]/page.tsx), so
-    // "Cinnamon Morning Bun" is the same product the "Add" .first() click
-    // above targets.
-    const product = vendor.products.find(
-      (p) => p.name === "Cinnamon Morning Bun",
-    );
-    if (!product) throw new Error("Seed data missing 'Cinnamon Morning Bun'");
-
-    try {
-      await page.goto("/vendors/corner-sourdough");
-      await page.getByRole("button", { name: "Add" }).first().click();
-      await page.getByRole("link", { name: /cart/i }).click();
-      await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
-
-      await page.getByPlaceholder(/your name/i).fill("Availability Check Customer");
-      await page.getByPlaceholder(/mobile number/i).fill("+15005550006");
-
-      // Simulate the vendor marking it unavailable (or the last one selling
-      // out) after it was added to the cart but before checkout submits.
-      await prisma.product.update({
-        where: { id: product.id },
-        data: { isAvailable: false },
+  test.skip(
+    "out-of-stock products show a badge and a disabled Add button",
+    async ({ page }) => {
+      // RED PHASE (Story 1.3, AC #1): ProductCard doesn't render an
+      // out-of-stock badge or disable "Add" yet - un-skip once Task 3 lands.
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const soldOut = await createTestProduct(vendor.id, {
+        name: "Playwright Sold Out Product",
+        stockQuantity: 0,
       });
 
-      await page.getByRole("button", { name: /checkout/i }).click();
-      await expect(
-        page.getByText("One or more items are unavailable"),
-      ).toBeVisible();
-    } finally {
-      await prisma.product.update({
-        where: { id: product.id },
-        data: { isAvailable: true },
-      });
-    }
-  });
+      try {
+        await page.goto("/vendors/corner-sourdough");
+        await expect(
+          page.getByRole("heading", { name: /corner sourdough/i }),
+        ).toBeVisible();
+
+        // Out-of-stock products must be visible (not hidden) per AC #1 —
+        // the opposite of this test's pre-Story-1.3 premise.
+        const productHeading = page.getByRole("heading", {
+          name: "Playwright Sold Out Product",
+        });
+        await expect(productHeading).toBeVisible();
+
+        // Scope to the product's own card so the badge/button assertions
+        // can't accidentally match a different row.
+        const card = productHeading.locator("..");
+        await expect(card.getByText(/out of stock/i)).toBeVisible();
+        await expect(card.getByRole("button", { name: "Add" })).toBeDisabled();
+      } finally {
+        await deleteProduct(soldOut.id);
+      }
+    },
+  );
+
+  test.skip(
+    "checkout shows an error when a cart item's stock drops below the cart quantity before submitting",
+    async ({ page }) => {
+      // RED PHASE (Story 1.3, AC #3): checkout's product lookup still
+      // filters by isAvailable:true (not stockQuantity sufficiency), so a
+      // product with stockQuantity:0 is still found and the order still
+      // succeeds today - fails until Task 5's per-line check lands.
+      const vendor = await getVendorBySlug("corner-sourdough");
+      // Storefront lists products alphabetically (vendors/[slug]/page.tsx), so
+      // "Cinnamon Morning Bun" is the same product the "Add" .first() click
+      // above targets.
+      const product = vendor.products.find(
+        (p) => p.name === "Cinnamon Morning Bun",
+      );
+      if (!product) throw new Error("Seed data missing 'Cinnamon Morning Bun'");
+      const originalStockQuantity = product.stockQuantity;
+
+      try {
+        await page.goto("/vendors/corner-sourdough");
+        await page.getByRole("button", { name: "Add" }).first().click();
+        await page.getByRole("link", { name: /cart/i }).click();
+        await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+
+        await page.getByPlaceholder(/your name/i).fill("Availability Check Customer");
+        await page.getByPlaceholder(/mobile number/i).fill("+15005550006");
+
+        // Simulate the last unit selling out (a concurrent order) after it
+        // was added to this cart but before this checkout submits.
+        await prisma.product.update({
+          where: { id: product.id },
+          data: { stockQuantity: 0 },
+        });
+
+        await page.getByRole("button", { name: /checkout/i }).click();
+        // Pinned contract string - Task 5 must produce this exact message.
+        await expect(
+          page.getByText("One or more items don't have enough stock"),
+        ).toBeVisible();
+      } finally {
+        await prisma.product.update({
+          where: { id: product.id },
+          data: { stockQuantity: originalStockQuantity },
+        });
+      }
+    },
+  );
 
   test("[P0] removing cart lines recalculates the total and empties the cart", async ({
     page,

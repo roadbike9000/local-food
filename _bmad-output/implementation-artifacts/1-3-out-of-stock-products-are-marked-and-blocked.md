@@ -45,7 +45,7 @@ so that I never pay for something unavailable.
 - [ ] Task 5: Checkout — per-line sufficiency check, not existence-only (AC: #3)
   - [ ] `src/app/api/checkout/route.ts`: change the `products` lookup (line 28) from `where: { id: { in: productIds }, vendorId, isAvailable: true }` to `where: { id: { in: productIds }, vendorId }` — fetch every requested product regardless of stock, so the code below can distinguish "doesn't exist / wrong vendor" from "exists but insufficient stock" and report each precisely rather than collapsing both into one existence-count mismatch
   - [ ] Keep the existing `products.length !== items.length` check (line 31) — it still correctly catches "product doesn't exist or isn't this vendor's," now that `isAvailable` no longer folds a third case into it
-  - [ ] Add a new check, after that existence check and before building `lineItems` (i.e. right after line 36): for every requested item, find its matching product and verify `product.stockQuantity >= item.quantity`; if any line fails this, return `400` immediately — reject the *whole* order, not just the short line (AC #3's literal wording). Reuse the existing `{ error: "..." }` JSON shape this route already returns for its other 400s; word the message accurately for a quantity shortfall (not "unavailable," which is no longer the precise failure mode) — e.g. `"One or more items don't have enough stock"` — and update Task 6's test/e2e assertions to match whatever exact string ships here, since `tests/storefront-cart.spec.ts:80` currently asserts the old text verbatim
+  - [ ] Add a new check, after that existence check and before building `lineItems` (i.e. right after line 36): for every requested item, find its matching product and verify `product.stockQuantity >= item.quantity`; if any line fails this, return `400` immediately — reject the *whole* order, not just the short line (AC #3's literal wording). Reuse the existing `{ error: "..." }` JSON shape this route already returns for its other 400s. **Pinned contract (see ATDD Artifacts below — the red-phase tests already assert this string):** the error message must be exactly `"One or more items don't have enough stock"`, not the old "unavailable" wording, which is no longer the precise failure mode
   - [ ] Do **not** add a transaction or decrement anything here — Story 1.3 only *validates* sufficiency at checkout time; actually decrementing stock on payment confirmation is Story 1.4's `decrementStock()`, which does not exist yet. This route still only creates a `PENDING` order and a Stripe session, exactly as today
 
 - [ ] Task 6: Update existing tests broken by the `isAvailable` drop (AC: #2, #3)
@@ -89,6 +89,18 @@ so that I never pay for something unavailable.
 - Everything else in this story (storefront rendering, checkout's DB-backed sufficiency check) requires a running server/DB and belongs in the existing Playwright specs being edited in Task 6 — no new Playwright spec *files*, just rewritten tests in the two files that already cover this territory.
 - Migration hygiene (`project-context.md`): `npx prisma migrate dev`, never `prisma db push`.
 - `src/lib/inventory.migration.test.ts` (Story 1.2's migration-literal drift guard) needs **no change** — it only reads the *historical, already-applied* Story 1.2 migration file, which this story never touches.
+
+### ATDD Artifacts
+
+- Checklist: `_bmad-output/test-artifacts/atdd-checklist-1-3-out-of-stock-products-are-marked-and-blocked.md`
+- Unit tests: `src/lib/inventory.test.ts` (new, 3 cases for `isInStock()`)
+- API tests: `tests/checkout-api.spec.ts` (1 case rewritten to red, 1 existing case's selector fixed)
+- E2E tests: `tests/storefront-cart.spec.ts` (1 new case, 1 existing case rewritten to red)
+- Fixture: `tests/helpers/db.ts`'s `createTestProduct` already had its `isAvailable` override removed as part of this red-phase pass (no remaining caller needs it)
+- **Pinned contracts — implement to match exactly:**
+  - Checkout's insufficient-stock error message: `"One or more items don't have enough stock"`
+  - Storefront out-of-stock badge text: must match `/out of stock/i` (case-insensitive substring)
+- Activate task-by-task per the checklist's "Next Steps" section — not all at once.
 
 ### References
 

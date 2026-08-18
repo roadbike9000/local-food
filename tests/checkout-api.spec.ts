@@ -15,8 +15,8 @@ test.describe("checkout API", () => {
     request,
   }) => {
     const vendor = await getVendorBySlug("corner-sourdough");
-    const product = vendor.products.find((p) => p.isAvailable);
-    if (!product) throw new Error("Seed data missing an available product");
+    const product = vendor.products.find((p) => p.stockQuantity > 0);
+    if (!product) throw new Error("Seed data missing an in-stock product");
 
     const quantity = 2;
     const customerPhone = `+1500555${Date.now() % 10000}`.padEnd(12, "0");
@@ -49,28 +49,33 @@ test.describe("checkout API", () => {
     }
   });
 
-  test("rejects a cart containing an unavailable product (400)", async ({
-    request,
-  }) => {
-    const vendor = await getVendorBySlug("corner-sourdough");
-    const unavailable = await createTestProduct(vendor.id, {
-      name: "Unavailable Test Product",
-      isAvailable: false,
-    });
-
-    try {
-      const response = await request.post("/api/checkout", {
-        data: {
-          vendorId: vendor.id,
-          customerName: "Playwright Availability Check",
-          customerPhone: "+15005550099",
-          items: [{ productId: unavailable.id, quantity: 1 }],
-        },
+  test.skip(
+    "rejects a cart requesting more than the available stock (400)",
+    async ({ request }) => {
+      // RED PHASE (Story 1.3, AC #3): checkout's product lookup still
+      // filters by isAvailable:true, not stockQuantity sufficiency - a
+      // stockQuantity:0 product is still found and the order still
+      // succeeds today. Fails until Task 5's per-line check lands.
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const outOfStock = await createTestProduct(vendor.id, {
+        name: "Insufficient Stock Test Product",
+        stockQuantity: 0,
       });
 
-      expect(response.status()).toBe(400);
-    } finally {
-      await deleteProduct(unavailable.id);
-    }
-  });
+      try {
+        const response = await request.post("/api/checkout", {
+          data: {
+            vendorId: vendor.id,
+            customerName: "Playwright Availability Check",
+            customerPhone: "+15005550099",
+            items: [{ productId: outOfStock.id, quantity: 1 }],
+          },
+        });
+
+        expect(response.status()).toBe(400);
+      } finally {
+        await deleteProduct(outOfStock.id);
+      }
+    },
+  );
 });

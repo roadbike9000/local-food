@@ -25,7 +25,6 @@ export async function createTestProduct(
   overrides: Partial<{
     name: string;
     priceCents: number;
-    isAvailable: boolean;
     stockQuantity: number;
     lowStockThreshold: number;
     stockIsPlaceholder: boolean;
@@ -37,7 +36,6 @@ export async function createTestProduct(
       vendorId,
       name: overrides.name ?? "Test Product (Playwright)",
       priceCents: overrides.priceCents ?? 500,
-      isAvailable: overrides.isAvailable ?? true,
       stockQuantity: overrides.stockQuantity ?? 50,
       lowStockThreshold: overrides.lowStockThreshold ?? 5,
       stockIsPlaceholder: overrides.stockIsPlaceholder ?? false,
