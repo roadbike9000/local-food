@@ -152,9 +152,11 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
 
         expect(response.status()).toBe(409);
         const body = await response.json();
-        // Task 5: "an error message the UI surfaces (\"Stock changed since
-        // you loaded this page — refresh and try again\")".
-        expect(body.error).toMatch(/refresh/i);
+        // Message reworded in review round 2 (P6) to past tense - the
+        // client auto-refreshes on 409, so "refresh and try again" was no
+        // longer accurate. See src/app/api/products/[id]/route.ts's 409
+        // branch for the current wording.
+        expect(body.error).toMatch(/changed since you loaded this page/i);
 
         // Review follow-up: a stock conflict must not silently discard the
         // Low-Stock Threshold half of the edit - it has no concurrent

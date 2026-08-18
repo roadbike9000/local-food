@@ -65,6 +65,17 @@ export async function PATCH(
       expectedStockQuantity,
     );
     if (!stockUpdated) {
+      // setStock returning false means either a lock conflict or the
+      // product was deleted in the moment since the threshold write above
+      // - disambiguate rather than reporting 409 for both (review round 3,
+      // finding L1; the threshold-write branch above already does this).
+      const stillExists = await prisma.product.findFirst({
+        where: { id: params.id, vendorId: vendor.id },
+      });
+      if (!stillExists) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+
       // EditStockControl calls router.refresh() on a 409, so by the time
       // the vendor reads this the current values are already showing -
       // the message describes what happened, not an instruction to retry.

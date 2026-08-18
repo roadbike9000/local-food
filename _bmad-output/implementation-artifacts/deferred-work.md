@@ -14,6 +14,10 @@
   summary: The stale Clerk auth fixture (see the Story 1.1 entry below) now blocks 15 e2e tests, including all 5 that verify this story's PATCH endpoint. Root cause re-confirmed independently; see the correction note in the story's Review Findings — the failure signature is 401 only for the 4 `products-api.spec.ts` tests, sign-in redirects for the 11 `dashboard.spec.ts` ones.
   evidence: Reviewer re-ran `npx playwright test` from a clean checkout of `fc05050`: 24 passed / 15 failed, matching the Dev Agent Record's counts exactly. The `__session` JWT in `playwright/.auth/vendor.json` expired 2026-08-07T23:59:50Z; the new inline-edit test's `error-context.md` snapshot shows the Clerk "Sign in to LocalFood" page, not the dashboard. Tracked under the Story 1.1 entry — not duplicated as a separate work item, only escalated.
 
+- source_spec: `_bmad-output/implementation-artifacts/1-2-stock-quantity-captured-at-creation-backfilled-for-existing-products.md`
+  summary: A vendor who deliberately sets Low-Stock Threshold to 0 ("never alert me") can never mark that as a deliberate choice — `thresholdIsPlaceholder` only clears on a genuine value change, and resubmitting the same 0 (the only way to express "I've confirmed this") leaves the flag `true` forever. Story 1.6 needs to account for this before it builds the low-stock-flagging logic on top of the flag.
+  evidence: Review round 3, finding M5. `stockIsPlaceholder` self-heals on any real edit since landing back on exactly 100 is unusual; `lowStockThreshold = 0` is a plausible terminal choice, so the same self-healing doesn't apply. Fixing it cleanly needs the client to send a dirty-field signal (only include `lowStockThreshold` in the PATCH body when the vendor actually touched that input) rather than always resubmitting both fields — new API-surface scope beyond a review-response patch. Accepted as-is for Story 1.2.
+
 ## Deferred from: code review of 1-1-verify-cart-line-removal-and-total-accuracy (2026-08-18)
 
 - source_spec: `_bmad-output/implementation-artifacts/1-1-verify-cart-line-removal-and-total-accuracy.md`
