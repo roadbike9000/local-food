@@ -10,7 +10,7 @@ const INT4_MAX = 2_147_483_647;
 export const CreateProductSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
-  priceCents: z.number().int().positive(),
+  priceCents: z.number().int().positive().max(INT4_MAX),
   imageUrl: z.string().url().optional(),
   // Required, no default - vendor must set both at creation (Story 1.2).
   stockQuantity: z.number().int().nonnegative().max(INT4_MAX),

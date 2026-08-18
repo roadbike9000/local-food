@@ -35,6 +35,15 @@ describe("UpdateProductStockSchema", () => {
     ).toBe(false);
   });
 
+  it("rejects a stockQuantity above the Postgres INTEGER max", () => {
+    expect(
+      UpdateProductStockSchema.safeParse({
+        ...validBody,
+        stockQuantity: 2_147_483_648,
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects a missing lowStockThreshold", () => {
     const result = UpdateProductStockSchema.safeParse({
       ...validBody,
@@ -52,6 +61,15 @@ describe("UpdateProductStockSchema", () => {
   it("rejects a non-integer lowStockThreshold", () => {
     expect(
       UpdateProductStockSchema.safeParse({ ...validBody, lowStockThreshold: 0.5 }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a lowStockThreshold above the Postgres INTEGER max", () => {
+    expect(
+      UpdateProductStockSchema.safeParse({
+        ...validBody,
+        lowStockThreshold: 2_147_483_648,
+      }).success,
     ).toBe(false);
   });
 
@@ -74,6 +92,15 @@ describe("UpdateProductStockSchema", () => {
     expect(
       UpdateProductStockSchema.safeParse({ ...validBody, expectedStockQuantity: 3.14 })
         .success,
+    ).toBe(false);
+  });
+
+  it("rejects an expectedStockQuantity above the Postgres INTEGER max", () => {
+    expect(
+      UpdateProductStockSchema.safeParse({
+        ...validBody,
+        expectedStockQuantity: 2_147_483_648,
+      }).success,
     ).toBe(false);
   });
 });

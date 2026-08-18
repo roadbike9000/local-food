@@ -85,9 +85,9 @@ export function EditStockControl({
         const body = await res.json().catch(() => null);
         setError(body?.error ?? "Could not update stock. Try again.");
         if (res.status === 409) {
-          // Reload the real current value now, so the vendor's next Save
-          // attempt starts from fresh data instead of 409-ing forever
-          // against the same stale expectedStockQuantity.
+          // Reload the real current values now - the server's error message
+          // already tells the vendor this happened, so this isn't a "try
+          // again" retry, it's what makes that message true.
           router.refresh();
         }
         return;
@@ -101,19 +101,44 @@ export function EditStockControl({
     }
   }
 
+  // Clears a stale error as soon as the vendor starts correcting the
+  // input it applies to, instead of leaving it displayed over a value
+  // that's no longer what triggered it.
+  function handleStockChange(value: string) {
+    setStockInput(value);
+    if (error) setError(null);
+  }
+
+  function handleThresholdChange(value: string) {
+    setThresholdInput(value);
+    if (error) setError(null);
+  }
+
+  const stockLabelId = `stock-qty-label-${productId}`;
+  const thresholdLabelId = `stock-threshold-label-${productId}`;
+  const productNameId = `stock-product-name-${productId}`;
+
   return (
     <>
       <td className="py-2">
+        {/* Shared by both inputs' aria-labelledby, so each keeps its
+            visible label text as the start of its accessible name (WCAG
+            2.5.3) while still getting a per-product-unique name overall.
+            Lives in this <td> (not a bare child of the fragment) because
+            <tr> only permits <td>/<th> children. */}
+        <span id={productNameId} className="sr-only">
+          for {productName}
+        </span>
         <label className="flex flex-col gap-0.5 text-xs text-stone-500">
-          <span>Qty</span>
+          <span id={stockLabelId}>Stock Quantity</span>
           <input
             type="number"
             step="1"
             min="0"
             max={INT4_MAX}
-            aria-label={`Stock Quantity for ${productName}`}
+            aria-labelledby={`${stockLabelId} ${productNameId}`}
             value={stockInput}
-            onChange={(e) => setStockInput(e.target.value)}
+            onChange={(e) => handleStockChange(e.target.value)}
             className="w-16 rounded-md border border-stone-300 px-1.5 py-1 text-sm text-stone-900"
           />
         </label>
@@ -121,15 +146,15 @@ export function EditStockControl({
       <td className="py-2">
         <div className="flex items-center gap-1.5">
           <label className="flex flex-col gap-0.5 text-xs text-stone-500">
-            <span>Alert at</span>
+            <span id={thresholdLabelId}>Low-Stock Threshold</span>
             <input
               type="number"
               step="1"
               min="0"
               max={INT4_MAX}
-              aria-label={`Low-Stock Threshold for ${productName}`}
+              aria-labelledby={`${thresholdLabelId} ${productNameId}`}
               value={thresholdInput}
-              onChange={(e) => setThresholdInput(e.target.value)}
+              onChange={(e) => handleThresholdChange(e.target.value)}
               className="w-16 rounded-md border border-stone-300 px-1.5 py-1 text-sm text-stone-900"
             />
           </label>
@@ -137,6 +162,7 @@ export function EditStockControl({
             type="button"
             disabled={submitting}
             onClick={handleSave}
+            aria-label={`Save stock changes for ${productName}`}
             className="rounded-md bg-brand px-2 py-1 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50"
           >
             Save

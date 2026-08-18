@@ -28,6 +28,8 @@ export async function createTestProduct(
     isAvailable: boolean;
     stockQuantity: number;
     lowStockThreshold: number;
+    stockIsPlaceholder: boolean;
+    thresholdIsPlaceholder: boolean;
   }> = {},
 ) {
   return prisma.product.create({
@@ -38,6 +40,8 @@ export async function createTestProduct(
       isAvailable: overrides.isAvailable ?? true,
       stockQuantity: overrides.stockQuantity ?? 50,
       lowStockThreshold: overrides.lowStockThreshold ?? 5,
+      stockIsPlaceholder: overrides.stockIsPlaceholder ?? false,
+      thresholdIsPlaceholder: overrides.thresholdIsPlaceholder ?? false,
     },
   });
 }

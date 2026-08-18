@@ -18,19 +18,19 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } },
 ) {
-  const vendor = await getCurrentVendor();
-  if (!vendor) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const parsed = UpdateProductStockSchema.safeParse(
-    await req.json().catch(() => null),
-  );
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
-
   try {
+    const vendor = await getCurrentVendor();
+    if (!vendor) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const parsed = UpdateProductStockSchema.safeParse(
+      await req.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+
     // Never trust the product ID alone - scope by ownership, same as every
     // other vendor-scoped route in this codebase.
     const product = await prisma.product.findFirst({
@@ -43,24 +43,35 @@ export async function PATCH(
     const { stockQuantity, lowStockThreshold, expectedStockQuantity } =
       parsed.data;
 
-    // Threshold has no concurrent writer (see setLowStockThreshold's own
+    // Threshold has no concurrent writer of its own (see setLowStockThreshold's
     // doc), so it's written unconditionally - a stock conflict below must
-    // not silently discard this half of the vendor's edit.
-    await setLowStockThreshold(params.id, lowStockThreshold);
+    // not silently discard this half of the vendor's edit. Passing the
+    // product's current value lets setLowStockThreshold tell a genuine edit
+    // apart from a same-value resubmission (every PATCH posts both fields).
+    const thresholdChanged = lowStockThreshold !== product.lowStockThreshold;
+    const thresholdUpdated = await setLowStockThreshold(
+      params.id,
+      lowStockThreshold,
+      product.lowStockThreshold,
+    );
+    if (!thresholdUpdated) {
+      // The product was deleted between the lookup above and this write.
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
-    const updated = await setStock(
+    const stockUpdated = await setStock(
       params.id,
       stockQuantity,
       expectedStockQuantity,
     );
-    if (!updated) {
-      return NextResponse.json(
-        {
-          error:
-            "Your Low-Stock Threshold was saved, but Stock Quantity changed since you loaded this page — refresh and try again",
-        },
-        { status: 409 },
-      );
+    if (!stockUpdated) {
+      // EditStockControl calls router.refresh() on a 409, so by the time
+      // the vendor reads this the current values are already showing -
+      // the message describes what happened, not an instruction to retry.
+      const error = thresholdChanged
+        ? "Stock Quantity changed since you loaded this page — your Low-Stock Threshold change was saved, and the values shown have been updated."
+        : "Stock Quantity changed since you loaded this page — the values shown have been updated.";
+      return NextResponse.json({ error }, { status: 409 });
     }
 
     // Re-scope by vendor, same as the lookup above - an unscoped read here

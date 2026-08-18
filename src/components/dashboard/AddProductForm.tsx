@@ -8,6 +8,10 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+// Postgres INTEGER max - priceCents/stockQuantity/lowStockThreshold are all
+// Int columns; matches the server-side Zod bound on each.
+const INT4_MAX = 2_147_483_647;
+
 export function AddProductForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -130,6 +134,7 @@ export function AddProductForm() {
           type="number"
           step="0.01"
           min="0.01"
+          max={INT4_MAX / 100}
           required
           className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
         />
@@ -145,6 +150,7 @@ export function AddProductForm() {
           type="number"
           step="1"
           min="0"
+          max={INT4_MAX}
           required
           className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
         />
@@ -160,6 +166,7 @@ export function AddProductForm() {
           type="number"
           step="1"
           min="0"
+          max={INT4_MAX}
           required
           className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
         />

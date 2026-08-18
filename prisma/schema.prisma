@@ -47,6 +47,10 @@ model Product {
   // the value chosen - this is what lets Story 1.6 tell a placeholder 0
   // apart from a vendor's deliberate 0.
   thresholdIsPlaceholder Boolean @default(false)
+  // Same idea as thresholdIsPlaceholder, for the migration-backfilled 100 -
+  // a vendor's deliberate stockQuantity of 100 is at least as plausible as
+  // the threshold's deliberate 0, so it needs the identical guard.
+  stockIsPlaceholder     Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

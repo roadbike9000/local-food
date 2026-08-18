@@ -47,6 +47,13 @@ describe("CreateProductSchema", () => {
     ).toBe(false);
   });
 
+  it("rejects a priceCents above the Postgres INTEGER max", () => {
+    expect(
+      CreateProductSchema.safeParse({ ...validBody, priceCents: 2_147_483_648 })
+        .success,
+    ).toBe(false);
+  });
+
   it("rejects an imageUrl that isn't a valid URL", () => {
     expect(
       CreateProductSchema.safeParse({ ...validBody, imageUrl: "not-a-url" }).success,
@@ -76,6 +83,13 @@ describe("stockQuantity (Story 1.2, AC #1)", () => {
       CreateProductSchema.safeParse({ ...validBody, stockQuantity: 4.5 }).success,
     ).toBe(false);
   });
+
+  it("rejects a stockQuantity above the Postgres INTEGER max", () => {
+    expect(
+      CreateProductSchema.safeParse({ ...validBody, stockQuantity: 2_147_483_648 })
+        .success,
+    ).toBe(false);
+  });
 });
 
 describe("lowStockThreshold (Story 1.2, AC #1)", () => {
@@ -101,6 +115,13 @@ describe("lowStockThreshold (Story 1.2, AC #1)", () => {
   it("rejects a non-integer lowStockThreshold", () => {
     expect(
       CreateProductSchema.safeParse({ ...validBody, lowStockThreshold: 2.2 }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a lowStockThreshold above the Postgres INTEGER max", () => {
+    expect(
+      CreateProductSchema.safeParse({ ...validBody, lowStockThreshold: 2_147_483_648 })
+        .success,
     ).toBe(false);
   });
 });
