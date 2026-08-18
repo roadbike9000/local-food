@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   PLACEHOLDER_LOW_STOCK_THRESHOLD,
   PLACEHOLDER_STOCK_QUANTITY,
-} from "./inventory";
+} from "./availability";
 
 // Raw SQL can't import a TS constant (see the migration's own comment), so
 // this is the one place AC #2's "never a hardcoded literal" rule is

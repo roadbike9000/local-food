@@ -15,8 +15,14 @@ test.describe("storefront and cart", () => {
       page.getByRole("heading", { name: /corner sourdough/i }),
     ).toBeVisible();
 
-    // Add the first product.
-    await page.getByRole("button", { name: "Add" }).first().click();
+    // Target a specific, known-in-stock product by name rather than
+    // .first() — a same-named/earlier-sorting out-of-stock fixture from a
+    // parallel test can render disabled and hang a .first() click (review
+    // round 1 finding).
+    const card = page
+      .getByRole("heading", { name: "Cinnamon Morning Bun", exact: true })
+      .locator("../..");
+    await card.getByRole("button", { name: "Add" }).click();
 
     // The cart badge in the navbar should now show at least 1.
     // /cart's first hit can lose the race against Next.js's on-demand route

@@ -2,7 +2,7 @@
 
 import { useCart } from "./CartProvider";
 import { formatPrice } from "@/lib/utils";
-import { isInStock } from "@/lib/inventory";
+import { isInStock } from "@/lib/availability";
 
 type ProductCardProps = {
   vendorId: string;

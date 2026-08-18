@@ -36,7 +36,7 @@ _Generated 2026-07-19 via `bmad-document-project` (deep scan). This is the prima
 1. Read [Project Overview](./project-overview.md) for the big picture and known gaps.
 2. `npm install && cp .env.example .env` — fill in Neon + Clerk keys at minimum.
 3. `npm run prisma:migrate && npm run db:seed && npm run dev`.
-4. For any new API/data work, check [Data Models](./data-models.md) and [API Contracts](./api-contracts.md) first — several access-control and pricing invariants (never trust client prices, always scope by `vendorId`, always filter `isAvailable`) are load-bearing and undocumented in code comments alone.
+4. For any new API/data work, check [Data Models](./data-models.md) and [API Contracts](./api-contracts.md) first — several access-control and pricing invariants (never trust client prices, always scope by `vendorId`, always check availability via `isInStock()`/`stockQuantity`, never a stored boolean) are load-bearing and undocumented in code comments alone.
 5. Before implementing, also read `_bmad-output/project-context.md` — it has 45 more granular rules (naming, error-handling patterns, file organization) that complement this documentation set.
 
 ## Notable findings from this scan

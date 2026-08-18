@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isInStock } from "./inventory";
+import { isInStock } from "./availability";
 
-// RED PHASE (Story 1.3, Task 2): isInStock doesn't exist in
-// src/lib/inventory.ts yet - this file correctly fails to import today.
 // Pure function, no Prisma/Clerk involved, so this belongs in Vitest per
 // project-context.md's Testing Rules (unlike Story 1.2's DB-touching tests,
 // which had to move out to Playwright).

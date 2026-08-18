@@ -26,11 +26,12 @@ Creates a `PENDING` order and a Stripe Checkout session.
 
 **Behavior:**
 1. `req.json().catch(() => null)` then `safeParse` — malformed JSON or schema mismatch → `400 { error: "Invalid request" }`.
-2. Re-fetches the named products from the DB, filtered by `vendorId` **and** `isAvailable: true`. If the count returned doesn't match `items.length` (an item is unavailable, deleted, or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
-3. Computes `totalCents` from DB prices — the client-sent price (there is none in this schema) can never influence the charge.
-4. Creates `Order` (status `PENDING`) with nested `OrderItem` creates.
-5. Creates a Stripe Checkout session (`mode: "payment"`), `metadata: { orderId }` so the webhook can find it back, `success_url` → `/checkout/success`, `cancel_url` → `/cart`.
-6. Updates the `Order` with `stripeSessionId`.
+2. Re-fetches the named products from the DB, filtered by `vendorId`. If the count returned doesn't match `items.length` (an item is deleted or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
+3. Per-line stock sufficiency check: `stockQuantity >= quantity` for every line (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean). Any short line rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created.
+4. Computes `totalCents` from DB prices — the client-sent price (there is none in this schema) can never influence the charge.
+5. Creates `Order` (status `PENDING`) with nested `OrderItem` creates.
+6. Creates a Stripe Checkout session (`mode: "payment"`), `metadata: { orderId }` so the webhook can find it back, `success_url` → `/checkout/success`, `cancel_url` → `/cart`.
+7. Updates the `Order` with `stripeSessionId`.
 
 **Response:** `200 { url: string }` — the Stripe-hosted checkout URL to redirect the browser to.
 
@@ -40,7 +41,7 @@ Creates a `PENDING` order and a Stripe Checkout session.
 Lists the signed-in vendor's products.
 
 - Auth: vendor-scoped (401 if no current vendor).
-- Response: `200 { products: Product[] }`, ordered `createdAt desc`. **Not** filtered by `isAvailable` — this is the vendor's own management view, unlike the storefront query.
+- Response: `200 { products: Product[] }`, ordered `createdAt desc`. Not filtered by stock — this is the vendor's own management view, unlike the storefront query, and vendors need to see out-of-stock products to restock them.
 
 ### `POST /api/products`
 Creates a product for the signed-in vendor.
