@@ -109,7 +109,14 @@ test.describe("storefront and cart", () => {
       );
     }
 
-    const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+    // Matches src/lib/utils.ts's formatPrice() exactly (Intl.NumberFormat
+    // inserts thousands separators formatPrice relies on) rather than a
+    // toFixed()-based reimplementation that would silently diverge at
+    // totals >= $1,000.
+    const dollars = (cents: number) =>
+      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+        cents / 100,
+      );
 
     // Every product card's "Add" button shares the accessible name "Add",
     // so scope each click to the specific card: the div containing both
@@ -141,6 +148,13 @@ test.describe("storefront and cart", () => {
       page.getByRole("heading", { name: /corner sourdough/i }),
     ).toBeVisible();
 
+    // productA is added twice (quantity 2) so the total assertion actually
+    // exercises priceCents * quantity, not just a sum of unit prices — with
+    // every line at quantity 1, a dropped `* quantity` in totalCents would
+    // pass unnoticed.
+    await productCard(productA.name)
+      .getByRole("button", { name: "Add" })
+      .click();
     await productCard(productA.name)
       .getByRole("button", { name: "Add" })
       .click();
@@ -154,13 +168,13 @@ test.describe("storefront and cart", () => {
     await page.getByRole("link", { name: /cart/i }).click();
     await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
 
-    // AC #1 (setup): both lines present, total is the sum of both fetched
-    // seed prices — never hardcoded, so this can't drift from seed data.
+    // AC #1 (setup): both lines present, total is 2x productA's price plus
+    // productB's — never hardcoded, so this can't drift from seed data.
     await expect(page.getByText(productA.name)).toBeVisible();
     await expect(page.getByText(productB.name)).toBeVisible();
     await expect(
       totalRow().getByText(
-        dollars(productA.priceCents + productB.priceCents),
+        dollars(2 * productA.priceCents + productB.priceCents),
         { exact: true },
       ),
     ).toBeVisible();
