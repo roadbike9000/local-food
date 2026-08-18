@@ -4,6 +4,16 @@
   summary: No Clerk test-auth infrastructure exists for authenticated dashboard e2e coverage.
   evidence: tests/dashboard.spec.ts only covers the unauthenticated redirect case (see its own header comment noting a Clerk test user/token is "a good next step"). This predates the new AddProductForm/AddSlotForm components and blocks e2e coverage for the authenticated create-product/create-slot flow.
 
+## Deferred from: code review of 1-2-stock-quantity-captured-at-creation-backfilled-for-existing-products (2026-08-18)
+
+- source_spec: `_bmad-output/implementation-artifacts/1-2-stock-quantity-captured-at-creation-backfilled-for-existing-products.md`
+  summary: `setStock()`'s value-equality optimistic lock is ABA-vulnerable — a decrement-then-restock between the vendor's page load and their save slips a stale edit through undetected.
+  evidence: `src/lib/inventory.ts:26-30` guards on `where: { id, stockQuantity: expectedCurrentValue }`. Verified working under 20-way concurrency (exactly 1 winner) and against a stale write (rejected, row unchanged) — the guard does what AD-3 asks. But if a sale takes 20→18 and a restock returns it 18→20 before the vendor's save, the where-clause matches and the vendor's edit silently overwrites the restock. Closing this fully requires a monotonic `version` column on `Product` and a `where: { id, version }` guard, which is a change to architecture AD-3's stated contract, not a story-level fix. Cheapest to fold into Story 1.4 (`decrementStock()`), which is the story that first introduces a real second writer.
+
+- source_spec: `_bmad-output/implementation-artifacts/1-2-stock-quantity-captured-at-creation-backfilled-for-existing-products.md`
+  summary: The stale Clerk auth fixture (see the Story 1.1 entry below) now blocks 15 e2e tests, including all 5 that verify this story's PATCH endpoint. Root cause re-confirmed independently; see the correction note in the story's Review Findings — the failure signature is 401 only for the 4 `products-api.spec.ts` tests, sign-in redirects for the 11 `dashboard.spec.ts` ones.
+  evidence: Reviewer re-ran `npx playwright test` from a clean checkout of `fc05050`: 24 passed / 15 failed, matching the Dev Agent Record's counts exactly. The `__session` JWT in `playwright/.auth/vendor.json` expired 2026-08-07T23:59:50Z; the new inline-edit test's `error-context.md` snapshot shows the Clerk "Sign in to LocalFood" page, not the dashboard. Tracked under the Story 1.1 entry — not duplicated as a separate work item, only escalated.
+
 ## Deferred from: code review of 1-1-verify-cart-line-removal-and-total-accuracy (2026-08-18)
 
 - source_spec: `_bmad-output/implementation-artifacts/1-1-verify-cart-line-removal-and-total-accuracy.md`
