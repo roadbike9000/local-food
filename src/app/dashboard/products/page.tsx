@@ -32,6 +32,7 @@ export default async function DashboardProductsPage() {
               <th className="py-2">Price</th>
               <th className="py-2">Available</th>
               <th className="py-2">Stock</th>
+              <th className="py-2">Low-Stock Threshold</th>
             </tr>
           </thead>
           <tbody>
@@ -40,13 +41,12 @@ export default async function DashboardProductsPage() {
                 <td className="py-2">{p.name}</td>
                 <td className="py-2">{formatPrice(p.priceCents)}</td>
                 <td className="py-2">{p.isAvailable ? "Yes" : "No"}</td>
-                <td className="py-2">
-                  <EditStockControl
-                    productId={p.id}
-                    initialStockQuantity={p.stockQuantity}
-                    initialLowStockThreshold={p.lowStockThreshold}
-                  />
-                </td>
+                <EditStockControl
+                  productId={p.id}
+                  productName={p.name}
+                  initialStockQuantity={p.stockQuantity}
+                  initialLowStockThreshold={p.lowStockThreshold}
+                />
               </tr>
             ))}
           </tbody>

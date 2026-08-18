@@ -145,7 +145,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
         const response = await request.patch(`/api/products/${product.id}`, {
           data: {
             stockQuantity: 15,
-            lowStockThreshold: 2,
+            lowStockThreshold: 9, // deliberately different from the seeded 2
             expectedStockQuantity: 20, // stale: actual value is now 18
           },
         });
@@ -155,6 +155,15 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
         // Task 5: "an error message the UI surfaces (\"Stock changed since
         // you loaded this page — refresh and try again\")".
         expect(body.error).toMatch(/refresh/i);
+
+        // Review follow-up: a stock conflict must not silently discard the
+        // Low-Stock Threshold half of the edit - it has no concurrent
+        // writer of its own and is written unconditionally.
+        const persisted = await prisma.product.findUnique({
+          where: { id: product.id },
+        });
+        expect(persisted?.lowStockThreshold).toBe(9);
+        expect(persisted?.stockQuantity).toBe(18); // stock write correctly rejected
       } finally {
         await deleteProduct(product.id);
       }

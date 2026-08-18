@@ -3,31 +3,66 @@
 /**
  * Inline edit control for a product's Stock Quantity and Low-Stock
  * Threshold - the only way to correct either value after creation (Story
- * 1.2). Both fields save together via a single PATCH request.
+ * 1.2). Both fields save together via a single PATCH request. Renders as
+ * two <td>s (a fragment) so the caller can give each field its own labeled
+ * table column.
  */
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+// Postgres INTEGER max - matches the server-side Zod bound, so the browser
+// rejects an overflowing value before it ever reaches the network.
+const INT4_MAX = 2_147_483_647;
 
 type EditStockControlProps = {
   productId: string;
+  productName: string;
   initialStockQuantity: number;
   initialLowStockThreshold: number;
 };
 
+function parseWholeNumber(raw: string): number | null {
+  if (!/^\d+$/.test(raw.trim())) return null;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value <= INT4_MAX ? value : null;
+}
+
 export function EditStockControl({
   productId,
+  productName,
   initialStockQuantity,
   initialLowStockThreshold,
 }: EditStockControlProps) {
   const router = useRouter();
-  const [stockQuantity, setStockQuantity] = useState(initialStockQuantity);
-  const [lowStockThreshold, setLowStockThreshold] = useState(
-    initialLowStockThreshold,
+  const [stockInput, setStockInput] = useState(String(initialStockQuantity));
+  const [thresholdInput, setThresholdInput] = useState(
+    String(initialLowStockThreshold),
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Resync from the server's value after a router.refresh() (success) or a
+  // reload - without this, a stale typed value keeps showing even when the
+  // server disagrees.
+  useEffect(() => {
+    setStockInput(String(initialStockQuantity));
+  }, [initialStockQuantity]);
+
+  useEffect(() => {
+    setThresholdInput(String(initialLowStockThreshold));
+  }, [initialLowStockThreshold]);
+
   async function handleSave() {
+    // Held as raw strings (not numbers) so an emptied input doesn't
+    // silently coerce to 0 - Number("") === 0, which would otherwise
+    // persist "sold out" the moment a vendor backspaces the field.
+    const stockQuantity = parseWholeNumber(stockInput);
+    const lowStockThreshold = parseWholeNumber(thresholdInput);
+    if (stockQuantity === null || lowStockThreshold === null) {
+      setError("Enter a whole number, 0 or greater, for both fields.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -43,8 +78,18 @@ export function EditStockControl({
       });
 
       if (!res.ok) {
+        if (res.status === 401) {
+          setError("Your session expired. Sign in again.");
+          return;
+        }
         const body = await res.json().catch(() => null);
         setError(body?.error ?? "Could not update stock. Try again.");
+        if (res.status === 409) {
+          // Reload the real current value now, so the vendor's next Save
+          // attempt starts from fresh data instead of 409-ing forever
+          // against the same stale expectedStockQuantity.
+          router.refresh();
+        }
         return;
       }
 
@@ -57,38 +102,52 @@ export function EditStockControl({
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      <input
-        type="number"
-        step="1"
-        min="0"
-        aria-label="Stock Quantity"
-        value={stockQuantity}
-        onChange={(e) => setStockQuantity(Number(e.target.value))}
-        className="w-16 rounded-md border border-stone-300 px-1.5 py-1 text-sm"
-      />
-      <input
-        type="number"
-        step="1"
-        min="0"
-        aria-label="Low-Stock Threshold"
-        value={lowStockThreshold}
-        onChange={(e) => setLowStockThreshold(Number(e.target.value))}
-        className="w-16 rounded-md border border-stone-300 px-1.5 py-1 text-sm"
-      />
-      <button
-        type="button"
-        disabled={submitting}
-        onClick={handleSave}
-        className="rounded-md bg-brand px-2 py-1 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50"
-      >
-        Save
-      </button>
-      {error ? (
-        <p role="alert" aria-live="polite" className="text-xs text-red-600">
-          {error}
-        </p>
-      ) : null}
-    </div>
+    <>
+      <td className="py-2">
+        <label className="flex flex-col gap-0.5 text-xs text-stone-500">
+          <span>Qty</span>
+          <input
+            type="number"
+            step="1"
+            min="0"
+            max={INT4_MAX}
+            aria-label={`Stock Quantity for ${productName}`}
+            value={stockInput}
+            onChange={(e) => setStockInput(e.target.value)}
+            className="w-16 rounded-md border border-stone-300 px-1.5 py-1 text-sm text-stone-900"
+          />
+        </label>
+      </td>
+      <td className="py-2">
+        <div className="flex items-center gap-1.5">
+          <label className="flex flex-col gap-0.5 text-xs text-stone-500">
+            <span>Alert at</span>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              max={INT4_MAX}
+              aria-label={`Low-Stock Threshold for ${productName}`}
+              value={thresholdInput}
+              onChange={(e) => setThresholdInput(e.target.value)}
+              className="w-16 rounded-md border border-stone-300 px-1.5 py-1 text-sm text-stone-900"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={handleSave}
+            className="rounded-md bg-brand px-2 py-1 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+          >
+            Save
+          </button>
+        </div>
+        {error ? (
+          <p role="alert" aria-live="polite" className="text-xs text-red-600">
+            {error}
+          </p>
+        ) : null}
+      </td>
+    </>
   );
 }

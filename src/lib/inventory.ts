@@ -34,6 +34,10 @@ export async function setStock(
  * Plain update, no conditional guard. Nothing else ever writes
  * lowStockThreshold, so there's no concurrent-write race to protect
  * against.
+ *
+ * Always clears thresholdIsPlaceholder to false, regardless of newValue -
+ * a vendor choosing 0 on purpose is a real decision, not the migration
+ * placeholder, and Story 1.6 must never flag it again after this write.
  */
 export async function setLowStockThreshold(
   productId: string,
@@ -41,6 +45,6 @@ export async function setLowStockThreshold(
 ): Promise<void> {
   await prisma.product.update({
     where: { id: productId },
-    data: { lowStockThreshold: newValue },
+    data: { lowStockThreshold: newValue, thresholdIsPlaceholder: false },
   });
 }

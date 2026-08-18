@@ -42,6 +42,11 @@ model Product {
   isAvailable  Boolean  @default(true)
   stockQuantity     Int // required at creation, no schema default - vendor must set it (Story 1.2)
   lowStockThreshold Int // required at creation, no schema default - vendor must set it (Story 1.2)
+  // True only for the migration-backfilled 0 (Story 1.2 review). Cleared to
+  // false on any vendor-initiated write to lowStockThreshold, regardless of
+  // the value chosen - this is what lets Story 1.6 tell a placeholder 0
+  // apart from a vendor's deliberate 0.
+  thresholdIsPlaceholder Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

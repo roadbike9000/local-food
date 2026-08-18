@@ -9,6 +9,7 @@ import {
   deleteOrder,
   createTestProduct,
   deleteProduct,
+  prisma,
 } from "./helpers/db";
 
 // The dashboard is auth-protected. Without a session, all tabs redirect to
@@ -139,12 +140,14 @@ test.describe("vendor dashboard (authenticated)", () => {
       await page.goto("/dashboard/products");
       await page.getByRole("button", { name: "Add product" }).click();
 
-      // Scoped to the add-product <form> — EditStockControl's per-row
-      // inputs (also labeled "Stock Quantity"/"Low-Stock Threshold") live
-      // in table cells, not inside this form, but an unscoped getByLabel
-      // would match every row plus the form and hit Playwright's
-      // strict-mode ambiguity.
-      const form = page.locator("form");
+      // Scoped to the add-product form by its accessible name —
+      // EditStockControl's per-row inputs (also labeled "Stock
+      // Quantity"/"Low-Stock Threshold") live in table cells, not inside
+      // this form, but an unscoped getByLabel would match every row plus
+      // the form and hit Playwright's strict-mode ambiguity. Anchoring by
+      // role/name (rather than the bare "form" tag) survives a second
+      // <form> being added to the page later.
+      const form = page.getByRole("form", { name: "Add product" });
       await form.getByLabel("Name").fill(productName);
       await form.getByLabel("Price (USD)").fill("4.50");
       await form.getByLabel("Stock Quantity", { exact: true }).fill("25");
@@ -245,9 +248,9 @@ test.describe("vendor dashboard (authenticated)", () => {
 
     await page.goto("/dashboard/products");
     await page.getByRole("button", { name: "Add product" }).click();
-    // Scoped to the add-product <form> - see the identical comment on the
-    // "vendor can add a new product" test above.
-    const form = page.locator("form");
+    // Scoped to the add-product form by its accessible name - see the
+    // identical comment on the "vendor can add a new product" test above.
+    const form = page.getByRole("form", { name: "Add product" });
     await form.getByLabel("Name").fill("Session Expiry Check");
     await form.getByLabel("Price (USD)").fill("4.50");
     await form.getByLabel("Stock Quantity", { exact: true }).fill("25");
@@ -295,16 +298,29 @@ test.describe("vendor dashboard (authenticated)", () => {
 
       // Network-first: register the response listener before the click that
       // triggers the PATCH, same pattern as "vendor can add a new product".
-      await Promise.all([
+      const [response] = await Promise.all([
         page.waitForResponse(`**/api/products/${product.id}`),
         row.getByRole("button", { name: "Save" }).click(),
       ]);
+      // This is the assertion the old version of this test lacked: without
+      // it, the test goes green even if the PATCH failed (409/500), because
+      // the input's value is React state that a router.refresh() alone
+      // doesn't roll back.
+      expect(response.status()).toBe(200);
 
-      // EditStockControl calls router.refresh() on success (per Dev Notes,
-      // mirrors AddProductForm's shape) — re-fetches the server component,
-      // so the same extended timeout as the analogous add-product assertion
-      // applies here.
-      await expect(stockInput).toHaveValue("35", { timeout: 15_000 });
+      // A hard reload, not another router.refresh() - proves the value was
+      // actually persisted server-side, not just held in client state.
+      await page.reload();
+      await expect(
+        row.getByRole("spinbutton", { name: /stock quantity/i }),
+      ).toHaveValue("35", { timeout: 15_000 });
+
+      // Direct DB read-back - the strongest form of "this actually
+      // persisted", independent of anything the UI renders.
+      const persisted = await prisma.product.findUnique({
+        where: { id: product.id },
+      });
+      expect(persisted?.stockQuantity).toBe(35);
     } finally {
       await deleteProduct(product.id);
     }
