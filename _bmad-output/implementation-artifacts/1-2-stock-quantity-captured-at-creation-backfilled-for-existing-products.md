@@ -102,6 +102,15 @@ so that the system knows my real stock, on an ongoing basis — not just once.
 - Ownership-scoping discipline (`project-context.md`): the new PATCH route must filter by `vendorId: vendor.id`, never trust a product ID from the client alone — same rule every other vendor-scoped route in this codebase already follows.
 - Migration hygiene (`project-context.md`): always `npm run prisma:migrate` (`prisma migrate dev`), never `prisma db push`.
 
+### ATDD Artifacts
+
+- Checklist: `_bmad-output/test-artifacts/atdd-checklist-1-2-stock-quantity-captured-at-creation-backfilled-for-existing-products.md`
+- Unit tests: `src/app/api/products/schema.test.ts` (extended, 8 new cases), `src/app/api/products/[id]/schema.test.ts` (new, 10 cases)
+- API tests: `tests/products-api.spec.ts` (new, 4 cases)
+- E2E tests: `tests/dashboard.spec.ts` (extended, 1 new case)
+- Component tests: none (no component-testing infra in this repo)
+- Activate task-by-task per the checklist's "Next Steps" section — not all at once.
+
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 1.2] — story definition, ACs, FR-12 traceability.

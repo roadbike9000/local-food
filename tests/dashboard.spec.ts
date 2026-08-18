@@ -7,6 +7,8 @@ import {
   deletePickupSlotByLocation,
   createTestOrder,
   deleteOrder,
+  createTestProduct,
+  deleteProduct,
 } from "./helpers/db";
 
 // The dashboard is auth-protected. Without a session, all tabs redirect to
@@ -242,5 +244,78 @@ test.describe("vendor dashboard (authenticated)", () => {
     await expect(
       page.getByText("Your session expired. Sign in again."),
     ).toBeVisible();
+  });
+
+  // --- RED PHASE (Story 1.2, Task 6/8) -------------------------------------
+  // EditStockControl doesn't exist yet: no "Stock" column on
+  // /dashboard/products, no PATCH /api/products/[id] endpoint. This test
+  // documents the expected green-phase behavior (AC #4, #5) and will fail
+  // until that work lands. Selectors are written from best practices (no
+  // live DOM to snapshot against this run — tea_browser_automation is
+  // unavailable) using this suite's existing resilient-selector convention
+  // (getByRole/getByLabel scoped to a row), mirroring the network-first
+  // pattern from "vendor can add a new product" above. If EditStockControl's
+  // actual accessible names differ once built, update the selectors here
+  // during dev-story's green-phase activation — don't just delete
+  // test.skip().
+  test.skip("[P1] vendor can edit an existing product's Stock Quantity via the inline control", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const productName = `Playwright Stock Edit ${Date.now()}`;
+
+    // A dedicated fixture product, not a shared seeded one — seeded products
+    // (prisma/seed.ts) are shared across parallel tests, and mutating a
+    // shared product's stock here would pollute other tests running
+    // concurrently. NOTE: createTestProduct (tests/helpers/db.ts) does not
+    // yet accept stockQuantity/lowStockThreshold overrides — that support
+    // needs to be added alongside the Prisma schema fields (Story 1.2,
+    // Task 1) before this compiles and runs. Tracked as a fixture need, not
+    // built by this ATDD scaffold.
+    const product = await createTestProduct(vendor.id, {
+      name: productName,
+      stockQuantity: 20,
+      lowStockThreshold: 5,
+    } as Partial<{
+      name: string;
+      priceCents: number;
+      isAvailable: boolean;
+      stockQuantity: number;
+      lowStockThreshold: number;
+    }>);
+
+    try {
+      await page.goto("/dashboard/products");
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible();
+
+      // Scope to the fixture product's row so this doesn't collide with
+      // other rows/parallel test data on the same page.
+      const row = page.getByRole("row", { name: new RegExp(productName) });
+      await expect(row).toBeVisible();
+
+      const stockInput = row.getByRole("spinbutton", {
+        name: /stock quantity/i,
+      });
+      await expect(stockInput).toHaveValue("20");
+
+      await stockInput.fill("35");
+
+      // Network-first: register the response listener before the click that
+      // triggers the PATCH, same pattern as "vendor can add a new product".
+      await Promise.all([
+        page.waitForResponse(`**/api/products/${product.id}`),
+        row.getByRole("button", { name: "Save" }).click(),
+      ]);
+
+      // EditStockControl calls router.refresh() on success (per Dev Notes,
+      // mirrors AddProductForm's shape) — re-fetches the server component,
+      // so the same extended timeout as the analogous add-product assertion
+      // applies here.
+      await expect(stockInput).toHaveValue("35", { timeout: 15_000 });
+    } finally {
+      await deleteProduct(product.id);
+    }
   });
 });

@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { CreateProductSchema } from "./schema";
 
+// Story 1.2, Task 8: stockQuantity/lowStockThreshold are added to this
+// schema as required fields (see the new describe blocks below). This
+// shared fixture must carry real values *now* so the existing "accepts"/
+// "rejects" tests below keep testing what they say they test once those
+// fields become required — otherwise every "rejects" case here would start
+// failing for the wrong reason (missing required field, not the thing
+// actually under test).
 const validBody = {
   name: "Sourdough Loaf",
   priceCents: 900,
+  stockQuantity: 50,
+  lowStockThreshold: 5,
 };
 
 describe("CreateProductSchema", () => {
@@ -41,6 +50,63 @@ describe("CreateProductSchema", () => {
   it("rejects an imageUrl that isn't a valid URL", () => {
     expect(
       CreateProductSchema.safeParse({ ...validBody, imageUrl: "not-a-url" }).success,
+    ).toBe(false);
+  });
+});
+
+// Story 1.2 (RED PHASE, AC #1): stockQuantity/lowStockThreshold don't exist
+// on CreateProductSchema yet (added in Task 4). Until then, Zod's default
+// object behavior silently strips missing/extra keys rather than rejecting
+// them, so every "rejects" case below currently gets success: true instead
+// of the expected false — that's the point of red phase. Kept in it.skip()
+// until Task 4 lands; un-skip case-by-case as dev-story activates them.
+describe("stockQuantity (Story 1.2, AC #1)", () => {
+  it.skip("accepts a valid non-negative integer stockQuantity", () => {
+    const result = CreateProductSchema.safeParse({ ...validBody, stockQuantity: 42 });
+    expect(result.success).toBe(true);
+  });
+
+  it.skip("rejects a missing stockQuantity", () => {
+    const result = CreateProductSchema.safeParse({ ...validBody, stockQuantity: undefined });
+    expect(result.success).toBe(false);
+  });
+
+  it.skip("rejects a negative stockQuantity", () => {
+    expect(
+      CreateProductSchema.safeParse({ ...validBody, stockQuantity: -1 }).success,
+    ).toBe(false);
+  });
+
+  it.skip("rejects a non-integer stockQuantity", () => {
+    expect(
+      CreateProductSchema.safeParse({ ...validBody, stockQuantity: 4.5 }).success,
+    ).toBe(false);
+  });
+});
+
+describe("lowStockThreshold (Story 1.2, AC #1)", () => {
+  it.skip("accepts a valid non-negative integer lowStockThreshold", () => {
+    const result = CreateProductSchema.safeParse({ ...validBody, lowStockThreshold: 7 });
+    expect(result.success).toBe(true);
+  });
+
+  it.skip("rejects a missing lowStockThreshold", () => {
+    const result = CreateProductSchema.safeParse({
+      ...validBody,
+      lowStockThreshold: undefined,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it.skip("rejects a negative lowStockThreshold", () => {
+    expect(
+      CreateProductSchema.safeParse({ ...validBody, lowStockThreshold: -1 }).success,
+    ).toBe(false);
+  });
+
+  it.skip("rejects a non-integer lowStockThreshold", () => {
+    expect(
+      CreateProductSchema.safeParse({ ...validBody, lowStockThreshold: 2.2 }).success,
     ).toBe(false);
   });
 });
