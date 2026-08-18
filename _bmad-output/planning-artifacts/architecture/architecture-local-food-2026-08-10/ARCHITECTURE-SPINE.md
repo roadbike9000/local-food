@@ -89,11 +89,14 @@ flowchart LR
 - **Prevents:** Two builders each guessing a different mechanism (a made-up invite token, a temporary password, an auto-generated Clerk account) for a flow the PRD never actually specified.
 - **Rule:** `Vendor.clerkUserId` becomes nullable (was required+unique). An admin-created Vendor has `clerkUserId: null` until someone (admin/ops) manually sets it once the vendor signs up with Clerk separately — no invite/claim flow is built. Every existing query assuming `clerkUserId` is always present (`getCurrentVendor()` and any vendor-facing route) must handle the null case as "not yet claimed," not crash.
 
-### AD-9 — The migration placeholder is one named constant, shared by the migration and the vendor-facing flag
+### AD-9 — Migration placeholders are named constants, shared by the migration and the vendor-facing flag
 
 - **Binds:** FR-12, FR-13
-- **Prevents:** The backfill migration and the dashboard banner check (FR-13) each hardcoding `100` independently, so a future change to the placeholder value silently desyncs them.
-- **Rule:** `PLACEHOLDER_STOCK_QUANTITY = 100` is defined once (e.g. `src/lib/inventory.ts`) and imported by both the migration script and the `/dashboard/products` banner condition (`stockQuantity === PLACEHOLDER_STOCK_QUANTITY`) — neither hardcodes the literal.
+- **Prevents:** The backfill migration and the dashboard banner check (FR-13) each hardcoding a placeholder literal independently, so a future change silently desyncs them.
+- **Rule:** Two constants, both defined once in `src/lib/inventory.ts` and imported everywhere they're checked — neither is ever hardcoded at the call site:
+  - `PLACEHOLDER_STOCK_QUANTITY = 100` — existing-product backfill for `stockQuantity` (`isAvailable: true` → 100, `false` → 0).
+  - `PLACEHOLDER_LOW_STOCK_THRESHOLD = 0` — existing-product backfill for `lowStockThreshold`. Vendor owns this value (per user direction, not an admin-picked business default), so the backfill is a neutral sentinel, not a real number: 0 means the low-stock alert (FR-10) never fires until the vendor sets a real positive threshold — silent by default, not a guessed business decision. New products require a vendor-supplied value on `AddProductForm`, no default.
+  - The `/dashboard/products` banner (FR-13, Story 1.6) checks **both** constants — a product flagged for either `stockQuantity === PLACEHOLDER_STOCK_QUANTITY` or `lowStockThreshold === PLACEHOLDER_LOW_STOCK_THRESHOLD` gets the same nudge-the-vendor treatment, same mechanism, same banner.
 
 ## Consistency Conventions
 

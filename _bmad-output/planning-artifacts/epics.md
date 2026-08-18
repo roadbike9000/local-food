@@ -109,12 +109,12 @@ So that the system knows my real stock.
 
 **Given** the vendor's `AddProductForm`
 **When** they create a new product
-**Then** Stock Quantity is a required field — no product can be created without one
-**And** on migration, every existing product with `isAvailable: true` is backfilled to 100, every `isAvailable: false` product to 0 (`PLACEHOLDER_STOCK_QUANTITY` constant, AD-9)
-**And** Low-Stock Threshold is likewise captured per-product at creation
-**And** the vendor editing an existing product's Stock Quantity goes through `setStock()` — a conditional update guarded against the value the form last loaded, never a bare write — so a concurrent sale decrementing the same product can't be silently clobbered by the vendor's edit
+**Then** Stock Quantity and Low-Stock Threshold are both required fields — no product can be created without them, no default offered for either (vendor owns their own stock, per explicit product direction)
+**And** on migration, every existing product's Stock Quantity is backfilled per `isAvailable` (`true` → 100, `false` → 0) and every existing product's Low-Stock Threshold is backfilled to 0 — both are named constants (`PLACEHOLDER_STOCK_QUANTITY`, `PLACEHOLDER_LOW_STOCK_THRESHOLD`, AD-9), never hardcoded at the call site
+**And** the Low-Stock Threshold backfill of 0 is a neutral sentinel, not a real business number — a 0 threshold means the low-stock alert (FR-10) never fires until the vendor sets a real positive value themselves
+**And** the vendor editing an existing product's Stock Quantity or Low-Stock Threshold goes through `setStock()` — a conditional update guarded against the value the form last loaded, never a bare write — so a concurrent sale decrementing the same product can't be silently clobbered by the vendor's edit
 
-*(FR12, AD-3.)*
+*(FR12, AD-3, AD-9.)*
 
 ### Story 1.3: Out-of-stock products are marked and blocked
 
@@ -165,18 +165,18 @@ So that I don't have to remove and re-add it.
 
 *(FR11.)*
 
-### Story 1.6: Vendor notified of placeholder Stock Quantity
+### Story 1.6: Vendor notified of placeholder Stock Quantity or Low-Stock Threshold
 
 As a vendor,
-I want to know which of my products still has a migration-placeholder count,
-So that I can enter the real number.
+I want to know which of my products still has a migration-placeholder Stock Quantity or Low-Stock Threshold,
+So that I can enter the real numbers.
 
 **Acceptance Criteria:**
 
-**Given** a product whose Stock Quantity still equals `PLACEHOLDER_STOCK_QUANTITY`
+**Given** a product whose Stock Quantity still equals `PLACEHOLDER_STOCK_QUANTITY`, or whose Low-Stock Threshold still equals `PLACEHOLDER_LOW_STOCK_THRESHOLD` (Story 1.2, AD-9)
 **When** the vendor views `/dashboard/products`
-**Then** a banner/badge flags that row
-**And** the banner disappears the moment the vendor edits that product's Stock Quantity to any value — via Story 1.2's `setStock()` path, same as any other vendor edit, no separate write mechanism for clearing this flag
+**Then** a banner/badge flags that row — same banner mechanism for either placeholder, not two separate flags
+**And** the banner disappears the moment the vendor edits the flagged field to any value — via Story 1.2's `setStock()` path, same as any other vendor edit, no separate write mechanism for clearing this flag
 **And** no SMS/email is sent — dashboard-only
 
 *(FR13, AD-9.)*
