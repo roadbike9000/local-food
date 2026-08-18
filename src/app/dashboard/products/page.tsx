@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentVendor } from "@/lib/vendor";
 import { formatPrice } from "@/lib/utils";
 import { AddProductForm } from "@/components/dashboard/AddProductForm";
+import { EditStockControl } from "@/components/dashboard/EditStockControl";
 
 // Products tab: lists the vendor's products and lets them add new ones.
 export default async function DashboardProductsPage() {
@@ -30,6 +31,7 @@ export default async function DashboardProductsPage() {
               <th className="py-2">Name</th>
               <th className="py-2">Price</th>
               <th className="py-2">Available</th>
+              <th className="py-2">Stock</th>
             </tr>
           </thead>
           <tbody>
@@ -38,6 +40,13 @@ export default async function DashboardProductsPage() {
                 <td className="py-2">{p.name}</td>
                 <td className="py-2">{formatPrice(p.priceCents)}</td>
                 <td className="py-2">{p.isAvailable ? "Yes" : "No"}</td>
+                <td className="py-2">
+                  <EditStockControl
+                    productId={p.id}
+                    initialStockQuantity={p.stockQuantity}
+                    initialLowStockThreshold={p.lowStockThreshold}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

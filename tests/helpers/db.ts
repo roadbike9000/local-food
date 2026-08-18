@@ -26,6 +26,8 @@ export async function createTestProduct(
     name: string;
     priceCents: number;
     isAvailable: boolean;
+    stockQuantity: number;
+    lowStockThreshold: number;
   }> = {},
 ) {
   return prisma.product.create({
@@ -34,6 +36,8 @@ export async function createTestProduct(
       name: overrides.name ?? "Test Product (Playwright)",
       priceCents: overrides.priceCents ?? 500,
       isAvailable: overrides.isAvailable ?? true,
+      stockQuantity: overrides.stockQuantity ?? 50,
+      lowStockThreshold: overrides.lowStockThreshold ?? 5,
     },
   });
 }

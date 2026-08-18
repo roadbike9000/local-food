@@ -40,6 +40,8 @@ model Product {
   priceCents   Int // e.g. 1250 == $12.50
   imageUrl     String? // Cloudinary URL
   isAvailable  Boolean  @default(true)
+  stockQuantity     Int // required at creation, no schema default - vendor must set it (Story 1.2)
+  lowStockThreshold Int // required at creation, no schema default - vendor must set it (Story 1.2)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

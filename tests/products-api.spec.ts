@@ -1,19 +1,11 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "@playwright/test";
-import { getVendorBySlug, deleteProduct, prisma } from "./helpers/db";
+import { getVendorBySlug, deleteProduct, prisma, createTestProduct } from "./helpers/db";
 
 /**
  * API-level coverage for PATCH /api/products/[id] — Story 1.2's new
  * stock-edit endpoint (AC #4, #5).
- *
- * RED PHASE: src/app/api/products/[id]/route.ts, its colocated
- * UpdateProductStockSchema, and the Product.stockQuantity/lowStockThreshold
- * columns themselves don't exist yet (Story 1.2, Tasks 1 and 5). Every test
- * below is expected to fail today (404 route-not-found, or a runtime/Prisma
- * error once the columns exist but the route doesn't) and is kept in
- * test.skip() until dev-story implements Task 5, per this workflow's
- * mandatory ATDD rule.
  *
  * Requires playwright/support/generate-vendor-auth.ts to have been run once
  * (same pre-existing stale-fixture limitation documented in
@@ -25,27 +17,6 @@ import { getVendorBySlug, deleteProduct, prisma } from "./helpers/db";
  */
 const authFile = join(process.cwd(), "playwright/.auth/vendor.json");
 
-// Local scaffold helper, not added to tests/helpers/db.ts's createTestProduct
-// (its `overrides` type doesn't have stockQuantity/lowStockThreshold, and
-// per this subagent's instructions fixture changes are tracked for the
-// aggregation step, not made here). `as any` is required because
-// stockQuantity/lowStockThreshold aren't in the generated Prisma types
-// until Story 1.2 Task 1's migration lands — expected in red phase.
-async function createStockTestProduct(
-  vendorId: string,
-  overrides: { name: string; stockQuantity: number; lowStockThreshold: number },
-) {
-  return prisma.product.create({
-    data: {
-      vendorId,
-      name: overrides.name,
-      priceCents: 500,
-      stockQuantity: overrides.stockQuantity,
-      lowStockThreshold: overrides.lowStockThreshold,
-    } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-  });
-}
-
 test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
   test.use({ storageState: authFile });
 
@@ -56,11 +27,11 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
     );
   });
 
-  test.skip(
+  test(
     "[P0] updates stockQuantity and lowStockThreshold for the caller's own product (200)",
     async ({ request }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
-      const product = await createStockTestProduct(vendor.id, {
+      const product = await createTestProduct(vendor.id, {
         name: "PATCH Success Test Product",
         stockQuantity: 20,
         lowStockThreshold: 5,
@@ -88,7 +59,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
     },
   );
 
-  test.skip(
+  test(
     "[P0] returns 404 when the product belongs to a different vendor (ownership scoping)",
     async ({ request }) => {
       // Ownership scoping is P0 in this codebase's own discipline
@@ -97,7 +68,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
       // alone). The authenticated session is Corner Sourdough (see file
       // header) — Green Valley Produce's product must be invisible to it.
       const otherVendor = await getVendorBySlug("green-valley-produce");
-      const foreignProduct = await createStockTestProduct(otherVendor.id, {
+      const foreignProduct = await createTestProduct(otherVendor.id, {
         name: "Ownership Scoping Test Product",
         stockQuantity: 10,
         lowStockThreshold: 2,
@@ -122,11 +93,11 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
     },
   );
 
-  test.skip(
+  test(
     "[P0] returns 400 when the request body fails validation",
     async ({ request }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
-      const product = await createStockTestProduct(vendor.id, {
+      const product = await createTestProduct(vendor.id, {
         name: "Validation Test Product",
         stockQuantity: 10,
         lowStockThreshold: 2,
@@ -148,7 +119,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
     },
   );
 
-  test.skip(
+  test(
     "[P0] returns 409 when expectedStockQuantity is stale (optimistic-lock conflict, AD-3)",
     async ({ request }) => {
       // This is the entire point of AD-3's design: setStock()'s conditional
@@ -157,7 +128,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
       // (e.g. a concurrent sale's decrementStock() call), not silently
       // clobber it.
       const vendor = await getVendorBySlug("corner-sourdough");
-      const product = await createStockTestProduct(vendor.id, {
+      const product = await createTestProduct(vendor.id, {
         name: "Conflict Test Product",
         stockQuantity: 20,
         lowStockThreshold: 2,
@@ -168,7 +139,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
         // form loaded stockQuantity=20 — e.g. a sale decrementing it.
         await prisma.product.update({
           where: { id: product.id },
-          data: { stockQuantity: 18 } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+          data: { stockQuantity: 18 },
         });
 
         const response = await request.patch(`/api/products/${product.id}`, {

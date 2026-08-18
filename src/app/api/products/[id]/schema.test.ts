@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { UpdateProductStockSchema } from "./schema";
 
-// Story 1.2, Task 5/8 (RED PHASE): UpdateProductStockSchema and its
-// colocated src/app/api/products/[id]/schema.ts don't exist yet — this
-// entire file fails to even import until dev-story creates that module.
 // Mirrors src/app/api/products/schema.test.ts's existing pattern: one
 // shared valid body, "accepts valid" + one "rejects" case per invalid
-// value per field. Kept in it.skip() until Task 5 lands; un-skip
-// case-by-case as dev-story activates them.
+// value per field.
 const validBody = {
   stockQuantity: 15,
   lowStockThreshold: 3,
@@ -15,11 +11,11 @@ const validBody = {
 };
 
 describe("UpdateProductStockSchema", () => {
-  it.skip("accepts a valid body with all three required fields", () => {
+  it("accepts a valid body with all three required fields", () => {
     expect(UpdateProductStockSchema.safeParse(validBody).success).toBe(true);
   });
 
-  it.skip("rejects a missing stockQuantity", () => {
+  it("rejects a missing stockQuantity", () => {
     const result = UpdateProductStockSchema.safeParse({
       ...validBody,
       stockQuantity: undefined,
@@ -27,19 +23,19 @@ describe("UpdateProductStockSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it.skip("rejects a negative stockQuantity", () => {
+  it("rejects a negative stockQuantity", () => {
     expect(
       UpdateProductStockSchema.safeParse({ ...validBody, stockQuantity: -1 }).success,
     ).toBe(false);
   });
 
-  it.skip("rejects a non-integer stockQuantity", () => {
+  it("rejects a non-integer stockQuantity", () => {
     expect(
       UpdateProductStockSchema.safeParse({ ...validBody, stockQuantity: 1.5 }).success,
     ).toBe(false);
   });
 
-  it.skip("rejects a missing lowStockThreshold", () => {
+  it("rejects a missing lowStockThreshold", () => {
     const result = UpdateProductStockSchema.safeParse({
       ...validBody,
       lowStockThreshold: undefined,
@@ -47,19 +43,19 @@ describe("UpdateProductStockSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it.skip("rejects a negative lowStockThreshold", () => {
+  it("rejects a negative lowStockThreshold", () => {
     expect(
       UpdateProductStockSchema.safeParse({ ...validBody, lowStockThreshold: -1 }).success,
     ).toBe(false);
   });
 
-  it.skip("rejects a non-integer lowStockThreshold", () => {
+  it("rejects a non-integer lowStockThreshold", () => {
     expect(
       UpdateProductStockSchema.safeParse({ ...validBody, lowStockThreshold: 0.5 }).success,
     ).toBe(false);
   });
 
-  it.skip("rejects a missing expectedStockQuantity", () => {
+  it("rejects a missing expectedStockQuantity", () => {
     const result = UpdateProductStockSchema.safeParse({
       ...validBody,
       expectedStockQuantity: undefined,
@@ -67,14 +63,14 @@ describe("UpdateProductStockSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it.skip("rejects a negative expectedStockQuantity", () => {
+  it("rejects a negative expectedStockQuantity", () => {
     expect(
       UpdateProductStockSchema.safeParse({ ...validBody, expectedStockQuantity: -1 })
         .success,
     ).toBe(false);
   });
 
-  it.skip("rejects a non-integer expectedStockQuantity", () => {
+  it("rejects a non-integer expectedStockQuantity", () => {
     expect(
       UpdateProductStockSchema.safeParse({ ...validBody, expectedStockQuantity: 3.14 })
         .success,

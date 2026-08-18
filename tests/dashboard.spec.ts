@@ -139,8 +139,16 @@ test.describe("vendor dashboard (authenticated)", () => {
       await page.goto("/dashboard/products");
       await page.getByRole("button", { name: "Add product" }).click();
 
-      await page.getByLabel("Name").fill(productName);
-      await page.getByLabel("Price (USD)").fill("4.50");
+      // Scoped to the add-product <form> — EditStockControl's per-row
+      // inputs (also labeled "Stock Quantity"/"Low-Stock Threshold") live
+      // in table cells, not inside this form, but an unscoped getByLabel
+      // would match every row plus the form and hit Playwright's
+      // strict-mode ambiguity.
+      const form = page.locator("form");
+      await form.getByLabel("Name").fill(productName);
+      await form.getByLabel("Price (USD)").fill("4.50");
+      await form.getByLabel("Stock Quantity", { exact: true }).fill("25");
+      await form.getByLabel("Low-Stock Threshold").fill("5");
 
       // Network-first: register the response listener before the click that
       // triggers it, then wait on the create request itself. A second,
@@ -237,8 +245,13 @@ test.describe("vendor dashboard (authenticated)", () => {
 
     await page.goto("/dashboard/products");
     await page.getByRole("button", { name: "Add product" }).click();
-    await page.getByLabel("Name").fill("Session Expiry Check");
-    await page.getByLabel("Price (USD)").fill("4.50");
+    // Scoped to the add-product <form> - see the identical comment on the
+    // "vendor can add a new product" test above.
+    const form = page.locator("form");
+    await form.getByLabel("Name").fill("Session Expiry Check");
+    await form.getByLabel("Price (USD)").fill("4.50");
+    await form.getByLabel("Stock Quantity", { exact: true }).fill("25");
+    await form.getByLabel("Low-Stock Threshold").fill("5");
     await page.getByRole("button", { name: "Save product" }).click();
 
     await expect(
@@ -246,19 +259,7 @@ test.describe("vendor dashboard (authenticated)", () => {
     ).toBeVisible();
   });
 
-  // --- RED PHASE (Story 1.2, Task 6/8) -------------------------------------
-  // EditStockControl doesn't exist yet: no "Stock" column on
-  // /dashboard/products, no PATCH /api/products/[id] endpoint. This test
-  // documents the expected green-phase behavior (AC #4, #5) and will fail
-  // until that work lands. Selectors are written from best practices (no
-  // live DOM to snapshot against this run — tea_browser_automation is
-  // unavailable) using this suite's existing resilient-selector convention
-  // (getByRole/getByLabel scoped to a row), mirroring the network-first
-  // pattern from "vendor can add a new product" above. If EditStockControl's
-  // actual accessible names differ once built, update the selectors here
-  // during dev-story's green-phase activation — don't just delete
-  // test.skip().
-  test.skip("[P1] vendor can edit an existing product's Stock Quantity via the inline control", async ({
+  test("[P1] vendor can edit an existing product's Stock Quantity via the inline control", async ({
     page,
   }) => {
     const vendor = await getVendorBySlug("corner-sourdough");
@@ -267,22 +268,12 @@ test.describe("vendor dashboard (authenticated)", () => {
     // A dedicated fixture product, not a shared seeded one — seeded products
     // (prisma/seed.ts) are shared across parallel tests, and mutating a
     // shared product's stock here would pollute other tests running
-    // concurrently. NOTE: createTestProduct (tests/helpers/db.ts) does not
-    // yet accept stockQuantity/lowStockThreshold overrides — that support
-    // needs to be added alongside the Prisma schema fields (Story 1.2,
-    // Task 1) before this compiles and runs. Tracked as a fixture need, not
-    // built by this ATDD scaffold.
+    // concurrently.
     const product = await createTestProduct(vendor.id, {
       name: productName,
       stockQuantity: 20,
       lowStockThreshold: 5,
-    } as Partial<{
-      name: string;
-      priceCents: number;
-      isAvailable: boolean;
-      stockQuantity: number;
-      lowStockThreshold: number;
-    }>);
+    });
 
     try {
       await page.goto("/dashboard/products");

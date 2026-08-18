@@ -54,30 +54,24 @@ describe("CreateProductSchema", () => {
   });
 });
 
-// Story 1.2 (RED PHASE, AC #1): stockQuantity/lowStockThreshold don't exist
-// on CreateProductSchema yet (added in Task 4). Until then, Zod's default
-// object behavior silently strips missing/extra keys rather than rejecting
-// them, so every "rejects" case below currently gets success: true instead
-// of the expected false — that's the point of red phase. Kept in it.skip()
-// until Task 4 lands; un-skip case-by-case as dev-story activates them.
 describe("stockQuantity (Story 1.2, AC #1)", () => {
-  it.skip("accepts a valid non-negative integer stockQuantity", () => {
+  it("accepts a valid non-negative integer stockQuantity", () => {
     const result = CreateProductSchema.safeParse({ ...validBody, stockQuantity: 42 });
     expect(result.success).toBe(true);
   });
 
-  it.skip("rejects a missing stockQuantity", () => {
+  it("rejects a missing stockQuantity", () => {
     const result = CreateProductSchema.safeParse({ ...validBody, stockQuantity: undefined });
     expect(result.success).toBe(false);
   });
 
-  it.skip("rejects a negative stockQuantity", () => {
+  it("rejects a negative stockQuantity", () => {
     expect(
       CreateProductSchema.safeParse({ ...validBody, stockQuantity: -1 }).success,
     ).toBe(false);
   });
 
-  it.skip("rejects a non-integer stockQuantity", () => {
+  it("rejects a non-integer stockQuantity", () => {
     expect(
       CreateProductSchema.safeParse({ ...validBody, stockQuantity: 4.5 }).success,
     ).toBe(false);
@@ -85,12 +79,12 @@ describe("stockQuantity (Story 1.2, AC #1)", () => {
 });
 
 describe("lowStockThreshold (Story 1.2, AC #1)", () => {
-  it.skip("accepts a valid non-negative integer lowStockThreshold", () => {
+  it("accepts a valid non-negative integer lowStockThreshold", () => {
     const result = CreateProductSchema.safeParse({ ...validBody, lowStockThreshold: 7 });
     expect(result.success).toBe(true);
   });
 
-  it.skip("rejects a missing lowStockThreshold", () => {
+  it("rejects a missing lowStockThreshold", () => {
     const result = CreateProductSchema.safeParse({
       ...validBody,
       lowStockThreshold: undefined,
@@ -98,13 +92,13 @@ describe("lowStockThreshold (Story 1.2, AC #1)", () => {
     expect(result.success).toBe(false);
   });
 
-  it.skip("rejects a negative lowStockThreshold", () => {
+  it("rejects a negative lowStockThreshold", () => {
     expect(
       CreateProductSchema.safeParse({ ...validBody, lowStockThreshold: -1 }).success,
     ).toBe(false);
   });
 
-  it.skip("rejects a non-integer lowStockThreshold", () => {
+  it("rejects a non-integer lowStockThreshold", () => {
     expect(
       CreateProductSchema.safeParse({ ...validBody, lowStockThreshold: 2.2 }).success,
     ).toBe(false);

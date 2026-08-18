@@ -1,6 +1,10 @@
+---
+baseline_commit: 8b5fbd7a8b02c632217399fde7fc3bcfec1a9995
+---
+
 # Story 1.2: Stock Quantity captured at creation, backfilled for existing products, and editable
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -20,60 +24,60 @@ so that the system knows my real stock, on an ongoing basis — not just once.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Prisma schema + two-step backfill migration (AC: #2, #3)
-  - [ ] Add `stockQuantity Int` and `lowStockThreshold Int` to the `Product` model in `prisma/schema.prisma` (both required, no `@default` — a schema-level default would apply to every future insert too, but only backfill needs it, and creation must force the vendor to choose per AC #1)
-  - [ ] Generate the migration skeleton with `npx prisma migrate dev --create-only --name add_stock_quantity_and_threshold` (do **not** run the interactive `prisma migrate dev` directly on a required column with no default against a non-empty `Product` table — it will prompt for a default value interactively, which can't be scripted; `--create-only` avoids that prompt entirely)
-  - [ ] Hand-edit the generated `migration.sql` to this exact sequence (order matters):
+- [x] Task 1: Prisma schema + two-step backfill migration (AC: #2, #3)
+  - [x] Add `stockQuantity Int` and `lowStockThreshold Int` to the `Product` model in `prisma/schema.prisma` (both required, no `@default` — a schema-level default would apply to every future insert too, but only backfill needs it, and creation must force the vendor to choose per AC #1)
+  - [x] Generate the migration skeleton with `npx prisma migrate dev --create-only --name add_stock_quantity_and_threshold` (do **not** run the interactive `prisma migrate dev` directly on a required column with no default against a non-empty `Product` table — it will prompt for a default value interactively, which can't be scripted; `--create-only` avoids that prompt entirely)
+  - [x] Hand-edit the generated `migration.sql` to this exact sequence (order matters):
     1. `ALTER TABLE "Product" ADD COLUMN "stockQuantity" INTEGER;` (nullable for now)
     2. `ALTER TABLE "Product" ADD COLUMN "lowStockThreshold" INTEGER;` (nullable for now)
     3. `UPDATE "Product" SET "stockQuantity" = CASE WHEN "isAvailable" THEN 100 ELSE 0 END;`
     4. `UPDATE "Product" SET "lowStockThreshold" = 0;`
     5. `ALTER TABLE "Product" ALTER COLUMN "stockQuantity" SET NOT NULL;`
     6. `ALTER TABLE "Product" ALTER COLUMN "lowStockThreshold" SET NOT NULL;`
-  - [ ] Add a one-line SQL comment above steps 3-4 noting these literals (`100`, `0`) must stay in sync with `PLACEHOLDER_STOCK_QUANTITY`/`PLACEHOLDER_LOW_STOCK_THRESHOLD` in `src/lib/inventory.ts` (Task 3) — raw SQL can't import a TS constant, so this is the one place AC #2's "never hardcoded at the call site" rule is necessarily broken; the comment is what keeps it from silently drifting
-  - [ ] Apply with `npx prisma migrate dev` (no `--create-only` this time) so it actually runs against the dev DB and regenerates Prisma Client types
-  - [ ] Do **not** touch `isAvailable` in this migration — it stays exactly as-is (still read by the checkout route and storefront listings). Dropping it is Story 1.3's job, not this one.
+  - [x] Add a one-line SQL comment above steps 3-4 noting these literals (`100`, `0`) must stay in sync with `PLACEHOLDER_STOCK_QUANTITY`/`PLACEHOLDER_LOW_STOCK_THRESHOLD` in `src/lib/inventory.ts` (Task 3) — raw SQL can't import a TS constant, so this is the one place AC #2's "never hardcoded at the call site" rule is necessarily broken; the comment is what keeps it from silently drifting
+  - [x] Apply with `npx prisma migrate dev` (no `--create-only` this time) so it actually runs against the dev DB and regenerates Prisma Client types
+  - [x] Do **not** touch `isAvailable` in this migration — it stays exactly as-is (still read by the checkout route and storefront listings). Dropping it is Story 1.3's job, not this one.
 
-- [ ] Task 2: Update seed data (AC: #1 — nothing can create a `Product` without these fields anymore, including the seed script)
-  - [ ] `prisma/seed.ts` creates 5 products across 2 vendors (`Corner Sourdough`: Classic Sourdough Loaf, Seeded Rye, Cinnamon Morning Bun; `Green Valley Produce`: Heirloom Tomato Box, Salad Greens Bag) via nested `products: { create: [...] }` — none currently set `stockQuantity`/`lowStockThreshold`. Once the schema requires them, `npm run db:seed` fails to typecheck. Add explicit values to all 5 (e.g. `stockQuantity: 50, lowStockThreshold: 5`) — real numbers, not the placeholder constants (this is fresh seed data being authored, not a backfill of pre-existing rows, so the placeholder sentinel doesn't apply here)
+- [x] Task 2: Update seed data (AC: #1 — nothing can create a `Product` without these fields anymore, including the seed script)
+  - [x] `prisma/seed.ts` creates 5 products across 2 vendors (`Corner Sourdough`: Classic Sourdough Loaf, Seeded Rye, Cinnamon Morning Bun; `Green Valley Produce`: Heirloom Tomato Box, Salad Greens Bag) via nested `products: { create: [...] }` — none currently set `stockQuantity`/`lowStockThreshold`. Once the schema requires them, `npm run db:seed` fails to typecheck. Add explicit values to all 5 (e.g. `stockQuantity: 50, lowStockThreshold: 5`) — real numbers, not the placeholder constants (this is fresh seed data being authored, not a backfill of pre-existing rows, so the placeholder sentinel doesn't apply here)
 
-- [ ] Task 3: Create `src/lib/inventory.ts` — new module (AC: #2, #3, #5)
-  - [ ] Export `PLACEHOLDER_STOCK_QUANTITY = 100`
-  - [ ] Export `PLACEHOLDER_LOW_STOCK_THRESHOLD = 0`
-  - [ ] Export `setStock(productId: string, newValue: number, expectedCurrentValue: number): Promise<boolean>` — conditional update per architecture AD-3: `UPDATE "Product" SET "stockQuantity" = :newValue WHERE id = :productId AND "stockQuantity" = :expectedCurrentValue`, returns `true` if a row was affected, `false` if not (someone changed it first — optimistic-lock miss, not an error to throw). Use Prisma's `updateMany` with a `where` clause matching both `id` and the expected `stockQuantity`, then check `result.count === 1`
-  - [ ] Export `setLowStockThreshold(productId: string, newValue: number): Promise<void>` — plain `prisma.product.update`, no conditional guard needed (nothing else ever writes this field, so there's no concurrent-write race to protect against — don't add optimistic-locking complexity this field doesn't need)
-  - [ ] `decrementStock()` is **not** part of this story — that's Story 1.4. Don't create it here; leave `inventory.ts` with just what this story needs.
+- [x] Task 3: Create `src/lib/inventory.ts` — new module (AC: #2, #3, #5)
+  - [x] Export `PLACEHOLDER_STOCK_QUANTITY = 100`
+  - [x] Export `PLACEHOLDER_LOW_STOCK_THRESHOLD = 0`
+  - [x] Export `setStock(productId: string, newValue: number, expectedCurrentValue: number): Promise<boolean>` — conditional update per architecture AD-3: `UPDATE "Product" SET "stockQuantity" = :newValue WHERE id = :productId AND "stockQuantity" = :expectedCurrentValue`, returns `true` if a row was affected, `false` if not (someone changed it first — optimistic-lock miss, not an error to throw). Use Prisma's `updateMany` with a `where` clause matching both `id` and the expected `stockQuantity`, then check `result.count === 1`
+  - [x] Export `setLowStockThreshold(productId: string, newValue: number): Promise<void>` — plain `prisma.product.update`, no conditional guard needed (nothing else ever writes this field, so there's no concurrent-write race to protect against — don't add optimistic-locking complexity this field doesn't need)
+  - [x] `decrementStock()` is **not** part of this story — that's Story 1.4. Don't create it here; leave `inventory.ts` with just what this story needs.
 
-- [ ] Task 4: Product creation requires the new fields (AC: #1)
-  - [ ] `src/app/api/products/schema.ts` — add `stockQuantity: z.number().int().nonnegative()` and `lowStockThreshold: z.number().int().nonnegative()` to `CreateProductSchema`, both required (no `.optional()`)
-  - [ ] `src/app/api/products/route.ts`'s `POST` handler needs no other change — `parsed.data` already spreads into `prisma.product.create`, so the new required fields flow through automatically once the schema requires them
-  - [ ] `src/components/dashboard/AddProductForm.tsx` — add two new required number inputs (`Stock Quantity`, `Low-Stock Threshold`, both `type="number" min="0" step="1" required`), read them via `Number(formData.get(...))` alongside the existing fields, include in the POST body
+- [x] Task 4: Product creation requires the new fields (AC: #1)
+  - [x] `src/app/api/products/schema.ts` — add `stockQuantity: z.number().int().nonnegative()` and `lowStockThreshold: z.number().int().nonnegative()` to `CreateProductSchema`, both required (no `.optional()`)
+  - [x] `src/app/api/products/route.ts`'s `POST` handler needs no other change — `parsed.data` already spreads into `prisma.product.create`, so the new required fields flow through automatically once the schema requires them
+  - [x] `src/components/dashboard/AddProductForm.tsx` — add two new required number inputs (`Stock Quantity`, `Low-Stock Threshold`, both `type="number" min="0" step="1" required`), read them via `Number(formData.get(...))` alongside the existing fields, include in the POST body
 
-- [ ] Task 5: New PATCH endpoint for editing stock (AC: #4, #5)
-  - [ ] New file `src/app/api/products/[id]/route.ts` (new dynamic route — doesn't exist today, only `src/app/api/products/route.ts` does)
-  - [ ] New `UpdateProductStockSchema` in a colocated `src/app/api/products/[id]/schema.ts` (mirrors the existing `schema.ts`-beside-`route.ts` pattern): `{ stockQuantity: z.number().int().nonnegative(), lowStockThreshold: z.number().int().nonnegative(), expectedStockQuantity: z.number().int().nonnegative() }` — all three required; the form always resubmits both current values together rather than tracking per-field dirty state (simpler, and `setLowStockThreshold` is cheap to call even when unchanged)
-  - [ ] Handler: `getCurrentVendor()` first (401 if none) — then verify the product belongs to that vendor (`prisma.product.findFirst({ where: { id, vendorId: vendor.id } })`, 404 if not found or not theirs) — **never trust the product ID alone**, this is the same ownership-scoping discipline `project-context.md` already documents for every other vendor-scoped route
-  - [ ] Call `setStock(id, body.stockQuantity, body.expectedStockQuantity)` — if it returns `false`, respond `409` with an error message the UI surfaces ("Stock changed since you loaded this page — refresh and try again"), do not retry automatically
-  - [ ] If `setStock` succeeds, call `setLowStockThreshold(id, body.lowStockThreshold)`
-  - [ ] Return `200` with the updated product on success
-  - [ ] **Accepted non-atomicity:** these are two independent writes, not wrapped in a transaction. If `setStock` succeeds but `setLowStockThreshold` throws, the product ends up with a new stock value and a stale threshold — no rollback. Both fields are independently correct-or-not (neither's validity depends on the other), so this is acceptable for this story's scope; don't add `prisma.$transaction` complexity for a failure mode this low-stakes.
+- [x] Task 5: New PATCH endpoint for editing stock (AC: #4, #5)
+  - [x] New file `src/app/api/products/[id]/route.ts` (new dynamic route — doesn't exist today, only `src/app/api/products/route.ts` does)
+  - [x] New `UpdateProductStockSchema` in a colocated `src/app/api/products/[id]/schema.ts` (mirrors the existing `schema.ts`-beside-`route.ts` pattern): `{ stockQuantity: z.number().int().nonnegative(), lowStockThreshold: z.number().int().nonnegative(), expectedStockQuantity: z.number().int().nonnegative() }` — all three required; the form always resubmits both current values together rather than tracking per-field dirty state (simpler, and `setLowStockThreshold` is cheap to call even when unchanged)
+  - [x] Handler: `getCurrentVendor()` first (401 if none) — then verify the product belongs to that vendor (`prisma.product.findFirst({ where: { id, vendorId: vendor.id } })`, 404 if not found or not theirs) — **never trust the product ID alone**, this is the same ownership-scoping discipline `project-context.md` already documents for every other vendor-scoped route
+  - [x] Call `setStock(id, body.stockQuantity, body.expectedStockQuantity)` — if it returns `false`, respond `409` with an error message the UI surfaces ("Stock changed since you loaded this page — refresh and try again"), do not retry automatically
+  - [x] If `setStock` succeeds, call `setLowStockThreshold(id, body.lowStockThreshold)`
+  - [x] Return `200` with the updated product on success
+  - [x] **Accepted non-atomicity:** these are two independent writes, not wrapped in a transaction. If `setStock` succeeds but `setLowStockThreshold` throws, the product ends up with a new stock value and a stale threshold — no rollback. Both fields are independently correct-or-not (neither's validity depends on the other), so this is acceptable for this story's scope; don't add `prisma.$transaction` complexity for a failure mode this low-stakes.
 
-- [ ] Task 6: Inline edit UI (AC: #4, #5)
-  - [ ] New client component `src/components/dashboard/EditStockControl.tsx` — takes `productId`, `initialStockQuantity`, `initialLowStockThreshold` as props; renders two small number inputs + a "Save" button (mirror `AddProductForm`'s state/error-handling shape: `submitting`, `error` state, `router.refresh()` on success)
-  - [ ] On submit, `PATCH /api/products/${productId}` with `{ stockQuantity, lowStockThreshold, expectedStockQuantity: initialStockQuantity }`
-  - [ ] On `409`, show the conflict error inline (`role="alert"`) — same pattern `AddProductForm` already uses for its error state
-  - [ ] Wire into `src/app/dashboard/products/page.tsx`: add "Stock" and "Low-Stock Threshold" columns to the existing table, each cell rendering `<EditStockControl productId={p.id} initialStockQuantity={p.stockQuantity} initialLowStockThreshold={p.lowStockThreshold} />`
-  - [ ] Do **not** touch the existing "Available" column or its `p.isAvailable` read in this story — that's Story 1.3's job
+- [x] Task 6: Inline edit UI (AC: #4, #5)
+  - [x] New client component `src/components/dashboard/EditStockControl.tsx` — takes `productId`, `initialStockQuantity`, `initialLowStockThreshold` as props; renders two small number inputs + a "Save" button (mirror `AddProductForm`'s state/error-handling shape: `submitting`, `error` state, `router.refresh()` on success)
+  - [x] On submit, `PATCH /api/products/${productId}` with `{ stockQuantity, lowStockThreshold, expectedStockQuantity: initialStockQuantity }`
+  - [x] On `409`, show the conflict error inline (`role="alert"`) — same pattern `AddProductForm` already uses for its error state
+  - [x] Wire into `src/app/dashboard/products/page.tsx`: add "Stock" and "Low-Stock Threshold" columns to the existing table, each cell rendering `<EditStockControl productId={p.id} initialStockQuantity={p.stockQuantity} initialLowStockThreshold={p.lowStockThreshold} />`
+  - [x] Do **not** touch the existing "Available" column or its `p.isAvailable` read in this story — that's Story 1.3's job
 
-- [ ] Task 7: Update existing e2e tests that submit the add-product form (AC: #1)
-  - [ ] `tests/dashboard.spec.ts`'s `"vendor can add a new product"` test (~line 132) currently fills only Name and Price — once Stock Quantity and Low-Stock Threshold are required, the form will reject submission without them. Add `.fill()` calls for both new fields before the existing `Promise.all([...])` submit block
-  - [ ] **Second occurrence, easy to miss:** `"add-product form shows an error when the session has expired"` (~line 217) also fills only Name and Price before clicking "Save product" to trigger its mocked-401 assertion. Once Stock Quantity/Low-Stock Threshold are `required` HTML inputs, native browser validation blocks the click before that mocked request ever fires — same failure mode, second test. Add the same two `.fill()` calls here too, or the test breaks for the wrong reason (blocked by validation, not exercising the 401 path it's meant to test).
-  - [ ] **Known limitation, not this story's to fix:** both tests (and the rest of the `vendor dashboard (authenticated)` suite) are currently blocked by a pre-existing stale Clerk auth fixture (`playwright/.auth/vendor.json`, expired — see `deferred-work.md`, deferred from Story 1.1's review). Update the test source correctly regardless; full green-run verification is blocked until that separate, already-tracked issue is resolved. Don't attempt to fix the auth fixture as part of this story — out of scope, already deferred.
+- [x] Task 7: Update existing e2e tests that submit the add-product form (AC: #1)
+  - [x] `tests/dashboard.spec.ts`'s `"vendor can add a new product"` test (~line 132) currently fills only Name and Price — once Stock Quantity and Low-Stock Threshold are required, the form will reject submission without them. Add `.fill()` calls for both new fields before the existing `Promise.all([...])` submit block
+  - [x] **Second occurrence, easy to miss:** `"add-product form shows an error when the session has expired"` (~line 217) also fills only Name and Price before clicking "Save product" to trigger its mocked-401 assertion. Once Stock Quantity/Low-Stock Threshold are `required` HTML inputs, native browser validation blocks the click before that mocked request ever fires — same failure mode, second test. Add the same two `.fill()` calls here too, or the test breaks for the wrong reason (blocked by validation, not exercising the 401 path it's meant to test).
+  - [x] **Known limitation, not this story's to fix:** both tests (and the rest of the `vendor dashboard (authenticated)` suite) are currently blocked by a pre-existing stale Clerk auth fixture (`playwright/.auth/vendor.json`, expired — see `deferred-work.md`, deferred from Story 1.1's review). Update the test source correctly regardless; full green-run verification is blocked until that separate, already-tracked issue is resolved. Don't attempt to fix the auth fixture as part of this story — out of scope, already deferred.
 
-- [ ] Task 8: New tests (AC: #1, #4, #5)
-  - [ ] **First, fix the existing suite:** `src/app/api/products/schema.test.ts`'s shared `validBody` (currently just `{ name, priceCents }`) is parsed by all 6 existing tests, including the "rejects" cases. Once `CreateProductSchema` requires `stockQuantity`/`lowStockThreshold` (Task 4), every existing test breaks — the "rejects" tests would start failing for the wrong reason (missing required field, not the thing actually under test). Add real values (e.g. `stockQuantity: 50, lowStockThreshold: 5`) to `validBody` itself before adding anything new.
-  - [ ] Then extend `schema.test.ts` with cases for the two new required fields (accepts valid, rejects missing/negative/non-integer). New `src/app/api/products/[id]/schema.test.ts` for `UpdateProductStockSchema` with the same shape of cases.
-  - [ ] E2E (Playwright, `tests/dashboard.spec.ts`, needs the authenticated vendor fixture — same pre-existing limitation as Task 7 applies): a test that edits a seeded product's Stock Quantity via the new inline control and confirms the displayed value updates after `router.refresh()`.
+- [x] Task 8: New tests (AC: #1, #4, #5)
+  - [x] **First, fix the existing suite:** `src/app/api/products/schema.test.ts`'s shared `validBody` (currently just `{ name, priceCents }`) is parsed by all 6 existing tests, including the "rejects" cases. Once `CreateProductSchema` requires `stockQuantity`/`lowStockThreshold` (Task 4), every existing test breaks — the "rejects" tests would start failing for the wrong reason (missing required field, not the thing actually under test). Add real values (e.g. `stockQuantity: 50, lowStockThreshold: 5`) to `validBody` itself before adding anything new.
+  - [x] Then extend `schema.test.ts` with cases for the two new required fields (accepts valid, rejects missing/negative/non-integer). New `src/app/api/products/[id]/schema.test.ts` for `UpdateProductStockSchema` with the same shape of cases.
+  - [x] E2E (Playwright, `tests/dashboard.spec.ts`, needs the authenticated vendor fixture — same pre-existing limitation as Task 7 applies): a test that edits a seeded product's Stock Quantity via the new inline control and confirms the displayed value updates after `router.refresh()`.
 
 ## Dev Notes
 
@@ -129,8 +133,44 @@ so that the system knows my real stock, on an ongoing basis — not just once.
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- Migration: `npx prisma migrate dev --create-only` (skeleton), hand-edited SQL to the 3-step nullable→backfill→NOT NULL sequence, applied with `npx prisma migrate dev`. Verified backfill directly against the DB post-migration: all 5 existing products had `isAvailable: true` → all correctly got `stockQuantity: 100, lowStockThreshold: 0`.
+- `npx tsc --noEmit` — clean.
+- `npm run lint` — clean.
+- `npm run test:unit` — 46/46 passed (18 newly activated: 8 `CreateProductSchema` cases + 10 `UpdateProductStockSchema` cases).
+- Activated all 23 ATDD red-phase scaffolds (`test.skip`/`it.skip` → `test`/`it`) as their corresponding tasks landed, per the ATDD checklist's task-by-task activation guidance. Cleaned up the scaffold's `as any` workarounds in `tests/products-api.spec.ts` and the new `dashboard.spec.ts` test now that real Prisma types exist — also added native `stockQuantity`/`lowStockThreshold` support to `tests/helpers/db.ts`'s `createTestProduct` (was previously only planned as a "fixture need," turned out to be required immediately since the migration makes these fields non-optional at the type level — `createTestProduct` itself wouldn't compile without it).
+- `npx playwright test tests/storefront-cart.spec.ts` — 4/4 pass, confirms no regression in Story 1.1's coverage (this story never touches `isAvailable` or cart code).
+- `npm run test:e2e` (full suite, 39 tests) — 24 passed, 15 failed. All 15 failures are the same single pre-existing root cause first identified in Story 1.1's review: `playwright/.auth/vendor.json`'s Clerk session is expired. 10 are the already-deferred pre-existing failures (`dashboard.spec.ts`'s other authenticated tests); the other 5 are this story's own new authenticated tests (`tests/products-api.spec.ts`'s 4 PATCH tests + `dashboard.spec.ts`'s new inline-edit test) hitting the identical 401 for the identical reason — confirmed by reading the failure output: every one is `expected 200/404/400/409, received 401`, not a logic error. This is not a new regression; it's the same tracked gap now blocking more tests because more of this story's coverage needs authentication. Not fixed here — still out of scope, still tracked in `deferred-work.md`.
 
 ### Completion Notes List
 
+- Real schema migration (2 new required `Product` columns, hand-authored backfill SQL), new `src/lib/inventory.ts` module, new `PATCH /api/products/[id]` route + schema, extended `CreateProductSchema`/`AddProductForm`, new `EditStockControl` inline-edit component wired into the products table.
+- Backfill verified correct against the real database before seed data overwrote it.
+- All 23 ATDD scaffolds activated and passing (Vitest) or blocked only by the pre-existing auth gap (Playwright authenticated tests) — none failing for a genuine implementation reason.
+- Fixed a locator ambiguity the new `EditStockControl` introduced: its per-row "Stock Quantity"/"Low-Stock Threshold" labels collide with `AddProductForm`'s same-named fields under a page-wide `getByLabel` — scoped the two existing add-product e2e tests to `page.locator("form")` to disambiguate.
+- Full e2e regression confirms no new failures beyond the single pre-existing stale-auth-fixture issue, now affecting 5 more tests (this story's own) for the identical reason — documented, not fixed, per this story's scope.
+
 ### File List
+
+- `prisma/schema.prisma` (modified — `Product.stockQuantity`, `Product.lowStockThreshold`)
+- `prisma/migrations/20260818151647_add_stock_quantity_and_threshold/migration.sql` (new — hand-authored backfill migration)
+- `prisma/seed.ts` (modified — all 5 seed products given explicit stock values)
+- `src/lib/inventory.ts` (new — `PLACEHOLDER_STOCK_QUANTITY`, `PLACEHOLDER_LOW_STOCK_THRESHOLD`, `setStock()`, `setLowStockThreshold()`)
+- `src/app/api/products/schema.ts` (modified — `CreateProductSchema` gains required `stockQuantity`/`lowStockThreshold`)
+- `src/app/api/products/schema.test.ts` (modified — `validBody` fixed, 8 new cases activated)
+- `src/app/api/products/[id]/route.ts` (new — `PATCH` handler)
+- `src/app/api/products/[id]/schema.ts` (new — `UpdateProductStockSchema`)
+- `src/app/api/products/[id]/schema.test.ts` (new — 10 cases activated)
+- `src/components/dashboard/AddProductForm.tsx` (modified — two new required inputs)
+- `src/components/dashboard/EditStockControl.tsx` (new — inline edit control)
+- `src/app/dashboard/products/page.tsx` (modified — new "Stock" column)
+- `tests/helpers/db.ts` (modified — `createTestProduct` gains `stockQuantity`/`lowStockThreshold` override support)
+- `tests/products-api.spec.ts` (modified — 4 tests activated, `as any` casts removed)
+- `tests/dashboard.spec.ts` (modified — 2 existing tests fixed for new required fields + scoped to avoid `EditStockControl` label collision, 1 new test activated)
+
+## Change Log
+
+- 2026-08-18: Implemented Story 1.2 in full. Real Prisma migration with hand-authored two-step backfill (verified against the live DB before seed data overwrote it), new `src/lib/inventory.ts` module, new `PATCH /api/products/[id]` endpoint, extended creation form, new inline stock-edit control. All 23 ATDD scaffolds activated — 18 Vitest tests pass; the 5 Playwright tests needing authentication are blocked by the same pre-existing stale-auth-fixture issue tracked since Story 1.1 (confirmed via failure output: uniformly 401, not a logic bug). Full regression: typecheck clean, lint clean, 46/46 unit tests, 4/4 Story 1.1 cart tests (no regression there), 24/39 e2e passing with the remaining 15 all attributable to the one known gap.
