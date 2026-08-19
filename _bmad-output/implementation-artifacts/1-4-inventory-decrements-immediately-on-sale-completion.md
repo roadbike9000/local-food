@@ -4,7 +4,7 @@ baseline_commit: 07c42ce
 
 # Story 1.4: Inventory decrements immediately on sale completion
 
-Status: review
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
