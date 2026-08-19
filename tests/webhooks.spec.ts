@@ -152,7 +152,7 @@ test.describe("stripe webhook", () => {
  * intentionally mutate stockQuantity down to 0/1.
  */
 test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
-  test.skip(
+  test(
     "checkout.session.completed decrements stock by exactly the ordered quantity (AC #1)",
     async ({ request }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -182,7 +182,7 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
     },
   );
 
-  test.skip(
+  test(
     "multi-item order: one webhook call decrements both products' stock together inside one transaction (AC #2)",
     async ({ request }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -219,7 +219,7 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
     },
   );
 
-  test.skip(
+  test(
     "shortfall discovered at decrement time: webhook still returns 200, order still becomes PAID, stock is left unchanged (AC #5)",
     async ({ request }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -265,7 +265,7 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
     },
   );
 
-  test.skip(
+  test(
     "idempotency: a replayed webhook does not decrement stock a second time (AC #6)",
     async ({ request }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -308,7 +308,7 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
     },
   );
 
-  test.skip(
+  test(
     "end-to-end race: two orders competing for the last unit resolve to exactly one decrement, both webhooks still 200 (AC #3)",
     async ({ request }) => {
       const vendor = await getVendorBySlug("corner-sourdough");

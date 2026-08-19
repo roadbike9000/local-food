@@ -27,7 +27,7 @@ Creates a `PENDING` order and a Stripe Checkout session.
 **Behavior:**
 1. `req.json().catch(() => null)` then `safeParse` — malformed JSON or schema mismatch → `400 { error: "Invalid request" }`.
 2. Quantities are aggregated per `productId` first (a cart can list the same product on multiple lines), then the distinct products are re-fetched from the DB, filtered by `vendorId`. If the count doesn't match the number of distinct requested products (one is deleted or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
-3. Stock sufficiency check: `stockQuantity >= totalRequestedQuantity` per product (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean; totaled across duplicate lines for the same product). Any short product rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created. **This check is a point-in-time read with no reservation or transaction** — it does not itself prevent two concurrent checkouts from both passing for the same last unit; stock is not decremented until Story 1.4's sale-completion path ships.
+3. Stock sufficiency check: `stockQuantity >= totalRequestedQuantity` per product (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean; totaled across duplicate lines for the same product). Any short product rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created. **This check is a point-in-time read with no reservation or transaction** — it does not itself prevent two concurrent checkouts from both passing for the same last unit. Stock itself is never written here; the actual decrement happens later, in `POST /api/webhooks/stripe`, only once Stripe confirms payment (Story 1.4) — see that route's contract below.
 4. Computes `totalCents` from DB prices — the client-sent price (there is none in this schema) can never influence the charge.
 5. Creates `Order` (status `PENDING`) with nested `OrderItem` creates.
 6. Creates a Stripe Checkout session (`mode: "payment"`), `metadata: { orderId }` so the webhook can find it back, `success_url` → `/checkout/success`, `cancel_url` → `/cart`.
@@ -86,15 +86,16 @@ Creates a pickup slot for the signed-in vendor.
 ---
 
 ### `POST /api/webhooks/stripe`
-Stripe → app event delivery. Confirms payment and triggers the SMS.
+Stripe → app event delivery. Confirms payment, decrements stock, and triggers the SMS.
 
 **Critical implementation detail:** reads `req.text()` (raw body), never `req.json()`. Stripe's signature verification (`stripe.webhooks.constructEvent`) needs the exact raw bytes; parsing JSON first breaks the signature check silently (wrong-error, not obviously "you parsed the body").
 
 **Behavior:**
 1. Missing `stripe-signature` header or unset `STRIPE_WEBHOOK_SECRET` → `400`.
 2. Signature mismatch (`constructEvent` throws) → `400 { error: <message> }`.
-3. On `checkout.session.completed`: reads `session.metadata.orderId`, updates that `Order` to `status: PAID`.
-4. If `order.smsNotified === false`: sends the pickup-confirmation SMS via Twilio, then sets `smsNotified: true`. This flag is the **only** replay/idempotency guard — any new code path that can reach "mark PAID" must check/set it the same way, or customers get double-texted.
-5. Always returns `200 { received: true }` for anything past signature verification (including unhandled event types), per Stripe's recommendation to ack receipt.
+3. On `checkout.session.completed`: reads `session.metadata.orderId`, then `prisma.order.updateMany({ where: { id: orderId, status: { not: "PAID" } }, data: { status: "PAID" } })`. `count === 1` means *this call* made the `PENDING → PAID` transition — the one-shot signal for "decrement stock now" (Story 1.4). `count === 0` means the order doesn't exist or was already `PAID` (a replay) — stock is never decremented twice for the same order, no new schema column needed.
+4. On the first transition only: loads the order's `items`, then decrements each line's `Product.stockQuantity` via `decrementStock(tx, productId, quantity)` (`src/lib/inventory.ts`) inside one `prisma.$transaction()` — every line succeeds or none are applied. If any line finds insufficient stock (a post-payment race — money already captured, stock ran out before this webhook ran), the whole transaction rolls back, the shortfall is reported via `Sentry.captureException`, and the order still ends up `PAID` — there's nothing to "reject" once Stripe has already charged the customer. This is not auto-resolved or auto-refunded; it's surfaced for manual admin follow-up (Story 3.2, once an Admin identity exists).
+5. If `order.smsNotified === false`: sends the pickup-confirmation SMS via Twilio, then sets `smsNotified: true`. This flag is the **only** replay/idempotency guard for the SMS specifically — stock decrement has its own guard via the `status` transition (step 3).
+6. Always returns `200 { received: true }` for anything past signature verification (including unhandled event types, a missing/stale `orderId`, or a stock shortfall), per Stripe's recommendation to ack receipt — the webhook never fails/retries because of a shortfall.
 
-**Not idempotency-guarded beyond `smsNotified`**: if Stripe redelivers the same `checkout.session.completed` event, the `Order.update` to `PAID` re-runs (harmless, same value) but there's no dedup on the event ID itself.
+**Idempotency:** both the stock decrement (via the `status`-transition guard, step 3) and the SMS (via `smsNotified`) are now replay-safe if Stripe redelivers the same `checkout.session.completed` event. There's still no dedup on the Stripe event ID itself, but neither side effect can double-fire as a result.

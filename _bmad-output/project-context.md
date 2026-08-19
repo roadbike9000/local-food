@@ -21,7 +21,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Node 18.17+ required (Next 14 floor — not enforced by an `engines` field, so don't assume otherwise)
 - Prisma 5.20 + PostgreSQL (Neon) — `DIRECT_URL` for migrations (unpooled), `DATABASE_URL` (pooled) for the app client. Always `npm run prisma:migrate`, never `prisma db push`
 - Clerk 5.7 (auth) — new protected routes must be added to `middleware.ts`'s `isProtectedRoute` matcher or they ship unprotected
-- Stripe 16.12 — **hosted Checkout only**, never Elements/PaymentIntents (keeps the app out of PCI scope). Webhook route reads raw `.text()` body — never `.json()` before `constructEvent`, or signature verification breaks. Webhook is not idempotency-guarded beyond `smsNotified` — don't assume replay-safety when extending it
+- Stripe 16.12 — **hosted Checkout only**, never Elements/PaymentIntents (keeps the app out of PCI scope). Webhook route reads raw `.text()` body — never `.json()` before `constructEvent`, or signature verification breaks. Replay-guarded via two independent one-shot flags: `smsNotified` (SMS) and, as of Story 1.4, the order's `PENDING → PAID` transition (`status`, via `updateMany({ where: { status: { not: "PAID" } } })`) for stock decrement — a replayed event can't double-fire either. Neither guard dedupes on the Stripe event ID itself, so don't assume replay-safety for anything new added to this route beyond what these two flags already cover
 - Twilio 5.3 — `sendSms` failures must not silently set `smsNotified: true`
 - Cloudinary 2.5, Sentry 8.30
 - Zod 3.23 — v3 API only, don't use v4-only syntax (e.g. top-level `z.email()`)
