@@ -176,7 +176,7 @@ test.describe("setStock / setLowStockThreshold", () => {
  * it doesn't actually prove anything about the race.
  */
 test.describe("decrementStock (Story 1.4)", () => {
-  test.skip(
+  test(
     "decrements stockQuantity by exactly quantity when enough stock exists",
     async () => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -196,7 +196,7 @@ test.describe("decrementStock (Story 1.4)", () => {
     },
   );
 
-  test.skip(
+  test(
     "returns false and leaves stockQuantity unchanged when insufficient",
     async () => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -216,7 +216,7 @@ test.describe("decrementStock (Story 1.4)", () => {
     },
   );
 
-  test.skip(
+  test(
     "boundary: quantity exactly equal to stockQuantity succeeds and lands at 0",
     async () => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -236,7 +236,7 @@ test.describe("decrementStock (Story 1.4)", () => {
     },
   );
 
-  test.skip(
+  test(
     "boundary: quantity one more than stockQuantity fails and never goes negative",
     async () => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -256,7 +256,7 @@ test.describe("decrementStock (Story 1.4)", () => {
     },
   );
 
-  test.skip(
+  test(
     "two concurrent decrementStock calls against the last unit resolve to exactly one success and one rejection (AC #3)",
     async () => {
       const vendor = await getVendorBySlug("corner-sourdough");

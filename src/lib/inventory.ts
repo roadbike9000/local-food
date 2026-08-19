@@ -3,6 +3,7 @@
  * Product.stockQuantity/lowStockThreshold go through this module — never a
  * bare prisma.product.update from a route handler (architecture AD-3).
  */
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 // Re-exported so server-side callers can keep importing everything from
@@ -43,6 +44,39 @@ export async function setStock(
         ? { stockIsPlaceholder: false }
         : {}),
     },
+  });
+  return result.count === 1;
+}
+
+/**
+ * Conditional decrement for a completed sale (Story 1.4, AD-3): only writes
+ * if the row's current stockQuantity is still >= quantity. Returns false
+ * (not an error) when it isn't — a post-payment shortfall, e.g. a
+ * concurrent sale already took the remaining units. Never takes
+ * stockQuantity negative.
+ *
+ * Same conditional-update-then-count-check shape as setStock() above, but
+ * keyed on a sufficiency floor (`gte: quantity`) rather than an exact
+ * expected-value match — this function doesn't need to know the
+ * "expected" pre-decrement value, only that enough stock currently exists.
+ *
+ * Must always be called from inside the caller's own prisma.$transaction()
+ * — it takes an explicit transaction client as its first parameter (never
+ * the bare prisma singleton) so that a multi-line order's decrements can be
+ * rolled back together on any single line's shortfall (AC #2). This is a
+ * convention, not fully type-enforced: Prisma.TransactionClient is
+ * structurally a subset of PrismaClient, so nothing at the type level stops
+ * a future caller from passing the bare prisma singleton here. Discipline
+ * only — flag for code review if that ever slips.
+ */
+export async function decrementStock(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  quantity: number,
+): Promise<boolean> {
+  const result = await tx.product.updateMany({
+    where: { id: productId, stockQuantity: { gte: quantity } },
+    data: { stockQuantity: { decrement: quantity } },
   });
   return result.count === 1;
 }

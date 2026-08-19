@@ -27,11 +27,11 @@ so that inventory never says "in stock" when it isn't.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `decrementStock()` to `src/lib/inventory.ts` (AC #1, #3, #6)
-  - [ ] Signature: `decrementStock(tx: Prisma.TransactionClient, productId: string, quantity: number): Promise<boolean>` — `import type { Prisma } from "@prisma/client"` for the type. Takes an explicit transaction client as its **first** parameter (never the bare `prisma` singleton) so it can only ever run as part of the caller's transaction — see Dev Notes for why this can't be fully type-enforced and what to do about it.
-  - [ ] Body: `tx.product.updateMany({ where: { id: productId, stockQuantity: { gte: quantity } }, data: { stockQuantity: { decrement: quantity } } })`, return `result.count === 1`. This is the same conditional-update-then-check-rows-affected shape `setStock()` already uses (architecture AD-3), just keyed on a sufficiency floor (`gte: quantity`) instead of an exact expected-value match — `decrementStock()` doesn't need to know the "expected" pre-decrement value, only that enough stock currently exists.
-  - [ ] Doc comment matching `setStock()`'s existing style: `false` means "not enough stock right now" — not an error to throw, the caller decides what that means (here: a post-payment shortfall, AC #5).
-  - [ ] `decrementStock()` lives in `inventory.ts` directly, **not** in `availability.ts` — unlike `isInStock()`, it genuinely needs Prisma and is never imported by a `"use client"` component (see Story 1.3's round-1 review finding about the client-bundle-Prisma-shim regression; that reasoning is why `availability.ts` exists, and doesn't apply here).
+- [x] Task 1: Add `decrementStock()` to `src/lib/inventory.ts` (AC #1, #3, #6)
+  - [x] Signature: `decrementStock(tx: Prisma.TransactionClient, productId: string, quantity: number): Promise<boolean>` — `import type { Prisma } from "@prisma/client"` for the type. Takes an explicit transaction client as its **first** parameter (never the bare `prisma` singleton) so it can only ever run as part of the caller's transaction — see Dev Notes for why this can't be fully type-enforced and what to do about it.
+  - [x] Body: `tx.product.updateMany({ where: { id: productId, stockQuantity: { gte: quantity } }, data: { stockQuantity: { decrement: quantity } } })`, return `result.count === 1`. This is the same conditional-update-then-check-rows-affected shape `setStock()` already uses (architecture AD-3), just keyed on a sufficiency floor (`gte: quantity`) instead of an exact expected-value match — `decrementStock()` doesn't need to know the "expected" pre-decrement value, only that enough stock currently exists.
+  - [x] Doc comment matching `setStock()`'s existing style: `false` means "not enough stock right now" — not an error to throw, the caller decides what that means (here: a post-payment shortfall, AC #5).
+  - [x] `decrementStock()` lives in `inventory.ts` directly, **not** in `availability.ts` — unlike `isInStock()`, it genuinely needs Prisma and is never imported by a `"use client"` component (see Story 1.3's round-1 review finding about the client-bundle-Prisma-shim regression; that reasoning is why `availability.ts` exists, and doesn't apply here).
 
 - [ ] Task 2: Wire `decrementStock()` into `src/app/api/webhooks/stripe/route.ts` (AC #1, #2, #4, #5, #6)
   - [ ] Replace the current unconditional `prisma.order.update({ where: { id: orderId }, data: { status: "PAID" }, include: { vendor: true } })` with a **conditional** update that also detects whether *this call* is the one making the `PENDING → PAID` transition (the idempotency guard for AC #6, with no new schema field needed): `prisma.order.updateMany({ where: { id: orderId, status: { not: "PAID" } }, data: { status: "PAID" } })`. `result.count === 1` means this call did the transition (first time — decrement stock); `result.count === 0` means the order doesn't exist or was already `PAID` (a replay — skip decrementing, same as `smsNotified`'s existing one-shot guard).
@@ -44,15 +44,15 @@ so that inventory never says "in stock" when it isn't.
 - [ ] Task 3: Verify `/api/checkout` makes zero stock writes (AC #4)
   - [ ] Read-only verification, not new code: `src/app/api/checkout/route.ts` already only *reads* `stockQuantity` for its Story 1.3 sufficiency check and creates a `PENDING` order + Stripe session — confirm this story introduces no write there. If everything above is scoped correctly to the webhook route only, this task requires no diff.
 
-- [ ] Task 4: Extend `tests/helpers/db.ts` (needed by Tasks 5-6)
-  - [ ] `createTestOrder()` currently creates an `Order` with no `OrderItem`s. Add an optional `items` override (`{ productId: string; quantity: number; unitPriceCents: number }[]`) that nests `items: { create: [...] }` into the `prisma.order.create()` call, mirroring the nested-create pattern `src/app/api/checkout/route.ts` and `prisma/seed.ts` already use. Needed so webhook/concurrency tests can build a realistic order-with-line-items fixture without hand-rolling raw Prisma calls in every spec file.
-  - [ ] `deleteOrder()` already deletes `OrderItem`s before the `Order` (existing `orderItem.deleteMany` then `order.deleteMany`) — confirm this still works once tests start creating orders with real items; no change expected here.
+- [x] Task 4: Extend `tests/helpers/db.ts` (needed by Tasks 5-6)
+  - [x] `createTestOrder()` currently creates an `Order` with no `OrderItem`s. Add an optional `items` override (`{ productId: string; quantity: number; unitPriceCents: number }[]`) that nests `items: { create: [...] }` into the `prisma.order.create()` call, mirroring the nested-create pattern `src/app/api/checkout/route.ts` and `prisma/seed.ts` already use. Needed so webhook/concurrency tests can build a realistic order-with-line-items fixture without hand-rolling raw Prisma calls in every spec file.
+  - [x] `deleteOrder()` already deletes `OrderItem`s before the `Order` (existing `orderItem.deleteMany` then `order.deleteMany`) — confirm this still works once tests start creating orders with real items; no change expected here.
 
-- [ ] Task 5: New tests — `tests/inventory.spec.ts` (AC #1, #3, #6)
-  - [ ] `decrementStock()` succeeds and reduces `stockQuantity` by exactly `quantity` when enough stock exists. Call it inside a real `prisma.$transaction(async (tx) => decrementStock(tx, ...))` in the test, matching how the webhook will call it.
-  - [ ] `decrementStock()` returns `false` and leaves `stockQuantity` **unchanged** when insufficient (e.g. `stockQuantity: 2`, `quantity: 5`).
-  - [ ] Boundary: `quantity` exactly equal to `stockQuantity` succeeds and lands at `0`; `quantity` one more than `stockQuantity` fails and leaves the row unchanged (never negative — this is the literal "conditional update, never negative" wording from AC #1).
-  - [ ] **Concurrency (new pattern in this codebase — see Dev Notes, this file's instructions initially assumed an existing precedent that turned out not to exist):** two concurrent `decrementStock()` calls, each in its own `prisma.$transaction()`, fired via `Promise.all` against a product with `stockQuantity: 1`, each requesting `quantity: 1`. Assert exactly one resolves `true` and one resolves `false`, and the final `stockQuantity` is `0` (not `-1`, not still `1`).
+- [x] Task 5: New tests — `tests/inventory.spec.ts` (AC #1, #3, #6)
+  - [x] `decrementStock()` succeeds and reduces `stockQuantity` by exactly `quantity` when enough stock exists. Call it inside a real `prisma.$transaction(async (tx) => decrementStock(tx, ...))` in the test, matching how the webhook will call it.
+  - [x] `decrementStock()` returns `false` and leaves `stockQuantity` **unchanged** when insufficient (e.g. `stockQuantity: 2`, `quantity: 5`).
+  - [x] Boundary: `quantity` exactly equal to `stockQuantity` succeeds and lands at `0`; `quantity` one more than `stockQuantity` fails and leaves the row unchanged (never negative — this is the literal "conditional update, never negative" wording from AC #1).
+  - [x] **Concurrency (new pattern in this codebase — see Dev Notes, this file's instructions initially assumed an existing precedent that turned out not to exist):** two concurrent `decrementStock()` calls, each in its own `prisma.$transaction()`, fired via `Promise.all` against a product with `stockQuantity: 1`, each requesting `quantity: 1`. Assert exactly one resolves `true` and one resolves `false`, and the final `stockQuantity` is `0` (not `-1`, not still `1`).
 
 - [ ] Task 6: New tests — `tests/webhooks.spec.ts` (AC #1, #2, #4, #5, #6)
   - [ ] Use Task 4's extended `createTestOrder()` to build fixture orders with real `OrderItem`s referencing a real (dedicated, `createTestProduct`-scoped — don't reuse shared seed products, per Story 1.3's round-2 review findings about shared-seed-data races under `fullyParallel: true`) `Product`.
@@ -128,8 +128,15 @@ so that inventory never says "in stock" when it isn't.
 
 ### Agent Model Used
 
+Claude Sonnet 5
+
 ### Debug Log References
 
 ### Completion Notes List
 
+- Task 1/5: Added `decrementStock(tx, productId, quantity)` to `src/lib/inventory.ts` — same conditional-update-then-count-check shape as `setStock()`, keyed on `stockQuantity: { gte: quantity }`. Un-skipped the 5 red-phase tests in `tests/inventory.spec.ts`'s `decrementStock (Story 1.4)` describe block (no rewrites — scaffolds matched the implementation exactly). `npx tsc --noEmit` clean. `npx playwright test tests/inventory.spec.ts`: 12/12 passed, including the two-concurrent-transactions race test — confirms Neon's pooled `DATABASE_URL` handles two simultaneous short `prisma.$transaction()` calls without connection errors.
+
 ### File List
+
+- src/lib/inventory.ts
+- tests/inventory.spec.ts

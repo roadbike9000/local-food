@@ -52,7 +52,7 @@ development_status:
   1-1-verify-cart-line-removal-and-total-accuracy: review
   1-2-stock-quantity-captured-at-creation-backfilled-for-existing-products: review
   1-3-out-of-stock-products-are-marked-and-blocked: done
-  1-4-inventory-decrements-immediately-on-sale-completion: ready-for-dev
+  1-4-inventory-decrements-immediately-on-sale-completion: in-progress
   1-5-cart-quantity-stepper: backlog
   1-6-vendor-notified-of-placeholder-stock-quantity: backlog
   epic-1-retrospective: optional
