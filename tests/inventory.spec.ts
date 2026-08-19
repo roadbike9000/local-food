@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { setLowStockThreshold, setStock } from "@/lib/inventory";
+import { decrementStock, setLowStockThreshold, setStock } from "@/lib/inventory";
 import { getVendorBySlug, createTestProduct, deleteProduct, prisma } from "./helpers/db";
 
 /**
@@ -152,4 +152,135 @@ test.describe("setStock / setLowStockThreshold", () => {
     const updated = await setLowStockThreshold(product.id, 9, 5);
     expect(updated).toBe(false);
   });
+});
+
+/**
+ * RED PHASE (Story 1.4, Task 1/5): decrementStock() doesn't exist yet in
+ * src/lib/inventory.ts - the import above correctly fails to resolve (one
+ * new `tsc --noEmit` error), and every test.skip() below documents the
+ * expected conditional-update-then-count-check behavior (same shape as
+ * setStock() above, keyed on a sufficiency floor `gte: quantity` instead of
+ * an exact expected-value match).
+ *
+ * Every call site wraps decrementStock() in its own real
+ * `prisma.$transaction()`, matching how the webhook route will call it
+ * (Task 2) - decrementStock() takes an explicit `tx` as its first param and
+ * is never called against the bare `prisma` singleton (Dev Notes).
+ *
+ * The concurrency test is the first committed concurrency test in this
+ * codebase (Story 1.2's review verified setStock()'s race by hand, never
+ * automated - see this story's Dev Notes). Built from the general
+ * Playwright `Promise.all` pattern already used elsewhere (e.g.
+ * payment.spec.ts's `Promise.all` around a click + waitForResponse) -
+ * firing two genuinely concurrent transactions, not sequential awaits, or
+ * it doesn't actually prove anything about the race.
+ */
+test.describe("decrementStock (Story 1.4)", () => {
+  test.skip(
+    "decrements stockQuantity by exactly quantity when enough stock exists",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, { stockQuantity: 20 });
+
+      try {
+        const succeeded = await prisma.$transaction((tx) =>
+          decrementStock(tx, product.id, 5),
+        );
+        expect(succeeded).toBe(true);
+
+        const result = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(result?.stockQuantity).toBe(15);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test.skip(
+    "returns false and leaves stockQuantity unchanged when insufficient",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, { stockQuantity: 2 });
+
+      try {
+        const succeeded = await prisma.$transaction((tx) =>
+          decrementStock(tx, product.id, 5),
+        );
+        expect(succeeded).toBe(false);
+
+        const result = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(result?.stockQuantity).toBe(2);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test.skip(
+    "boundary: quantity exactly equal to stockQuantity succeeds and lands at 0",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, { stockQuantity: 3 });
+
+      try {
+        const succeeded = await prisma.$transaction((tx) =>
+          decrementStock(tx, product.id, 3),
+        );
+        expect(succeeded).toBe(true);
+
+        const result = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(result?.stockQuantity).toBe(0);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test.skip(
+    "boundary: quantity one more than stockQuantity fails and never goes negative",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, { stockQuantity: 3 });
+
+      try {
+        const succeeded = await prisma.$transaction((tx) =>
+          decrementStock(tx, product.id, 4),
+        );
+        expect(succeeded).toBe(false);
+
+        const result = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(result?.stockQuantity).toBe(3);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test.skip(
+    "two concurrent decrementStock calls against the last unit resolve to exactly one success and one rejection (AC #3)",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, { stockQuantity: 1 });
+
+      try {
+        // Genuinely concurrent - each call gets its own transaction, fired
+        // together via Promise.all, not sequential awaits. Only one of the
+        // two conditional updates (`WHERE stockQuantity >= 1`) can see a
+        // still-sufficient row; the other must lose the race.
+        const [first, second] = await Promise.all([
+          prisma.$transaction((tx) => decrementStock(tx, product.id, 1)),
+          prisma.$transaction((tx) => decrementStock(tx, product.id, 1)),
+        ]);
+
+        const results = [first, second];
+        expect(results.filter((r) => r === true)).toHaveLength(1);
+        expect(results.filter((r) => r === false)).toHaveLength(1);
+
+        const result = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(result?.stockQuantity).toBe(0);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
 });
