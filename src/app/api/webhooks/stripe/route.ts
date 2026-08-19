@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       // was CANCELLED, is never touched by a later/replayed webhook. The
       // result isn't read - `stockDecremented` below is the real
       // decrement-guard signal, not whether this call made the transition
-      // (review round 2, P0: this used to be captured as unused `transition`).
+      // (review round 2, Patch: this used to be captured as unused `transition`).
       await prisma.order.updateMany({
         where: { id: orderId, status: "PENDING" },
         data: { status: "PAID" },
@@ -177,6 +177,18 @@ export async function POST(req: Request) {
             return { shortfalls: [] as ShortfallDetail[] };
           }
 
+          // Capture each short line's stock at the point of failure BEFORE
+          // running the compensation loop below (review round 3, Patch).
+          // If a shortfalled productId also appears in `applied` (one
+          // OrderItem line for a product succeeds, another line for the
+          // SAME product shortfalls), reading currentStock after
+          // compensating would report the just-restored, inflated figure
+          // instead of what was actually available when the line failed.
+          const currentStock = await tx.product.findMany({
+            where: { id: { in: shortfalls.map((s) => s.productId) } },
+            select: { id: true, stockQuantity: true },
+          });
+
           // A shortfall is terminal (AC #5, and documented in
           // api-contracts.md / deferred-work.md) - a later replay or
           // manual Stripe "Resend" must not silently re-attempt and
@@ -187,7 +199,11 @@ export async function POST(req: Request) {
           // undo only the lines this pass actually applied - AC #2's
           // all-or-nothing still holds (no line ends up partially
           // decremented) - and let the transaction commit normally with
-          // the claim intact.
+          // the claim intact. This unconditional increment is only safe
+          // because it runs inside the same open transaction still
+          // holding the row lock `decrementStock` acquired above - it
+          // must not be extracted or retried outside that lock (review
+          // round 3, Patch).
           for (const item of applied) {
             await tx.product.update({
               where: { id: item.productId },
@@ -195,10 +211,6 @@ export async function POST(req: Request) {
             });
           }
 
-          const currentStock = await tx.product.findMany({
-            where: { id: { in: shortfalls.map((s) => s.productId) } },
-            select: { id: true, stockQuantity: true },
-          });
           return {
             shortfalls: shortfalls.map((s) => ({
               ...s,

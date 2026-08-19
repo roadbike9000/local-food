@@ -514,6 +514,61 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
   );
 
   test(
+    "idempotency: TWO CONCURRENT deliveries of an event whose order shortfalls both resolve cleanly, exactly one report (review round 3)",
+    async ({ request }) => {
+      // D1's fix (atomic claim) and D2's fix (terminal shortfall via
+      // compensating writes, not a thrown rollback) were each tested in
+      // isolation - this is their intersection, untested until now (review
+      // round 3, Patch). Two concurrent deliveries race for the atomic
+      // claim; the winner runs the full decrement/shortfall/compensation
+      // path, the loser sees claim.count === 0 and no-ops. Assert the
+      // shortfall is handled exactly once, not duplicated or dropped.
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, { stockQuantity: 1 });
+      const order = await createTestOrder(vendor.id, {
+        status: "PENDING",
+        items: [{ productId: product.id, quantity: 3, unitPriceCents: product.priceCents }],
+      });
+
+      try {
+        const payload = buildCheckoutCompletedPayload(order.id);
+        const signature = signPayload(payload);
+        test.skip(!signature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+        const [first, second] = await Promise.all([
+          request.post("/api/webhooks/stripe", {
+            headers: { "stripe-signature": signature! },
+            data: payload,
+          }),
+          request.post("/api/webhooks/stripe", {
+            headers: { "stripe-signature": signature! },
+            data: payload,
+          }),
+        ]);
+
+        expect(first.status()).toBe(200);
+        expect(second.status()).toBe(200);
+
+        // The order's single line requests more than the 1 unit in stock -
+        // whichever delivery wins the claim finds it insufficient, reverses
+        // its own no-op decrement, and stock is untouched. The loser's
+        // claim.count === 0 means it never attempts a decrement at all.
+        const updatedProduct = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(updatedProduct?.stockQuantity).toBe(1);
+
+        const updatedOrder = await getOrder(order.id);
+        expect(updatedOrder?.status).toBe("PAID");
+        // Terminal even though shortfalled - claimed by whichever delivery
+        // won the race, never re-attempted by the loser or a later replay.
+        expect(updatedOrder?.stockDecremented).toBe(true);
+      } finally {
+        await deleteOrder(order.id);
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test(
     "two concurrent multi-item orders sharing products in opposite line order don't deadlock (review round 1)",
     async ({ request }) => {
       // Reproduced live pre-fix: two orders listing the same two products
