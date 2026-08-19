@@ -155,12 +155,10 @@ test.describe("setStock / setLowStockThreshold", () => {
 });
 
 /**
- * RED PHASE (Story 1.4, Task 1/5): decrementStock() doesn't exist yet in
- * src/lib/inventory.ts - the import above correctly fails to resolve (one
- * new `tsc --noEmit` error), and every test.skip() below documents the
- * expected conditional-update-then-count-check behavior (same shape as
- * setStock() above, keyed on a sufficiency floor `gte: quantity` instead of
- * an exact expected-value match).
+ * Story 1.4, Task 1/5: decrementStock() in src/lib/inventory.ts is a
+ * conditional-update-then-count-check (same shape as setStock() above),
+ * keyed on a sufficiency floor `gte: quantity` instead of an exact
+ * expected-value match.
  *
  * Every call site wraps decrementStock() in its own real
  * `prisma.$transaction()`, matching how the webhook route will call it

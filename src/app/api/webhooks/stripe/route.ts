@@ -4,9 +4,13 @@
  * Stripe calls this URL after events happen (here: a completed checkout).
  * We must:
  *   1. Verify the signature so we know the request really came from Stripe.
- *   2. On checkout.session.completed, mark the matching order PAID.
- *   3. Decrement stock for each line item (Story 1.4) — only on the first
- *      PENDING -> PAID transition, never on a replay.
+ *   2. On checkout.session.completed, mark the matching order PAID — only
+ *      a genuinely PENDING order transitions; a replay or an order that has
+ *      since moved to READY/COMPLETED/CANCELLED is never touched.
+ *   3. Decrement stock for each line item (Story 1.4), guarded by its own
+ *      `stockDecremented` flag (not `status`) so a retry after a transient
+ *      failure between the PAID commit and the decrement re-attempts
+ *      cleanly instead of losing the decrement permanently.
  *   4. Text the customer via Twilio.
  *
  * IMPORTANT: this route reads the RAW request body for signature verification,
@@ -23,8 +27,30 @@ import { decrementStock } from "@/lib/inventory";
 // Sentinel thrown inside the $transaction callback to trigger Prisma's
 // automatic full rollback when any line's stock is insufficient (AC #2).
 // Never surfaced to the caller as a thrown error - caught and reported via
-// Sentry instead (AC #5); the webhook still returns 200.
-class StockShortfallError extends Error {}
+// Sentry instead (AC #5); the webhook still returns 200. Carries every short
+// line (not just the first) plus each one's current stock, so the report is
+// actionable rather than a bare message naming one product (review round 1).
+class StockShortfallError extends Error {
+  constructor(
+    public readonly orderId: string,
+    public readonly shortfalls: Array<{
+      productId: string;
+      requested: number;
+      available: number | null; // null = product row no longer exists
+    }>,
+  ) {
+    super(
+      `Stock shortfall on order ${orderId}: ${shortfalls
+        .map(
+          (s) =>
+            `${s.productId} (requested ${s.requested}, available ${
+              s.available === null ? "none - product deleted" : s.available
+            })`,
+        )
+        .join("; ")}`,
+    );
+  }
+}
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -53,15 +79,15 @@ export async function POST(req: Request) {
     const orderId = session.metadata?.orderId;
 
     if (orderId) {
-      // Conditional update doubles as the idempotency guard for AC #6: only
-      // a call that actually flips PENDING -> PAID (count === 1) is the
-      // first time we've seen this order complete, and only that call
-      // should decrement stock. A replayed webhook (Stripe retries on
-      // timeout/5xx) for an order already PAID matches count === 0 and
-      // skips the decrement entirely - no new schema column needed, same
-      // idea as the existing smsNotified one-shot guard below.
+      // Only a genuinely PENDING order can become PAID here. Guarding on
+      // `status: "PENDING"` (not `status: { not: "PAID" }`) matters: the
+      // old guard also matched READY/COMPLETED/CANCELLED, so a Stripe
+      // retry arriving after a vendor marked an order READY/COMPLETED
+      // silently reverted it back to PAID and re-decremented stock (review
+      // round 1, reproduced live). An order that has moved past PAID, or
+      // was CANCELLED, is never touched by a later/replayed webhook.
       const transition = await prisma.order.updateMany({
-        where: { id: orderId, status: { not: "PAID" } },
+        where: { id: orderId, status: "PENDING" },
         data: { status: "PAID" },
       });
 
@@ -78,29 +104,93 @@ export async function POST(req: Request) {
         return NextResponse.json({ received: true });
       }
 
-      if (transition.count === 1) {
+      // `stockDecremented` (not `transition.count`) is the retry-safe guard
+      // for whether decrementing still needs to happen. If this call made
+      // the PENDING -> PAID transition, it's obviously still false. But a
+      // *previous* call may have made that transition and then failed
+      // between committing PAID and finishing the decrement (a deadlock, a
+      // dropped pooled connection, a killed serverless invocation) - with
+      // the old code, that failure permanently burned the one-shot
+      // `status`-based guard and silently lost the decrement forever
+      // (review round 1, reproduced live via a forced lock timeout). Guarding
+      // on a flag set inside the *same* $transaction as the decrements means
+      // a failed attempt leaves it false, so Stripe's retry re-attempts
+      // cleanly instead of finding status already PAID and giving up.
+      if (order.status === "PAID" && !order.stockDecremented) {
         try {
           await prisma.$transaction(async (tx) => {
-            for (const item of order.items) {
+            // Stable lock-acquisition order across concurrent transactions
+            // touching overlapping products. Two orders listing the same
+            // products in opposite line order previously deadlocked
+            // reliably (review round 1, reproduced 5/6 runs) - checkout
+            // preserves raw cart line order, so two shoppers adding the
+            // same two products in different order hit this directly.
+            const items = [...order.items].sort((a, b) =>
+              a.productId < b.productId ? -1 : a.productId > b.productId ? 1 : 0,
+            );
+
+            // Collect every short line rather than throwing on the first,
+            // so the eventual report names all of them, not just one
+            // (review round 1).
+            const shortfalls: Array<{ productId: string; requested: number }> =
+              [];
+            for (const item of items) {
               const decremented = await decrementStock(
                 tx,
                 item.productId,
                 item.quantity,
               );
               if (!decremented) {
-                throw new StockShortfallError(
-                  `Insufficient stock for product ${item.productId} on order ${order.id}`,
-                );
+                shortfalls.push({
+                  productId: item.productId,
+                  requested: item.quantity,
+                });
               }
             }
+
+            if (shortfalls.length > 0) {
+              const currentStock = await tx.product.findMany({
+                where: { id: { in: shortfalls.map((s) => s.productId) } },
+                select: { id: true, stockQuantity: true },
+              });
+              throw new StockShortfallError(
+                order.id,
+                shortfalls.map((s) => ({
+                  ...s,
+                  available:
+                    currentStock.find((p) => p.id === s.productId)
+                      ?.stockQuantity ?? null,
+                })),
+              );
+            }
+
+            await tx.order.update({
+              where: { id: order.id },
+              data: { stockDecremented: true },
+            });
           });
         } catch (err) {
           if (err instanceof StockShortfallError) {
             // Payment already happened - there's nothing to "reject" at
             // this point. Surface it rather than silently swallow or
             // auto-refund (AC #5); a human resolves it (Story 3.2).
-            Sentry.captureException(err);
+            // Sentry.captureException is currently a no-op in this app
+            // (missing instrumentation.ts, pre-existing gap - review round
+            // 1) - console.error alongside it so the event at least lands
+            // in server/Vercel logs until that's fixed.
+            Sentry.captureException(err, {
+              extra: { orderId: err.orderId, shortfalls: err.shortfalls },
+            });
+            console.error(
+              "[webhooks/stripe] stock shortfall",
+              err.orderId,
+              err.shortfalls,
+            );
           } else {
+            // Not a shortfall - a transient failure (deadlock, dropped
+            // connection, etc). Rethrow so Stripe sees a 5xx and retries;
+            // `stockDecremented` is still false, so the retry cleanly
+            // re-attempts the decrement above.
             throw err;
           }
         }

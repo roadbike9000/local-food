@@ -62,6 +62,6 @@ Playwright E2E only, no unit test runner. Tests hit real dev-mode services (no m
 ## Architecturally significant risks (as found, not yet fixed)
 
 1. **Unenforced `PickupSlot.capacity`** — displayed but never checked against booking count.
-2. **No idempotency on the Stripe webhook beyond `smsNotified`** — a redelivered event re-runs the `Order` update (harmless) but there's no general event-dedup.
+2. **No idempotency on the Stripe webhook's Stripe event ID itself** — `smsNotified` and, as of Story 1.4, `Order.stockDecremented` independently guard the two side effects a redelivery could double-fire (SMS, stock decrement), but there's no general event-dedup beneath those two flags. A future side effect added to this route needs its own guard, not a free ride off the existing two.
 3. **Cart is in-memory only** — a page refresh during checkout loses the cart (though the in-flight `Order` + Stripe session already exist server-side by that point).
 4. **`priceCents`/`totalCents` 32-bit ceiling** — fine at current scale, would silently misbehave on very large carts/totals.

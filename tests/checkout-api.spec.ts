@@ -60,6 +60,47 @@ test.describe("checkout API", () => {
   });
 
   test(
+    "checkout-session creation never writes stockQuantity (AC #4) — the decrement only happens later, in the webhook (Story 1.4)",
+    async ({ request }) => {
+      // Story 1.4's Task 6 claimed this coverage without a test actually
+      // exercising it (review round 1 bookkeeping finding) — AC #4 itself
+      // does hold (verified by code inspection at review time), this test
+      // makes the claim true rather than just correcting the wording.
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, { stockQuantity: 10 });
+
+      try {
+        const response = await request.post("/api/checkout", {
+          data: {
+            vendorId: vendor.id,
+            customerName: "Playwright Stock Write Check",
+            customerPhone: "+15005550097",
+            items: [{ productId: product.id, quantity: 3 }],
+          },
+        });
+
+        test.skip(response.status() === 500, "Stripe test keys not configured; skipping");
+        expect(response.status()).toBe(200);
+
+        const unchanged = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(unchanged?.stockQuantity).toBe(10);
+
+        const order = await prisma.order.findFirst({
+          where: { vendorId: vendor.id, customerPhone: "+15005550097" },
+          orderBy: { createdAt: "desc" },
+        });
+        try {
+          expect(order?.status).toBe("PENDING");
+        } finally {
+          if (order) await deleteOrder(order.id);
+        }
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test(
     "rejects a cart requesting more than the available stock (400)",
     async ({ request }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
