@@ -22,27 +22,40 @@ export async function POST(req: Request) {
 
   const { vendorId, customerName, customerPhone, items } = parsed.data;
 
+  // A cart can list the same product across multiple lines; aggregate the
+  // requested quantity per product so both checks below evaluate total
+  // demand, not each line in isolation (otherwise e.g. two lines of
+  // quantity 3 each would independently "pass" a stockQuantity: 4 check
+  // that their combined quantity of 6 should fail).
+  const quantityByProductId = new Map<string, number>();
+  for (const i of items) {
+    quantityByProductId.set(
+      i.productId,
+      (quantityByProductId.get(i.productId) ?? 0) + i.quantity,
+    );
+  }
+  const productIds = [...quantityByProductId.keys()];
+
   // Load the real products so we control the prices. Fetched regardless of
   // stock so the checks below can tell "doesn't exist / wrong vendor" apart
   // from "exists but insufficient stock" (architecture AD-2).
-  const productIds = items.map((i) => i.productId);
   const products = await prisma.product.findMany({
     where: { id: { in: productIds }, vendorId },
   });
 
-  if (products.length !== items.length) {
+  if (products.length !== productIds.length) {
     return NextResponse.json(
       { error: "One or more items are unavailable" },
       { status: 400 },
     );
   }
 
-  // Per-line stock sufficiency, not just existence (AD-2) - reject the
-  // whole order if any line is short, before creating anything.
-  const hasInsufficientStock = items.some((i) => {
-    const product = products.find((p) => p.id === i.productId)!;
-    return product.stockQuantity < i.quantity;
-  });
+  // Stock sufficiency against total requested quantity per product, not
+  // just existence (AD-2) - reject the whole order if any product is short,
+  // before creating anything.
+  const hasInsufficientStock = products.some(
+    (product) => product.stockQuantity < quantityByProductId.get(product.id)!,
+  );
   if (hasInsufficientStock) {
     return NextResponse.json(
       { error: "One or more items don't have enough stock" },

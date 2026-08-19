@@ -27,3 +27,13 @@
 - source_spec: `_bmad-output/implementation-artifacts/1-1-verify-cart-line-removal-and-total-accuracy.md`
   summary: Cart e2e locators lean on brittle document-order `.last()` heuristics over bare `div` selectors.
   evidence: tests/storefront-cart.spec.ts:120 and :136 use `page.locator("div").filter({ hasText: ... }).last()` for the product card and the total row. `hasText` is a case-insensitive substring match, so introducing a "Subtotal" or "Order total" div later in DOM order in src/app/cart/page.tsx would silently retarget the P0 total assertion rather than fail loudly. Correct against today's DOM and consistent with the repo's role/text-locator convention; a `data-testid` on the total row would make it durable.
+
+## Deferred from: round-2 code review of 1-3-out-of-stock-products-are-marked-and-blocked (2026-08-19)
+
+- source_spec: `_bmad-output/implementation-artifacts/1-3-out-of-stock-products-are-marked-and-blocked.md`
+  summary: `src/app/vendors/[slug]/page.tsx` has no explicit `dynamic`/`revalidate` export, and availability is now computed at read time instead of filtered in the DB query. Under Next 14.2's default route cache, a dynamic segment with no dynamic API call is cache-eligible — a stale cached render could show an in-stock, enabled Add button for a product that's since sold out (the old `isAvailable` filter made a stale cache fail safe — hiding an available product — this direction fails unsafe).
+  evidence: No `export const dynamic`/`revalidate` anywhere under `src/app`. Neither the dev server nor `npm run build` alone proves actual cache behavior in production — needs verification against a real deploy before Epic 1 ships. If confirmed live, the fix is a one-line `export const dynamic = "force-dynamic"` (or an appropriate `revalidate` window) on that route.
+
+- source_spec: `_bmad-output/implementation-artifacts/1-3-out-of-stock-products-are-marked-and-blocked.md`
+  summary: The `drop_is_available` migration's folder rename (`20260818160625_...` → `20260818200653_...`, to match its actual UTC apply time) and the corresponding `_prisma_migrations.migration_name` update exist only as hand-run SQL recorded in the story file's Review Findings prose, not as a rerunnable script.
+  evidence: Fine for the single shared dev DB this project uses today — `npx prisma migrate status` confirms clean/no-drift there. Would break any second environment (CI, a teammate's DB, staging) that already applied the migration under its original name, since that environment's `_prisma_migrations` row wouldn't match either the folder name or get the rename. No action needed while there's exactly one dev DB; worth a proper migration/script if a second environment is ever provisioned before this is otherwise cleaned up.

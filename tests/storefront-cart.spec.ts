@@ -10,27 +10,40 @@ import {
 // item, and confirms it appears in the cart.
 test.describe("storefront and cart", () => {
   test("can add a product to the cart", async ({ page }) => {
-    await page.goto("/vendors/corner-sourdough");
-    await expect(
-      page.getByRole("heading", { name: /corner sourdough/i }),
-    ).toBeVisible();
+    // Own dedicated fixture rather than a shared seed product — a seed
+    // product's stock can be mutated to 0 by another test running
+    // concurrently under fullyParallel:true, disabling its Add button out
+    // from under this test (review round 2 finding: round 1's fix to
+    // target "Cinnamon Morning Bun" by name instead of .first() didn't
+    // remove the race, it just made it deterministic against the sibling
+    // "checkout shows an error..." test below, which sets that exact
+    // product's stock to 0).
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, {
+      name: "Playwright Add To Cart Product",
+    });
 
-    // Target a specific, known-in-stock product by name rather than
-    // .first() — a same-named/earlier-sorting out-of-stock fixture from a
-    // parallel test can render disabled and hang a .first() click (review
-    // round 1 finding).
-    const card = page
-      .getByRole("heading", { name: "Cinnamon Morning Bun", exact: true })
-      .locator("../..");
-    await card.getByRole("button", { name: "Add" }).click();
+    try {
+      await page.goto("/vendors/corner-sourdough");
+      await expect(
+        page.getByRole("heading", { name: /corner sourdough/i }),
+      ).toBeVisible();
 
-    // The cart badge in the navbar should now show at least 1.
-    // /cart's first hit can lose the race against Next.js's on-demand route
-    // compile under parallel test load (see playwright.config.ts's timeout
-    // comment) — same reasoning as the extended timeouts in dashboard.spec.ts.
-    await page.getByRole("link", { name: /cart/i }).click();
-    await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
-    await expect(page.getByText(/total/i)).toBeVisible();
+      const card = page
+        .getByRole("heading", { name: product.name, exact: true })
+        .locator("../..");
+      await card.getByRole("button", { name: "Add" }).click();
+
+      // The cart badge in the navbar should now show at least 1.
+      // /cart's first hit can lose the race against Next.js's on-demand route
+      // compile under parallel test load (see playwright.config.ts's timeout
+      // comment) — same reasoning as the extended timeouts in dashboard.spec.ts.
+      await page.getByRole("link", { name: /cart/i }).click();
+      await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+      await expect(page.getByText(/total/i)).toBeVisible();
+    } finally {
+      await deleteProduct(product.id);
+    }
   });
 
   test(
@@ -73,30 +86,41 @@ test.describe("storefront and cart", () => {
   test(
     "checkout shows an error when a cart item's stock drops below the cart quantity before submitting",
     async ({ page }) => {
+      // Own dedicated fixture, not the shared seed product — see the
+      // comment on "can add a product to the cart" above. Also drops the
+      // .first() click round 2 review flagged as an unfixed instance of
+      // round 1's finding, and the durability hole of relying on `finally`
+      // to restore a shared row's original stock value.
       const vendor = await getVendorBySlug("corner-sourdough");
-      // Storefront lists products alphabetically (vendors/[slug]/page.tsx), so
-      // "Cinnamon Morning Bun" is the same product the "Add" .first() click
-      // above targets.
-      const product = vendor.products.find(
-        (p) => p.name === "Cinnamon Morning Bun",
-      );
-      if (!product) throw new Error("Seed data missing 'Cinnamon Morning Bun'");
-      const originalStockQuantity = product.stockQuantity;
+      const product = await createTestProduct(vendor.id, {
+        name: "Playwright Stock Drop Product",
+        stockQuantity: 3,
+      });
 
       try {
         await page.goto("/vendors/corner-sourdough");
-        await page.getByRole("button", { name: "Add" }).first().click();
+        const card = page
+          .getByRole("heading", { name: product.name, exact: true })
+          .locator("../..");
+        // Add twice (cart quantity 2), so the sufficiency check below is
+        // exercised at a non-zero, non-boundary stock value (0 < stock <
+        // quantity) rather than only the stock-is-exactly-0 case — AD-2's
+        // sufficiency check is `stockQuantity >= quantity`, not `> 0`, and
+        // review round 2 flagged that nothing tested the difference.
+        await card.getByRole("button", { name: "Add" }).click();
+        await card.getByRole("button", { name: "Add" }).click();
         await page.getByRole("link", { name: /cart/i }).click();
         await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
 
         await page.getByPlaceholder(/your name/i).fill("Availability Check Customer");
         await page.getByPlaceholder(/mobile number/i).fill("+15005550006");
 
-        // Simulate the last unit selling out (a concurrent order) after it
-        // was added to this cart but before this checkout submits.
+        // Simulate a concurrent order taking 2 of the 3 units, leaving 1 —
+        // enough to still be "in stock" but short of this cart's quantity
+        // of 2.
         await prisma.product.update({
           where: { id: product.id },
-          data: { stockQuantity: 0 },
+          data: { stockQuantity: 1 },
         });
 
         await page.getByRole("button", { name: /checkout/i }).click();
@@ -105,10 +129,7 @@ test.describe("storefront and cart", () => {
           page.getByText("One or more items don't have enough stock"),
         ).toBeVisible();
       } finally {
-        await prisma.product.update({
-          where: { id: product.id },
-          data: { stockQuantity: originalStockQuantity },
-        });
+        await deleteProduct(product.id);
       }
     },
   );

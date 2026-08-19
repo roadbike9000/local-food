@@ -26,8 +26,8 @@ Creates a `PENDING` order and a Stripe Checkout session.
 
 **Behavior:**
 1. `req.json().catch(() => null)` then `safeParse` — malformed JSON or schema mismatch → `400 { error: "Invalid request" }`.
-2. Re-fetches the named products from the DB, filtered by `vendorId`. If the count returned doesn't match `items.length` (an item is deleted or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
-3. Per-line stock sufficiency check: `stockQuantity >= quantity` for every line (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean). Any short line rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created.
+2. Quantities are aggregated per `productId` first (a cart can list the same product on multiple lines), then the distinct products are re-fetched from the DB, filtered by `vendorId`. If the count doesn't match the number of distinct requested products (one is deleted or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
+3. Stock sufficiency check: `stockQuantity >= totalRequestedQuantity` per product (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean; totaled across duplicate lines for the same product). Any short product rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created. **This check is a point-in-time read with no reservation or transaction** — it does not itself prevent two concurrent checkouts from both passing for the same last unit; stock is not decremented until Story 1.4's sale-completion path ships.
 4. Computes `totalCents` from DB prices — the client-sent price (there is none in this schema) can never influence the charge.
 5. Creates `Order` (status `PENDING`) with nested `OrderItem` creates.
 6. Creates a Stripe Checkout session (`mode: "payment"`), `metadata: { orderId }` so the webhook can find it back, `success_url` → `/checkout/success`, `cancel_url` → `/cart`.
