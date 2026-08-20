@@ -14,6 +14,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { clampQuantity } from "@/lib/cart";
 
 export type CartItem = {
   productId: string;
@@ -28,13 +29,6 @@ export type CartItem = {
   stockQuantity: number;
 };
 
-// Floor 1, ceiling stockQuantity - shared by addItem's repeat-click
-// increment and the cart page's stepper so the two paths can't drift into
-// enforcing two different limits (Story 1.5, AC #3/#6).
-function clampQuantity(quantity: number, stockQuantity: number): number {
-  return Math.max(1, Math.min(quantity, stockQuantity));
-}
-
 type CartContextValue = {
   vendorId: string | null;
   vendorSlug: string | null;
@@ -46,7 +40,7 @@ type CartContextValue = {
     item: Omit<CartItem, "quantity">,
   ) => void;
   removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  updateQuantity: (productId: string, delta: number) => void;
   clear: () => void;
 };
 
@@ -75,16 +69,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) => {
       const existing = prev.find((i) => i.productId === item.productId);
       if (existing) {
-        // Refresh stockQuantity to this click's value (freshest known read)
-        // and clamp the increment against it, so repeat-"Add" can't exceed
-        // the same ceiling the cart stepper enforces (AC #6).
+        // Refresh every field to this click's fresh values (not just
+        // stockQuantity - review round 1 finding: cherry-picking one field
+        // left name/priceCents silently stale if a vendor edited them
+        // between two "Add" clicks) and clamp the increment against the
+        // fresh ceiling, so repeat-"Add" can't exceed the same limit the
+        // cart stepper enforces (AC #6).
         return prev.map((i) =>
           i.productId === item.productId
-            ? {
-                ...i,
-                stockQuantity: item.stockQuantity,
-                quantity: clampQuantity(i.quantity + 1, item.stockQuantity),
-              }
+            ? { ...item, quantity: clampQuantity(i.quantity + 1, item.stockQuantity) }
             : i,
         );
       }
@@ -96,11 +89,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) => prev.filter((i) => i.productId !== productId));
   }
 
-  function updateQuantity(productId: string, quantity: number) {
+  // Takes a delta (+1/-1), not an absolute target, and computes the next
+  // quantity from `prev` inside the updater - review round 1 finding: a
+  // caller passing a precomputed `currentQuantity + delta` bakes in a
+  // stale render-time value, so two clicks landing before a re-render
+  // commits could silently drop one step. Mirrors addItem's existing-item
+  // branch, which already reads from `prev` for the same reason.
+  function updateQuantity(productId: string, delta: number) {
     setItems((prev) =>
       prev.map((i) =>
         i.productId === productId
-          ? { ...i, quantity: clampQuantity(quantity, i.stockQuantity) }
+          ? { ...i, quantity: clampQuantity(i.quantity + delta, i.stockQuantity) }
           : i,
       ),
     );

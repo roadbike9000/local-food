@@ -164,15 +164,6 @@ test.describe("storefront and cart", () => {
       );
     }
 
-    // Matches src/lib/utils.ts's formatPrice() exactly (Intl.NumberFormat
-    // inserts thousands separators formatPrice relies on) rather than a
-    // toFixed()-based reimplementation that would silently diverge at
-    // totals >= $1,000.
-    const dollars = (cents: number) =>
-      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-        cents / 100,
-      );
-
     // Every product card's "Add" button shares the accessible name "Add",
     // so scope each click to the specific card: the div containing both
     // this product's heading and an "Add" button, narrowed to the

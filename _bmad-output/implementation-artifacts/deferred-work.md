@@ -84,3 +84,21 @@
 - source_spec: `_bmad-output/implementation-artifacts/1-4-inventory-decrements-immediately-on-sale-completion.md`
   summary: The webhook route's `claim.count === 0` early return is indistinguishable from a genuine full success — both return the identical `{ shortfalls: [] }` shape from the `$transaction` callback.
   evidence: `route.ts:135-140` (lost the race to a concurrent duplicate delivery, or someone else already handled it) and `:176-178` (fully decremented with zero shortfalls) both return the same shape. Harmless today — both cases correctly no-op — but any future logging/metrics keyed off this result can't distinguish "lost the race" from "handled fully" without re-querying. Low priority.
+
+## Deferred from: round-1 code review of 1-5-cart-quantity-stepper (2026-08-19)
+
+- source_spec: `_bmad-output/implementation-artifacts/1-5-cart-quantity-stepper.md`
+  summary: Stepper aria-labels (`Increase/Decrease quantity of ${name}`, `Quantity of ${name}`) are keyed by product name, not `productId` — two same-named products in one vendor's catalog would collide.
+  evidence: `src/app/cart/page.tsx:69,77,80`. `productId` is the unique key used everywhere else in this file (React `key`, `updateQuantity`, `removeItem`), but names carry no schema-level uniqueness constraint. Real but narrow — no evidence of duplicate names in practice — and not a regression: the pre-existing "Add" button already shares one identical accessible name ("Add") across every product card on the page, an ambiguity this file's existing tests already work around via DOM-position scoping. This story's name-keyed labels are strictly more specific than that pattern, just not fully collision-proof.
+
+- source_spec: `_bmad-output/implementation-artifacts/1-5-cart-quantity-stepper.md`
+  summary: No `aria-live` region on the cart's quantity display — a screen-reader user gets no announcement when a stepper click changes the count.
+  evidence: `src/app/cart/page.tsx:76-78`. Real accessibility gap for a control whose whole purpose is a fast in-place change, but no `aria-live` convention exists anywhere else in this codebase, and no AC in Story 1.5 calls for screen-reader announcement behavior — out of that story's stated scope, not a regression.
+
+- source_spec: `_bmad-output/implementation-artifacts/1-5-cart-quantity-stepper.md`
+  summary: Repeat-clicking "Add" can silently reduce an already-chosen cart quantity with zero user feedback, if live stock has dropped below what's already in the cart.
+  evidence: `src/components/CartProvider.tsx:81-89` — `clampQuantity(i.quantity + 1, item.stockQuantity)` can clamp *down* from the stored quantity if the fresh `item.stockQuantity` is now lower than it. Corollary of Story 1.5's own AC #6, which explicitly specifies this as a silent cap with no new disabled state or error message. If a real affordance is wanted later, that's a follow-up UX decision, not a missed gap.
+
+- source_spec: `_bmad-output/implementation-artifacts/1-5-cart-quantity-stepper.md`
+  summary: `CartProvider`'s `updateQuantity(productId, quantity)` has no guard against non-finite (`NaN`) input on its public context API.
+  evidence: `src/components/CartProvider.tsx:99-107`. Currently unreachable — the only two call sites in the codebase (`src/app/cart/page.tsx`'s two stepper buttons) both pass `i.quantity ± 1`, always an already-clamped integer. Defense-in-depth on an unreachable path.
