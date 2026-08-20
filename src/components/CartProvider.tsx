@@ -20,7 +20,20 @@ export type CartItem = {
   name: string;
   priceCents: number;
   quantity: number;
+  // Stock Quantity known at add-to-cart time (Story 1.5). A UX hint only for
+  // the cart stepper's ceiling - never re-validated against the server, may
+  // go stale, and is never authoritative. Checkout's own per-line
+  // sufficiency check is the sole enforcement point regardless of this
+  // value (architecture AD-3).
+  stockQuantity: number;
 };
+
+// Floor 1, ceiling stockQuantity - shared by addItem's repeat-click
+// increment and the cart page's stepper so the two paths can't drift into
+// enforcing two different limits (Story 1.5, AC #3/#6).
+function clampQuantity(quantity: number, stockQuantity: number): number {
+  return Math.max(1, Math.min(quantity, stockQuantity));
+}
 
 type CartContextValue = {
   vendorId: string | null;
@@ -33,6 +46,7 @@ type CartContextValue = {
     item: Omit<CartItem, "quantity">,
   ) => void;
   removeItem: (productId: string) => void;
+  updateQuantity: (productId: string, quantity: number) => void;
   clear: () => void;
 };
 
@@ -61,9 +75,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) => {
       const existing = prev.find((i) => i.productId === item.productId);
       if (existing) {
+        // Refresh stockQuantity to this click's value (freshest known read)
+        // and clamp the increment against it, so repeat-"Add" can't exceed
+        // the same ceiling the cart stepper enforces (AC #6).
         return prev.map((i) =>
           i.productId === item.productId
-            ? { ...i, quantity: i.quantity + 1 }
+            ? {
+                ...i,
+                stockQuantity: item.stockQuantity,
+                quantity: clampQuantity(i.quantity + 1, item.stockQuantity),
+              }
             : i,
         );
       }
@@ -73,6 +94,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   function removeItem(productId: string) {
     setItems((prev) => prev.filter((i) => i.productId !== productId));
+  }
+
+  function updateQuantity(productId: string, quantity: number) {
+    setItems((prev) =>
+      prev.map((i) =>
+        i.productId === productId
+          ? { ...i, quantity: clampQuantity(quantity, i.stockQuantity) }
+          : i,
+      ),
+    );
   }
 
   function clear() {
@@ -93,6 +124,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     totalCents,
     addItem,
     removeItem,
+    updateQuantity,
     clear,
   };
 

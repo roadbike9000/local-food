@@ -50,6 +50,7 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
             productId: product.id,
             name: product.name,
             priceCents: product.priceCents,
+            stockQuantity: product.stockQuantity,
           });
         }}
         className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark aria-disabled:cursor-not-allowed aria-disabled:opacity-50"

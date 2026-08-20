@@ -7,7 +7,7 @@ import { formatPrice } from "@/lib/utils";
 // The cart + checkout page. Collects customer contact info, then calls our
 // /api/checkout route which creates a Stripe Checkout session and redirects.
 export default function CartPage() {
-  const { items, vendorId, totalCents, removeItem } = useCart();
+  const { items, vendorId, totalCents, removeItem, updateQuantity } = useCart();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -64,8 +64,27 @@ export default function CartPage() {
             key={i.productId}
             className="flex items-center justify-between p-3"
           >
-            <span>
-              {i.quantity} × {i.name}
+            <span className="flex items-center gap-2">
+              <button
+                aria-label={`Decrease quantity of ${i.name}`}
+                disabled={i.quantity <= 1}
+                onClick={() => updateQuantity(i.productId, i.quantity - 1)}
+                className="flex h-6 w-6 items-center justify-center rounded border border-stone-300 text-stone-600 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                −
+              </button>
+              <span aria-label={`Quantity of ${i.name}`} className="w-4 text-center">
+                {i.quantity}
+              </span>
+              <button
+                aria-label={`Increase quantity of ${i.name}`}
+                disabled={i.quantity >= i.stockQuantity}
+                onClick={() => updateQuantity(i.productId, i.quantity + 1)}
+                className="flex h-6 w-6 items-center justify-center rounded border border-stone-300 text-stone-600 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                +
+              </button>
+              <span className="ml-1">{i.name}</span>
             </span>
             <span className="flex items-center gap-3">
               {formatPrice(i.priceCents * i.quantity)}

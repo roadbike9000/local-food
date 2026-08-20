@@ -6,6 +6,14 @@ import {
   prisma,
 } from "./helpers/db";
 
+// Matches src/lib/utils.ts's formatPrice() exactly, same reasoning as the
+// P0 test below: avoids a toFixed()-based reimplementation that would
+// silently diverge at totals >= $1,000.
+const dollars = (cents: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+    cents / 100,
+  );
+
 // Requires seeded data (npm run db:seed). Visits a vendor storefront, adds an
 // item, and confirms it appears in the cart.
 test.describe("storefront and cart", () => {
@@ -246,5 +254,174 @@ test.describe("storefront and cart", () => {
       .click();
 
     await expect(page.getByText("Your cart is empty.")).toBeVisible();
+  });
+
+  test("cart stepper increments and decrements quantity, total recalculates (Story 1.5)", async ({
+    page,
+  }) => {
+    // Own dedicated fixture, not shared seed data - same discipline as the
+    // other tests in this file (fullyParallel:true, Story 1.3 round-2).
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, {
+      name: "Playwright Stepper Product",
+      stockQuantity: 10,
+    });
+
+    try {
+      await page.goto("/vendors/corner-sourdough");
+      const card = page
+        .getByRole("heading", { name: product.name, exact: true })
+        .locator("../..");
+      await card.getByRole("button", { name: "Add" }).click();
+
+      await page.getByRole("link", { name: /cart/i }).click();
+      await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+
+      const increment = page.getByRole("button", {
+        name: `Increase quantity of ${product.name}`,
+      });
+      const decrement = page.getByRole("button", {
+        name: `Decrease quantity of ${product.name}`,
+      });
+      const quantity = page.locator(
+        `[aria-label="Quantity of ${product.name}"]`,
+      );
+      const lineTotal = page
+        .locator("li")
+        .filter({ hasText: product.name });
+      const totalRow = () =>
+        page.locator("div").filter({ hasText: "Total" }).last();
+
+      await expect(quantity).toHaveText("1");
+      await expect(lineTotal).toContainText(dollars(product.priceCents));
+
+      await increment.click();
+      await increment.click();
+      await expect(quantity).toHaveText("3");
+      await expect(lineTotal).toContainText(dollars(3 * product.priceCents));
+      await expect(
+        totalRow().getByText(dollars(3 * product.priceCents), { exact: true }),
+      ).toBeVisible();
+
+      await decrement.click();
+      await expect(quantity).toHaveText("2");
+      await expect(lineTotal).toContainText(dollars(2 * product.priceCents));
+      await expect(
+        totalRow().getByText(dollars(2 * product.priceCents), { exact: true }),
+      ).toBeVisible();
+    } finally {
+      await deleteProduct(product.id);
+    }
+  });
+
+  test("cart stepper floor: decrement is disabled at quantity 1, never reaches 0 (Story 1.5, AC #2)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, {
+      name: "Playwright Stepper Floor Product",
+      stockQuantity: 10,
+    });
+
+    try {
+      await page.goto("/vendors/corner-sourdough");
+      const card = page
+        .getByRole("heading", { name: product.name, exact: true })
+        .locator("../..");
+      await card.getByRole("button", { name: "Add" }).click();
+
+      await page.getByRole("link", { name: /cart/i }).click();
+      await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+
+      const decrement = page.getByRole("button", {
+        name: `Decrease quantity of ${product.name}`,
+      });
+      const quantity = page.locator(
+        `[aria-label="Quantity of ${product.name}"]`,
+      );
+
+      await expect(quantity).toHaveText("1");
+      await expect(decrement).toBeDisabled();
+
+      // The line must still be present at quantity 1, not removed - the
+      // stepper's floor is not a removal path (Story 1.1's "remove" button
+      // is the only way to zero out a line).
+      await expect(page.getByText(product.name)).toBeVisible();
+    } finally {
+      await deleteProduct(product.id);
+    }
+  });
+
+  test("cart stepper ceiling: increment is disabled once quantity reaches the product's stock (Story 1.5, AC #3)", async ({
+    page,
+  }) => {
+    // Low-stock dedicated product so the ceiling is reachable quickly - a
+    // high-stock fixture would make this test meaningless, not just slow.
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, {
+      name: "Playwright Stepper Ceiling Product",
+      stockQuantity: 2,
+    });
+
+    try {
+      await page.goto("/vendors/corner-sourdough");
+      const card = page
+        .getByRole("heading", { name: product.name, exact: true })
+        .locator("../..");
+      await card.getByRole("button", { name: "Add" }).click();
+
+      await page.getByRole("link", { name: /cart/i }).click();
+      await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+
+      const increment = page.getByRole("button", {
+        name: `Increase quantity of ${product.name}`,
+      });
+      const quantity = page.locator(
+        `[aria-label="Quantity of ${product.name}"]`,
+      );
+
+      await expect(quantity).toHaveText("1");
+      await increment.click();
+      await expect(quantity).toHaveText("2");
+      await expect(increment).toBeDisabled();
+
+      // Clicking a disabled button is a no-op - confirms the ceiling isn't
+      // just a UI hint that a determined click can bypass.
+      await increment.click({ force: true });
+      await expect(quantity).toHaveText("2");
+    } finally {
+      await deleteProduct(product.id);
+    }
+  });
+
+  test("repeat-clicking Add is capped at the product's stock ceiling, same limit the stepper enforces (Story 1.5, AC #6)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, {
+      name: "Playwright Add Cap Product",
+      stockQuantity: 2,
+    });
+
+    try {
+      await page.goto("/vendors/corner-sourdough");
+      const card = page
+        .getByRole("heading", { name: product.name, exact: true })
+        .locator("../..");
+
+      await card.getByRole("button", { name: "Add" }).click();
+      await card.getByRole("button", { name: "Add" }).click();
+      await card.getByRole("button", { name: "Add" }).click();
+
+      await page.getByRole("link", { name: /cart/i }).click();
+      await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+
+      const quantity = page.locator(
+        `[aria-label="Quantity of ${product.name}"]`,
+      );
+      await expect(quantity).toHaveText("2");
+    } finally {
+      await deleteProduct(product.id);
+    }
   });
 });
