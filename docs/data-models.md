@@ -42,7 +42,7 @@ Something a vendor sells.
 | imageUrl | String? | Cloudinary URL |
 | stockQuantity | Int | availability is derived, never stored (architecture AD-2) — `isInStock()` in `src/lib/availability.ts` is the single canonical check (`stockQuantity > 0`); checkout additionally requires `stockQuantity >= requestedQuantity` per line |
 | lowStockThreshold | Int | vendor-set threshold for the dashboard's low-stock indicator |
-| stockIsPlaceholder | Boolean | `true` for rows backfilled by Story 1.2's migration whose `stockQuantity` is still the migration sentinel, not a real vendor-entered value; cleared on the vendor's first genuine edit. Story 1.6 (FR13) surfaces this to the vendor — not yet consulted by any read site as of Story 1.3 |
+| stockIsPlaceholder | Boolean | `true` for rows backfilled by Story 1.2's migration whose `stockQuantity` is still the migration sentinel, not a real vendor-entered value; cleared on the vendor's first genuine edit. Surfaced to the vendor as a "Needs review" badge on `/dashboard/products` (Story 1.6, FR13) |
 | thresholdIsPlaceholder | Boolean | same as `stockIsPlaceholder`, for `lowStockThreshold` |
 | createdAt / updatedAt | DateTime | |
 

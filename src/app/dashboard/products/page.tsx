@@ -5,6 +5,23 @@ import { isInStock } from "@/lib/inventory";
 import { AddProductForm } from "@/components/dashboard/AddProductForm";
 import { EditStockControl } from "@/components/dashboard/EditStockControl";
 
+// Story 1.6: one shared badge for either placeholder flag - never two
+// separate badges - naming which field(s) still hold a migration-backfilled
+// value (Story 1.2's stockIsPlaceholder/thresholdIsPlaceholder), not real
+// vendor-entered data yet.
+function placeholderReason(product: {
+  stockIsPlaceholder: boolean;
+  thresholdIsPlaceholder: boolean;
+}): string {
+  if (product.stockIsPlaceholder && product.thresholdIsPlaceholder) {
+    return "Stock Quantity and Low-Stock Threshold are still migration placeholders — update both.";
+  }
+  if (product.stockIsPlaceholder) {
+    return "Stock Quantity is still a migration placeholder — update it.";
+  }
+  return "Low-Stock Threshold is still a migration placeholder — update it.";
+}
+
 // Products tab: lists the vendor's products and lets them add new ones.
 export default async function DashboardProductsPage() {
   const vendor = await getCurrentVendor();
@@ -39,7 +56,18 @@ export default async function DashboardProductsPage() {
           <tbody>
             {products.map((p) => (
               <tr key={p.id} className="border-b border-stone-100">
-                <td className="py-2">{p.name}</td>
+                <td className="py-2">
+                  {p.name}
+                  {(p.stockIsPlaceholder || p.thresholdIsPlaceholder) && (
+                    <span
+                      id={`placeholder-badge-${p.id}`}
+                      title={placeholderReason(p)}
+                      className="ml-2 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                    >
+                      Needs review
+                    </span>
+                  )}
+                </td>
                 <td className="py-2">{formatPrice(p.priceCents)}</td>
                 <td className="py-2">{isInStock(p) ? "Yes" : "No"}</td>
                 <EditStockControl

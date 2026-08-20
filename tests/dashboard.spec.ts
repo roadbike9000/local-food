@@ -325,4 +325,87 @@ test.describe("vendor dashboard (authenticated)", () => {
       await deleteProduct(product.id);
     }
   });
+
+  test("[P1] a placeholder Stock Quantity or Low-Stock Threshold shows a 'Needs review' badge on its row (Story 1.6)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const flaggedName = `Playwright Placeholder ${Date.now()}`;
+    const cleanName = `Playwright No Placeholder ${Date.now()}`;
+
+    // Two dedicated fixtures: one with a placeholder flag set, one without -
+    // proves the badge is conditional on the flag, not just always rendered.
+    const flagged = await createTestProduct(vendor.id, {
+      name: flaggedName,
+      stockIsPlaceholder: true,
+    });
+    const clean = await createTestProduct(vendor.id, {
+      name: cleanName,
+    });
+
+    try {
+      await page.goto("/dashboard/products");
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible();
+
+      const flaggedRow = page.getByRole("row", { name: new RegExp(flaggedName) });
+      const cleanRow = page.getByRole("row", { name: new RegExp(cleanName) });
+      await expect(flaggedRow).toBeVisible();
+      await expect(cleanRow).toBeVisible();
+
+      await expect(flaggedRow.getByText("Needs review")).toBeVisible();
+      await expect(cleanRow.getByText("Needs review")).not.toBeVisible();
+    } finally {
+      await deleteProduct(flagged.id);
+      await deleteProduct(clean.id);
+    }
+  });
+
+  test("[P1] the badge disappears once the flagged field is edited via the existing inline control (Story 1.6, AC #2)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const productName = `Playwright Placeholder Clear ${Date.now()}`;
+
+    const product = await createTestProduct(vendor.id, {
+      name: productName,
+      stockQuantity: 20,
+      stockIsPlaceholder: true,
+    });
+
+    try {
+      await page.goto("/dashboard/products");
+      const row = page.getByRole("row", { name: new RegExp(productName) });
+      await expect(row).toBeVisible();
+      await expect(row.getByText("Needs review")).toBeVisible();
+
+      const stockInput = row.getByRole("spinbutton", {
+        name: /stock quantity/i,
+      });
+      await stockInput.fill("35");
+
+      const [response] = await Promise.all([
+        page.waitForResponse(`**/api/products/${product.id}`),
+        row.getByRole("button", { name: "Save" }).click(),
+      ]);
+      expect(response.status()).toBe(200);
+
+      // The existing edit path (setStock(), Story 1.2) already clears
+      // stockIsPlaceholder server-side on a genuine value change - this
+      // story adds no new write mechanism, so a hard reload should be
+      // enough for the badge to reflect the persisted state.
+      await page.reload();
+      await expect(row.getByText("Needs review")).not.toBeVisible({
+        timeout: 15_000,
+      });
+
+      const persisted = await prisma.product.findUnique({
+        where: { id: product.id },
+      });
+      expect(persisted?.stockIsPlaceholder).toBe(false);
+    } finally {
+      await deleteProduct(product.id);
+    }
+  });
 });
