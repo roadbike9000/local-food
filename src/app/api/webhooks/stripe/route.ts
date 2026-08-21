@@ -128,6 +128,16 @@ export async function POST(req: Request) {
       // once the first commits.
       if (order.status === "PAID" && !order.stockDecremented) {
         const result = await prisma.$transaction(async (tx) => {
+          // Bounds how long this transaction will block waiting to
+          // *acquire* a row lock (deferred-work.md, Story 1.4 round 2/3).
+          // Prisma's own `timeout` option only bounds the transaction once
+          // a query completes - it doesn't preempt a query stuck waiting
+          // on a lock, which measured at 58.7s under real contention
+          // before this fix. SET LOCAL scopes it to this transaction only
+          // (not the whole pooled connection); the literal is hardcoded,
+          // not interpolated user input, so $executeRawUnsafe is safe here.
+          await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '15s'");
+
           const claim = await tx.order.updateMany({
             where: { id: order.id, stockDecremented: false },
             data: { stockDecremented: true },
@@ -135,8 +145,12 @@ export async function POST(req: Request) {
           if (claim.count === 0) {
             // Lost the race to another concurrent delivery of this same
             // event (or someone else already handled it) - nothing left
-            // to do.
-            return { shortfalls: [] as ShortfallDetail[] };
+            // to do. `claimed: false` distinguishes this from a genuine
+            // full success below, which previously returned the identical
+            // `{ shortfalls: [] }` shape (deferred-work.md, round 3) -
+            // harmless today, but any future logging/metrics keyed off
+            // this result couldn't tell the two apart without re-querying.
+            return { claimed: false, shortfalls: [] as ShortfallDetail[] };
           }
 
           // Stable lock-acquisition order across concurrent transactions
@@ -174,7 +188,7 @@ export async function POST(req: Request) {
           }
 
           if (shortfalls.length === 0) {
-            return { shortfalls: [] as ShortfallDetail[] };
+            return { claimed: true, shortfalls: [] as ShortfallDetail[] };
           }
 
           // Capture each short line's stock at the point of failure BEFORE
@@ -212,6 +226,7 @@ export async function POST(req: Request) {
           }
 
           return {
+            claimed: true,
             shortfalls: shortfalls.map((s) => ({
               ...s,
               available:
@@ -248,8 +263,13 @@ export async function POST(req: Request) {
 
       // Notify the customer once. Only record it as notified if the SMS
       // actually sent — a Twilio failure must not mark this done, or the
-      // customer never gets retried.
-      if (!order.smsNotified) {
+      // customer never gets retried. Also gated on status === "PAID"
+      // (deferred-work.md, Story 1.4 round 2): the smsNotified guard alone
+      // let a replayed webhook for an order that had since moved to
+      // CANCELLED still send "your order is confirmed" - correct, since
+      // stock is untouched for a CANCELLED order, but the message no
+      // longer matches the record.
+      if (order.status === "PAID" && !order.smsNotified) {
         const sent = await sendSms(
           order.customerPhone,
           orderConfirmedMessage(order.vendor.name, order.id),

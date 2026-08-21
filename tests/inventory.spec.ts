@@ -281,4 +281,36 @@ test.describe("decrementStock (Story 1.4)", () => {
       }
     },
   );
+
+  test(
+    "rejects a quantity of 0 or negative rather than writing nothing or incrementing (deferred-work.md, round 1)",
+    async () => {
+      // Unreachable via any real caller today (CheckoutSchema enforces a
+      // positive int), but decrementStock() is a shared primitive and
+      // should be safe on its own terms. Before the fix: quantity 0
+      // matched `gte: 0` and returned true having written nothing;
+      // quantity -5 also matched `gte` and *incremented* stock via
+      // `decrement: -5`, against the function's own "never negative"
+      // promise.
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, { stockQuantity: 10 });
+
+      try {
+        const zero = await prisma.$transaction((tx) =>
+          decrementStock(tx, product.id, 0),
+        );
+        expect(zero).toBe(false);
+
+        const negative = await prisma.$transaction((tx) =>
+          decrementStock(tx, product.id, -5),
+        );
+        expect(negative).toBe(false);
+
+        const result = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(result?.stockQuantity).toBe(10);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
 });

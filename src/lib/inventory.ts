@@ -74,6 +74,17 @@ export async function decrementStock(
   productId: string,
   quantity: number,
 ): Promise<boolean> {
+  // Defence-in-depth (deferred-work.md, Story 1.4 round 1): quantity: 0
+  // matches `gte: 0` and writes nothing, and a negative value also matches
+  // `gte` and would *increment* stock via `decrement: -N` — against this
+  // function's own "never negative" promise. Unreachable today
+  // (CheckoutSchema enforces a positive int, nothing else writes
+  // OrderItem.quantity), but this primitive should be safe for any future
+  // caller regardless.
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    return false;
+  }
+
   const result = await tx.product.updateMany({
     where: { id: productId, stockQuantity: { gte: quantity } },
     data: { stockQuantity: { decrement: quantity } },

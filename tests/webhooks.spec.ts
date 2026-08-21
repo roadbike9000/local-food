@@ -88,6 +88,39 @@ test.describe("stripe webhook", () => {
     }
   });
 
+  test("a CANCELLED order never gets the 'order confirmed' SMS, even on a replayed webhook (deferred-work.md, Story 1.4 round 2)", async ({
+    request,
+  }) => {
+    // Round 1's idempotency-guard fix correctly stopped a replayed webhook
+    // from reviving a CANCELLED order back to PAID - but the SMS block was
+    // gated only on `!order.smsNotified`, so it still fired and told the
+    // customer their (cancelled) order was confirmed. Fixed by also
+    // gating on `order.status === "PAID"`.
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const order = await createTestOrder(vendor.id, {
+      status: "CANCELLED",
+      smsNotified: false,
+    });
+
+    try {
+      const payload = buildCheckoutCompletedPayload(order.id);
+      const signature = signPayload(payload);
+      test.skip(!signature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+      const response = await request.post("/api/webhooks/stripe", {
+        headers: { "stripe-signature": signature! },
+        data: payload,
+      });
+      expect(response.status()).toBe(200);
+
+      const updated = await getOrder(order.id);
+      expect(updated?.status).toBe("CANCELLED");
+      expect(updated?.smsNotified).toBe(false);
+    } finally {
+      await deleteOrder(order.id);
+    }
+  });
+
   test("invalid/missing signature is rejected (400)", async ({ request }) => {
     const payload = buildCheckoutCompletedPayload("nonexistent-order-id");
 
