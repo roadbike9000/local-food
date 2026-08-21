@@ -18,8 +18,14 @@ test.describe("payment flow", () => {
     // another test concurrently zeroed under fullyParallel:true (review
     // round 2 finding).
     const vendor = await getVendorBySlug("corner-sourdough");
+    // Timestamped, not a fixed name — a fixed name collides with any stale
+    // leftover row from a prior interrupted run (this test's own finally
+    // block only deletes the row it created, not a same-named stale one),
+    // producing a strict-mode "resolved to 2 elements" locator error.
+    // Matches the timestamped-name convention every other fixture in this
+    // suite already uses for the same reason.
     const product = await createTestProduct(vendor.id, {
-      name: "Playwright Payment Flow Product",
+      name: `Playwright Payment Flow Product ${Date.now()}`,
     });
 
     try {
