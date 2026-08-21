@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-08-17
-last_updated: 2026-08-19
+last_updated: 2026-08-21
 project: local-food
 project_key: NOKEY
 tracking_system: file-system
@@ -55,7 +55,7 @@ development_status:
   1-4-inventory-decrements-immediately-on-sale-completion: done
   1-5-cart-quantity-stepper: done
   1-6-vendor-notified-of-placeholder-stock-quantity: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   epic-2: backlog
   2-1-admin-identity-and-access-gating: backlog
@@ -67,3 +67,25 @@ development_status:
   3-1-admin-inventory-dashboard: backlog
   3-2-low-stock-sms-alert-to-admin: backlog
   epic-3-retrospective: optional
+
+action_items:
+  - epic: 1
+    action: "Fix the stale Clerk vendor auth fixture (playwright/.auth/vendor.json) and build an equivalent Admin test-identity fixture before Epic 2's first story lands"
+    owner: "Dev"
+    status: open
+  - epic: 1
+    action: "Make npm run test:e2e:auth-style fixture generation self-sufficient (currently needs a dev server already running standalone)"
+    owner: "Dev"
+    status: open
+  - epic: 1
+    action: "Verify Epic 2's migration against a real DB (or rolled-back transaction) before the first review round, given Story 1.2's precedent of shadow-DB/timezone/cardinality bugs only catchable that way"
+    owner: "Dev"
+    status: open
+  - epic: 1
+    action: "Before shipping any new interactive UI in Epic 2, check for touch/keyboard/screen-reader-reachable equivalents of any title-only tooltip content - this gap shipped twice in Epic 1 (Stories 1.5, 1.6)"
+    owner: "Dev"
+    status: open
+  - epic: 1
+    action: "Add npm run test:unit as a CI step (flagged in Story 1.2's round-2 review, still open)"
+    owner: "Dev"
+    status: open
