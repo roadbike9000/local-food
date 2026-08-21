@@ -38,17 +38,19 @@ test.describe("vendor dashboard (unauthenticated)", () => {
 
 const authFile = join(process.cwd(), "playwright/.auth/vendor.json");
 
-// Requires playwright/support/generate-vendor-auth.ts to have been run once
-// (see that file — it needs a human to read an emailed Clerk verification
-// code, so it can't run unattended in CI). Skips gracefully when missing,
-// same pattern as payment.spec.ts's Stripe-keys check.
+// playwright/support/global-setup.ts authenticates the E2E vendor via
+// Clerk's Backend API and writes this file fresh before every test run — no
+// human, no email code, can't go stale between runs. Still skips gracefully
+// if E2E_VENDOR_EMAIL/CLERK_SECRET_KEY aren't configured (global setup warns
+// and skips writing the file rather than failing the whole suite), same
+// pattern as payment.spec.ts's Stripe-keys check.
 test.describe("vendor dashboard (authenticated)", () => {
   test.use({ storageState: authFile });
 
   test.beforeEach(async ({ page }) => {
     test.skip(
       !existsSync(authFile),
-      "No saved vendor session — run `npm run test:e2e:auth` first",
+      "No vendor session — E2E_VENDOR_EMAIL/CLERK_SECRET_KEY not configured",
     );
     // Clerk's saved session needs one full page load to become valid against
     // the middleware; without this warm-up, the very first navigation after
@@ -163,7 +165,14 @@ test.describe("vendor dashboard (authenticated)", () => {
         page.getByRole("button", { name: "Save product" }).click(),
       ]);
 
-      await expect(page.getByText(productName)).toBeVisible({ timeout: 15_000 });
+      // getByRole("cell", ...), not getByText - EditStockControl's
+      // accessibility fix (Story 1.2 round 2) added a sr-only "for
+      // {productName}" span in the same row, which getByText's substring
+      // match also matches once this test actually runs (previously masked
+      // since it never ran at all - blocked by the stale auth fixture).
+      await expect(
+        page.getByRole("cell", { name: productName, exact: true }),
+      ).toBeVisible({ timeout: 15_000 });
     } finally {
       await deleteProductByName(vendor.id, productName);
     }

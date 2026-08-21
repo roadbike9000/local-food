@@ -34,6 +34,11 @@ export default defineConfig({
   // suite time down.
   timeout: 45_000,
   reporter: "html",
+  // Authenticates the E2E vendor via Clerk's Backend API and writes
+  // playwright/.auth/vendor.json fresh before every run - see
+  // playwright/support/global-setup.ts for why this replaced a manual,
+  // human-in-the-loop script.
+  globalSetup: "./playwright/support/global-setup.ts",
   use: {
     baseURL: process.env.BASE_URL ?? "http://localhost:3000",
     trace: "on-first-retry",

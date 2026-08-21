@@ -26,7 +26,7 @@ async function main() {
   const bakery = await prisma.vendor.create({
     data: {
       // Bound to E2E_VENDOR_CLERK_ID when set, so re-seeding doesn't break the
-      // authenticated Playwright fixture (playwright/support/generate-vendor-auth.ts).
+      // authenticated Playwright fixture (playwright/support/global-setup.ts).
       clerkUserId: process.env.E2E_VENDOR_CLERK_ID || "seed_user_bakery",
       name: "Corner Sourdough",
       slug: "corner-sourdough",

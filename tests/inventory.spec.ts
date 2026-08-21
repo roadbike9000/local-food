@@ -12,9 +12,9 @@ import { getVendorBySlug, createTestProduct, deleteProduct, prisma } from "./hel
  * review, round 2, finding P9).
  *
  * No Clerk session needed - these call the library functions directly, not
- * an HTTP route, so this suite isn't blocked by the stale
+ * an HTTP route, so this suite doesn't depend on the
  * playwright/.auth/vendor.json fixture the way tests/dashboard.spec.ts and
- * tests/products-api.spec.ts are.
+ * tests/products-api.spec.ts do.
  */
 test.describe("setStock / setLowStockThreshold", () => {
   test("updates stockQuantity when expectedCurrentValue matches", async () => {

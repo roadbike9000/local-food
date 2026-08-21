@@ -7,13 +7,12 @@ import { getVendorBySlug, deleteProduct, prisma, createTestProduct } from "./hel
  * API-level coverage for PATCH /api/products/[id] — Story 1.2's new
  * stock-edit endpoint (AC #4, #5).
  *
- * Requires playwright/support/generate-vendor-auth.ts to have been run once
- * (same pre-existing stale-fixture limitation documented in
- * tests/dashboard.spec.ts and deferred-work.md) — the saved session belongs
- * to the seeded "Corner Sourdough" vendor (prisma/seed.ts binds
- * E2E_VENDOR_CLERK_ID to it), which is why every test below authenticates
- * as Corner Sourdough and uses "Green Valley Produce" as the *other* vendor
- * for the ownership-scoping case.
+ * playwright/support/global-setup.ts authenticates via Clerk's Backend API
+ * and writes playwright/.auth/vendor.json fresh before every run — the saved
+ * session belongs to the seeded "Corner Sourdough" vendor (prisma/seed.ts
+ * binds E2E_VENDOR_CLERK_ID to it), which is why every test below
+ * authenticates as Corner Sourdough and uses "Green Valley Produce" as the
+ * *other* vendor for the ownership-scoping case.
  */
 const authFile = join(process.cwd(), "playwright/.auth/vendor.json");
 
@@ -23,7 +22,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
   test.beforeEach(async () => {
     test.skip(
       !existsSync(authFile),
-      "No saved vendor session — run `npm run test:e2e:auth` first",
+      "No vendor session — E2E_VENDOR_EMAIL/CLERK_SECRET_KEY not configured",
     );
   });
 
