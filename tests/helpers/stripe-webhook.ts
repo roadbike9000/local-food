@@ -13,6 +13,12 @@ export function buildCheckoutCompletedPayload(
   // pass something else, to prove a mismatch against Order.stripeSessionId
   // is caught - see that test for why.
   sessionId: string = `cs_test_${orderId}`,
+  // Defaults to "paid" - real card-based Checkout completes with
+  // payment_status: "paid" immediately, which is what every existing test
+  // here has always implicitly assumed. Only the async-payment tests need
+  // "unpaid" (a delayed-notification method's session completing before
+  // money actually clears).
+  paymentStatus: string = "paid",
 ) {
   return JSON.stringify({
     id: `evt_test_${orderId}`,
@@ -22,6 +28,46 @@ export function buildCheckoutCompletedPayload(
       object: {
         id: sessionId,
         object: "checkout.session",
+        payment_status: paymentStatus,
+        metadata: { orderId },
+      },
+    },
+  });
+}
+
+/** Same shape as checkout.session.completed's payload, different event type. */
+export function buildAsyncPaymentSucceededPayload(
+  orderId: string,
+  sessionId: string = `cs_test_${orderId}`,
+) {
+  return JSON.stringify({
+    id: `evt_test_async_ok_${orderId}`,
+    object: "event",
+    type: "checkout.session.async_payment_succeeded",
+    data: {
+      object: {
+        id: sessionId,
+        object: "checkout.session",
+        payment_status: "paid",
+        metadata: { orderId },
+      },
+    },
+  });
+}
+
+export function buildAsyncPaymentFailedPayload(
+  orderId: string,
+  sessionId: string = `cs_test_${orderId}`,
+) {
+  return JSON.stringify({
+    id: `evt_test_async_fail_${orderId}`,
+    object: "event",
+    type: "checkout.session.async_payment_failed",
+    data: {
+      object: {
+        id: sessionId,
+        object: "checkout.session",
+        payment_status: "unpaid",
         metadata: { orderId },
       },
     },

@@ -8,7 +8,12 @@ import {
   deleteProduct,
   prisma,
 } from "./helpers/db";
-import { buildCheckoutCompletedPayload, signPayload } from "./helpers/stripe-webhook";
+import {
+  buildCheckoutCompletedPayload,
+  buildAsyncPaymentSucceededPayload,
+  buildAsyncPaymentFailedPayload,
+  signPayload,
+} from "./helpers/stripe-webhook";
 
 // Direct API-level coverage for /api/webhooks/stripe. Nothing else in the
 // suite touches this route: it carries two Critical Don't-Miss Rules
@@ -160,6 +165,104 @@ test.describe("stripe webhook", () => {
       expect(updated?.smsNotified).toBe(false);
     } finally {
       await deleteOrder(order.id);
+    }
+  });
+
+  test("a delayed-notification checkout.session.completed (payment_status: unpaid) does not mark PAID or decrement, until async_payment_succeeded arrives (deferred-work.md)", async ({
+    request,
+  }) => {
+    // checkout.session.completed alone never guaranteed money was
+    // captured - a delayed-notification payment method (e.g. bank
+    // transfers) completes the session immediately with payment_status
+    // "unpaid", and only fires async_payment_succeeded once payment
+    // actually clears, which can be minutes to days later.
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, { stockQuantity: 10 });
+    const order = await createTestOrder(vendor.id, {
+      status: "PENDING",
+      stripeSessionId: "cs_test_delayed_method",
+      items: [{ productId: product.id, quantity: 2, unitPriceCents: product.priceCents }],
+    });
+
+    try {
+      const completedPayload = buildCheckoutCompletedPayload(
+        order.id,
+        "cs_test_delayed_method",
+        "unpaid",
+      );
+      const completedSignature = signPayload(completedPayload);
+      test.skip(!completedSignature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+      const completedResponse = await request.post("/api/webhooks/stripe", {
+        headers: { "stripe-signature": completedSignature! },
+        data: completedPayload,
+      });
+      expect(completedResponse.status()).toBe(200);
+
+      const afterCompleted = await getOrder(order.id);
+      expect(afterCompleted?.status).toBe("PENDING");
+      expect(afterCompleted?.stockDecremented).toBe(false);
+      const stockAfterCompleted = await prisma.product.findUnique({
+        where: { id: product.id },
+      });
+      expect(stockAfterCompleted?.stockQuantity).toBe(10);
+
+      // Payment actually clears - the delayed method's real success event.
+      const succeededPayload = buildAsyncPaymentSucceededPayload(
+        order.id,
+        "cs_test_delayed_method",
+      );
+      const succeededSignature = signPayload(succeededPayload);
+
+      const succeededResponse = await request.post("/api/webhooks/stripe", {
+        headers: { "stripe-signature": succeededSignature! },
+        data: succeededPayload,
+      });
+      expect(succeededResponse.status()).toBe(200);
+
+      const afterSucceeded = await getOrder(order.id);
+      expect(afterSucceeded?.status).toBe("PAID");
+      expect(afterSucceeded?.stockDecremented).toBe(true);
+      const stockAfterSucceeded = await prisma.product.findUnique({
+        where: { id: product.id },
+      });
+      expect(stockAfterSucceeded?.stockQuantity).toBe(8);
+    } finally {
+      await deleteOrder(order.id);
+      await deleteProduct(product.id);
+    }
+  });
+
+  test("checkout.session.async_payment_failed cancels a still-PENDING order, never marks PAID, never touches stock (deferred-work.md)", async ({
+    request,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, { stockQuantity: 10 });
+    const order = await createTestOrder(vendor.id, {
+      status: "PENDING",
+      stripeSessionId: "cs_test_delayed_fail",
+      items: [{ productId: product.id, quantity: 2, unitPriceCents: product.priceCents }],
+    });
+
+    try {
+      const payload = buildAsyncPaymentFailedPayload(order.id, "cs_test_delayed_fail");
+      const signature = signPayload(payload);
+      test.skip(!signature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+      const response = await request.post("/api/webhooks/stripe", {
+        headers: { "stripe-signature": signature! },
+        data: payload,
+      });
+      expect(response.status()).toBe(200);
+
+      const updated = await getOrder(order.id);
+      expect(updated?.status).toBe("CANCELLED");
+      expect(updated?.stockDecremented).toBe(false);
+      const stock = await prisma.product.findUnique({ where: { id: product.id } });
+      expect(stock?.stockQuantity).toBe(10);
+    } finally {
+      await deleteOrder(order.id);
+      await deleteProduct(product.id);
     }
   });
 
