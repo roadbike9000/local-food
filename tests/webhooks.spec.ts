@@ -121,6 +121,48 @@ test.describe("stripe webhook", () => {
     }
   });
 
+  test("a signed event whose session.id doesn't match Order.stripeSessionId is ignored, not acted on (deferred-work.md)", async ({
+    request,
+  }) => {
+    // Any signed event carrying a valid orderId in its metadata was
+    // previously trusted outright, regardless of which Stripe Checkout
+    // session it actually came from. A real checkout-created order always
+    // has stripeSessionId set (src/app/api/checkout/route.ts), so this
+    // fixture sets it explicitly to simulate that, then signs a payload
+    // claiming a *different* session.id for the same orderId.
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const order = await createTestOrder(vendor.id, {
+      status: "PENDING",
+      stripeSessionId: "cs_test_the_real_session",
+    });
+
+    try {
+      const payload = buildCheckoutCompletedPayload(
+        order.id,
+        "cs_test_a_different_session",
+      );
+      const signature = signPayload(payload);
+      test.skip(!signature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+      const response = await request.post("/api/webhooks/stripe", {
+        headers: { "stripe-signature": signature! },
+        data: payload,
+      });
+      // Still 200 - a signature mismatch of this specific kind isn't a
+      // malformed request, it's an event that isn't trusted for this
+      // order; the route acks receipt the same way it does for a stock
+      // shortfall or a stale orderId, per Stripe's own recommendation.
+      expect(response.status()).toBe(200);
+
+      const updated = await getOrder(order.id);
+      expect(updated?.status).toBe("PENDING");
+      expect(updated?.stockDecremented).toBe(false);
+      expect(updated?.smsNotified).toBe(false);
+    } finally {
+      await deleteOrder(order.id);
+    }
+  });
+
   test("invalid/missing signature is rejected (400)", async ({ request }) => {
     const payload = buildCheckoutCompletedPayload("nonexistent-order-id");
 

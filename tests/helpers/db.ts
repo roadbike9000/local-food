@@ -62,6 +62,11 @@ export async function createTestOrder(
     // every spec file. Mirrors the nested-create pattern
     // src/app/api/checkout/route.ts and prisma/seed.ts already use.
     items: { productId: string; quantity: number; unitPriceCents: number }[];
+    // Deliberately omitted by every existing fixture (stays null) - the
+    // webhook's session.id cross-check (deferred-work.md) only activates
+    // when this is set, matching real checkout-created orders. Only the
+    // dedicated test proving that cross-check needs to set this.
+    stripeSessionId: string;
   }> = {},
 ) {
   return prisma.order.create({
@@ -72,6 +77,7 @@ export async function createTestOrder(
       totalCents: overrides.totalCents ?? 1000,
       status: overrides.status ?? "PENDING",
       smsNotified: overrides.smsNotified ?? false,
+      stripeSessionId: overrides.stripeSessionId,
       ...(overrides.items ? { items: { create: overrides.items } } : {}),
     },
   });

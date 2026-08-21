@@ -88,6 +88,29 @@ export async function POST(req: Request) {
     const orderId = session.metadata?.orderId;
 
     if (orderId) {
+      // Cross-check against what checkout actually created, before
+      // trusting session.metadata.orderId for anything (deferred-work.md
+      // — any signed event carrying a valid orderId in metadata was
+      // previously trusted outright). Only activates when
+      // stripeSessionId is set, which every real checkout-created order
+      // has (checkout/route.ts sets it at session-creation time) — skips
+      // gracefully for null (nothing else currently leaves it null, but
+      // this keeps the check additive rather than a hard requirement).
+      const sessionCheck = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { stripeSessionId: true },
+      });
+      if (
+        sessionCheck?.stripeSessionId &&
+        sessionCheck.stripeSessionId !== session.id
+      ) {
+        console.error(
+          "[webhooks/stripe] session.id mismatch, ignoring event",
+          orderId,
+        );
+        return NextResponse.json({ received: true });
+      }
+
       // Only a genuinely PENDING order can become PAID here. Guarding on
       // `status: "PENDING"` (not `status: { not: "PAID" }`) matters: the
       // old guard also matched READY/COMPLETED/CANCELLED, so a Stripe

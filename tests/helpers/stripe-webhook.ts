@@ -6,14 +6,21 @@
  */
 import { stripe } from "@/lib/stripe";
 
-export function buildCheckoutCompletedPayload(orderId: string) {
+export function buildCheckoutCompletedPayload(
+  orderId: string,
+  // Defaults to the same deterministic id every existing test already
+  // relies on. Only the webhook's session.id-cross-check test needs to
+  // pass something else, to prove a mismatch against Order.stripeSessionId
+  // is caught - see that test for why.
+  sessionId: string = `cs_test_${orderId}`,
+) {
   return JSON.stringify({
     id: `evt_test_${orderId}`,
     object: "event",
     type: "checkout.session.completed",
     data: {
       object: {
-        id: `cs_test_${orderId}`,
+        id: sessionId,
         object: "checkout.session",
         metadata: { orderId },
       },
