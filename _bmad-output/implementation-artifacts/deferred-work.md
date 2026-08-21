@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: 2-1-admin-identity-and-access-gating (2026-08-21)
+
+- source_spec: `_bmad-output/implementation-artifacts/2-1-admin-identity-and-access-gating.md`
+  summary: `dashboard.spec.ts`/`products-api.spec.ts` likely have a latent bug where `test.use({ storageState: authFile })` throws `ENOENT` and fails the suite (instead of skipping gracefully) if `playwright/.auth/vendor.json` doesn't exist yet.
+  evidence: Discovered building `tests/admin.spec.ts` for this story — its naive `test.use({ storageState: adminAuthFile })` failed with exactly this error against a genuinely-missing `admin.json` (no real `E2E_ADMIN_EMAIL` configured in this dev environment). `storageState` is resolved at browser-context creation, which happens *before* `beforeEach`'s `test.skip(!existsSync(authFile), ...)` guard runs — so the intended graceful-skip behavior these files' own header comments describe cannot actually work on a fresh clone with no vendor credentials configured. Never triggered in practice because `vendor.json` has existed in every environment these tests have run in so far (this session configured `E2E_VENDOR_EMAIL`/`CLERK_SECRET_KEY` early on). `tests/admin.spec.ts` fixes this for itself via `existsSync(authFile) ? authFile : undefined` in `test.use()` — the same fix would apply to the two existing files if this is ever reproduced there. Low priority: only manifests on a genuinely fresh clone/CI run before secrets are configured, which is exactly the state that's supposed to skip gracefully, not the common case.
+
 - source_spec: `_bmad-output/implementation-artifacts/spec-wire-dashboard-forms.md`
   summary: No Clerk test-auth infrastructure exists for authenticated dashboard e2e coverage.
   evidence: tests/dashboard.spec.ts only covers the unauthenticated redirect case (see its own header comment noting a Clerk test user/token is "a good next step"). This predates the new AddProductForm/AddSlotForm components and blocks e2e coverage for the authenticated create-product/create-slot flow.

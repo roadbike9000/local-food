@@ -58,7 +58,7 @@ development_status:
   epic-1-retrospective: done
 
   epic-2: in-progress
-  2-1-admin-identity-and-access-gating: ready-for-dev
+  2-1-admin-identity-and-access-gating: review
   2-2-admin-adds-a-vendor: backlog
   2-3-admin-deactivates-a-vendor: backlog
   epic-2-retrospective: optional

@@ -50,6 +50,11 @@ jobs:
           # real coverage on those tests once both secrets are added.
           E2E_VENDOR_EMAIL: ${{ secrets.E2E_VENDOR_EMAIL }}
           E2E_VENDOR_CLERK_ID: ${{ secrets.E2E_VENDOR_CLERK_ID }}
+          # Same pattern as E2E_VENDOR_EMAIL/E2E_VENDOR_CLERK_ID above, for
+          # the Admin identity (Story 2.1). admin.spec.ts's Admin-authenticated
+          # cases skip themselves until both secrets are added.
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_CLERK_ID: ${{ secrets.E2E_ADMIN_CLERK_ID }}
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}

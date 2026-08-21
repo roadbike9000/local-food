@@ -13,6 +13,17 @@ Vendor 1───* Product 1───* OrderItem *───1 Order *───1 V
 
 ## Models
 
+### Admin
+A platform operator, distinct from a Vendor. Not related to `Vendor` by a Prisma relation as of Story 2.1 — attribution FKs (`Vendor.createdByAdminId`/`deletedByAdminId`) land in Stories 2.2/2.3.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | String (cuid) | PK |
+| clerkUserId | String | `@unique` — sole source of admin identity (architecture AD-1); `getCurrentAdmin()` looks up by this, never a Clerk session claim |
+| createdAt / updatedAt | DateTime | |
+
+No `phone` yet — Story 3.2 adds it (required to deliver that story's SMS alert, per its own AC).
+
 ### Vendor
 One seller, one Clerk user, one storefront.
 

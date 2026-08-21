@@ -15,6 +15,7 @@ async function main() {
   await prisma.pickupSlot.deleteMany();
   await prisma.product.deleteMany();
   await prisma.vendor.deleteMany();
+  await prisma.admin.deleteMany();
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -108,7 +109,17 @@ async function main() {
     },
   });
 
+  // Bound to E2E_ADMIN_CLERK_ID when set, mirroring the vendor pattern above
+  // - so playwright/support/global-setup.ts's Admin auth fixture keeps
+  // working after re-seeding.
+  const admin = await prisma.admin.create({
+    data: {
+      clerkUserId: process.env.E2E_ADMIN_CLERK_ID || "seed_user_admin",
+    },
+  });
+
   console.log(`Seeded vendors: ${bakery.name}, ${farm.name}`);
+  console.log(`Seeded admin: ${admin.clerkUserId}`);
 }
 
 main()

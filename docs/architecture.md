@@ -33,7 +33,7 @@ There is no service layer, no repository pattern, no DTO mapping — route handl
 
 ## Data architecture
 
-See [Data Models](./data-models.md) for full schema. Five tables (`Vendor`, `Product`, `PickupSlot`, `Order`, `OrderItem`) plus an `OrderStatus` enum. Every child table carries an indexed `vendorId` (or reaches it transitively) — vendor-scoping is the primary access-control mechanism: dashboard queries filter `where: { vendorId: vendor.id }` rather than trusting any client-supplied ID.
+See [Data Models](./data-models.md) for full schema. Six tables (`Admin`, `Vendor`, `Product`, `PickupSlot`, `Order`, `OrderItem`) plus an `OrderStatus` enum. Every child table carries an indexed `vendorId` (or reaches it transitively) — vendor-scoping is the primary access-control mechanism: dashboard queries filter `where: { vendorId: vendor.id }` rather than trusting any client-supplied ID. `Admin` is a separate identity, resolved via `Admin.clerkUserId` only (architecture AD-1) — never a Clerk session claim.
 
 ## API design
 

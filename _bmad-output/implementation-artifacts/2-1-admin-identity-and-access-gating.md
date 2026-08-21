@@ -4,7 +4,7 @@ baseline_commit: 1f1ff82d220559de21cd749bb084023947847bac
 
 # Story 2.1: Admin identity and access gating
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -25,42 +25,43 @@ so that only trusted operators can manage vendors and inventory.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Prisma schema + migration — new `Admin` model (AC #1)
-  - [ ] Add to `prisma/schema.prisma`: `model Admin { id String @id @default(cuid()); clerkUserId String @unique; createdAt DateTime @default(now()); updatedAt DateTime @updatedAt }`
-  - [ ] **Do not add `phone`.** Epics' own Story 3.2 AC states `Admin` "gains a `phone` field... required to actually deliver this story, missing from the original schema" — that sentence only makes sense if this story's `Admin` table does *not* have it. Adding it now would make Story 3.2's own AC false the moment it's read. (This contradicts the architecture spine's ER-diagram sketch, which shows `phone` on `Admin` already — the spine is a structural sketch predating epics.md's per-story refinement; epics.md is the authoritative source for what each *story* ships. Follow epics.md.)
-  - [ ] **Do not add anything to `Vendor`** (`deletedAt`, `createdByAdminId`, `deletedByAdminId`, nullable `clerkUserId`) — those belong to Stories 2.2 (creation-time fields) and 2.3 (deactivation-time fields), not this one. This story's entire schema surface is the new `Admin` table.
-  - [ ] This is a plain additive table with no backfill (unlike Story 1.2's hand-edited multi-step migration) — run `npx prisma migrate dev --name add_admin_table` directly, no `--create-only`/manual SQL editing needed.
+- [x] Task 1: Prisma schema + migration — new `Admin` model (AC #1)
+  - [x] Add to `prisma/schema.prisma`: `model Admin { id String @id @default(cuid()); clerkUserId String @unique; createdAt DateTime @default(now()); updatedAt DateTime @updatedAt }`
+  - [x] **Do not add `phone`.** Epics' own Story 3.2 AC states `Admin` "gains a `phone` field... required to actually deliver this story, missing from the original schema" — that sentence only makes sense if this story's `Admin` table does *not* have it. Adding it now would make Story 3.2's own AC false the moment it's read. (This contradicts the architecture spine's ER-diagram sketch, which shows `phone` on `Admin` already — the spine is a structural sketch predating epics.md's per-story refinement; epics.md is the authoritative source for what each *story* ships. Follow epics.md.)
+  - [x] **Do not add anything to `Vendor`** (`deletedAt`, `createdByAdminId`, `deletedByAdminId`, nullable `clerkUserId`) — those belong to Stories 2.2 (creation-time fields) and 2.3 (deactivation-time fields), not this one. This story's entire schema surface is the new `Admin` table.
+  - [x] This is a plain additive table with no backfill (unlike Story 1.2's hand-edited multi-step migration) — run `npx prisma migrate dev --name add_admin_table` directly, no `--create-only`/manual SQL editing needed.
 
-- [ ] Task 2: `src/lib/admin.ts` — `getCurrentAdmin()` (AC #1)
-  - [ ] New file. Mirror `src/lib/vendor.ts`'s `getCurrentVendor()` exactly (read it in full first): `auth()` from `@clerk/nextjs/server` for `userId`; return `null` if absent; otherwise `prisma.admin.findUnique({ where: { clerkUserId: userId } })`. Same shape, same file-header-comment convention ("Import only in server components / route handlers").
+- [x] Task 2: `src/lib/admin.ts` — `getCurrentAdmin()` (AC #1)
+  - [x] New file. Mirror `src/lib/vendor.ts`'s `getCurrentVendor()` exactly (read it in full first): `auth()` from `@clerk/nextjs/server` for `userId`; return `null` if absent; otherwise `prisma.admin.findUnique({ where: { clerkUserId: userId } })`. Same shape, same file-header-comment convention ("Import only in server components / route handlers").
 
-- [ ] Task 3: `middleware.ts` — gate `/admin/*` at the authentication layer (AC #2)
-  - [ ] `src/middleware.ts`: change `createRouteMatcher(["/dashboard(.*)"])` to `createRouteMatcher(["/dashboard(.*)", "/admin(.*)"])`. This proves *authenticated* only — `getCurrentAdmin()` (Task 4) is what proves *admin*. Neither replaces the other.
+- [x] Task 3: `middleware.ts` — gate `/admin/*` at the authentication layer (AC #2)
+  - [x] `src/middleware.ts`: change `createRouteMatcher(["/dashboard(.*)"])` to `createRouteMatcher(["/dashboard(.*)", "/admin(.*)"])`. This proves *authenticated* only — `getCurrentAdmin()` (Task 4) is what proves *admin*. Neither replaces the other.
 
-- [ ] Task 4: Minimal `/admin` page — proves the gate end-to-end (AC #2, #3)
-  - [ ] New file `src/app/admin/page.tsx` (Server Component, no `"use client"`). Call `getCurrentAdmin()`; if `null`, call `notFound()` (from `next/navigation`) — the only existing precedent for this exact pattern in this codebase is `src/app/vendors/[slug]/page.tsx:29`, and using it here is a deliberate choice, not spec'd by any doc: it's consistent with that convention, and it avoids confirming to a non-admin that the route exists/an identity check even ran. If admin resolves, render a minimal stub (e.g. a heading and one line naming `admin.clerkUserId`) — this page's real content ships in Stories 2.2 (`/admin/vendors`) and 3.1 (`/admin/inventory`); don't build anything beyond proving the gate here.
-  - [ ] No shared `src/app/admin/layout.tsx` in this story — `src/app/dashboard/layout.tsx` doesn't gate either; every existing dashboard page calls `getCurrentVendor()` itself. Match that per-page-gates-itself shape. A layout with nav tabs is reasonable once there's more than one admin page (Story 2.2+), not before.
-  - [ ] No mutating "admin action" route ships in this story. AC #2's "or calling an admin action" describes the contract `getCurrentAdmin()` must satisfy for *future* routes (2.2/2.3 add real ones), not a Story 2.1 deliverable. Document (in Dev Notes, already done below) the pattern those routes should follow: `if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })`, mirroring `src/app/api/products/[id]/route.ts`'s existing `!vendor` branch exactly — don't build one speculatively now.
+- [x] Task 4: Minimal `/admin` page — proves the gate end-to-end (AC #2, #3)
+  - [x] New file `src/app/admin/page.tsx` (Server Component, no `"use client"`). Call `getCurrentAdmin()`; if `null`, call `notFound()` (from `next/navigation`) — the only existing precedent for this exact pattern in this codebase is `src/app/vendors/[slug]/page.tsx:29`, and using it here is a deliberate choice, not spec'd by any doc: it's consistent with that convention, and it avoids confirming to a non-admin that the route exists/an identity check even ran. If admin resolves, render a minimal stub (e.g. a heading and one line naming `admin.clerkUserId`) — this page's real content ships in Stories 2.2 (`/admin/vendors`) and 3.1 (`/admin/inventory`); don't build anything beyond proving the gate here.
+  - [x] No shared `src/app/admin/layout.tsx` in this story — `src/app/dashboard/layout.tsx` doesn't gate either; every existing dashboard page calls `getCurrentVendor()` itself. Match that per-page-gates-itself shape. A layout with nav tabs is reasonable once there's more than one admin page (Story 2.2+), not before.
+  - [x] No mutating "admin action" route ships in this story. AC #2's "or calling an admin action" describes the contract `getCurrentAdmin()` must satisfy for *future* routes (2.2/2.3 add real ones), not a Story 2.1 deliverable. Document (in Dev Notes, already done below) the pattern those routes should follow: `if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })`, mirroring `src/app/api/products/[id]/route.ts`'s existing `!vendor` branch exactly — don't build one speculatively now.
 
-- [ ] Task 5: Admin Playwright auth fixture + seed data (testing infra AC #2/#3 need to be provable at all)
-  - [ ] `prisma/seed.ts`: add one `Admin` row, `clerkUserId: process.env.E2E_ADMIN_CLERK_ID || "seed_user_admin"` — mirrors the existing bakery `Vendor` seed block's exact `E2E_VENDOR_CLERK_ID` pattern (read that block first).
-  - [ ] `.env.example`: add `E2E_ADMIN_EMAIL`/`E2E_ADMIN_CLERK_ID`, mirroring the existing `E2E_VENDOR_EMAIL`/`E2E_VENDOR_CLERK_ID` block (same comments shape, right after it).
-  - [ ] `playwright/support/global-setup.ts`: extend to also sign in `E2E_ADMIN_EMAIL` via the same `clerk.signIn({ page, emailAddress })` Backend-API call already used for the vendor, and save `playwright/.auth/admin.json` (new file, sibling to `vendor.json`). Gate the admin half **independently** — warn-and-skip only that half if `E2E_ADMIN_EMAIL` is unset, without touching the vendor half's existing behavior either way.
-  - [ ] `.github/workflows/ci.yml`: add `E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}` / `E2E_ADMIN_CLERK_ID: ${{ secrets.E2E_ADMIN_CLERK_ID }}` to the e2e step's `env:` block, mirroring the two existing `E2E_VENDOR_*` lines.
-  - [ ] **Out of this story's reach:** creating the actual Clerk test user and setting the two values as real GitHub Actions secrets is a manual step outside the codebase (same as `E2E_VENDOR_EMAIL`/`E2E_VENDOR_CLERK_ID` were, earlier). Until set, the admin fixture warns and skips — CI stays green either way, but admin e2e coverage only actually executes once configured. This is expected, not a defect; note it in the Dev Agent Record.
+- [x] Task 5: Admin Playwright auth fixture + seed data (testing infra AC #2/#3 need to be provable at all)
+  - [x] `prisma/seed.ts`: add one `Admin` row, `clerkUserId: process.env.E2E_ADMIN_CLERK_ID || "seed_user_admin"` — mirrors the existing bakery `Vendor` seed block's exact `E2E_VENDOR_CLERK_ID` pattern (read that block first).
+  - [x] `.env.example`: add `E2E_ADMIN_EMAIL`/`E2E_ADMIN_CLERK_ID`, mirroring the existing `E2E_VENDOR_EMAIL`/`E2E_VENDOR_CLERK_ID` block (same comments shape, right after it).
+  - [x] `playwright/support/global-setup.ts`: extend to also sign in `E2E_ADMIN_EMAIL` via the same `clerk.signIn({ page, emailAddress })` Backend-API call already used for the vendor, and save `playwright/.auth/admin.json` (new file, sibling to `vendor.json`). Gate the admin half **independently** — warn-and-skip only that half if `E2E_ADMIN_EMAIL` is unset, without touching the vendor half's existing behavior either way.
+  - [x] `.github/workflows/ci.yml`: add `E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}` / `E2E_ADMIN_CLERK_ID: ${{ secrets.E2E_ADMIN_CLERK_ID }}` to the e2e step's `env:` block, mirroring the two existing `E2E_VENDOR_*` lines.
+  - [x] **Out of this story's reach:** creating the actual Clerk test user and setting the two values as real GitHub Actions secrets is a manual step outside the codebase (same as `E2E_VENDOR_EMAIL`/`E2E_VENDOR_CLERK_ID` were, earlier). Until set, the admin fixture warns and skips — CI stays green either way, but admin e2e coverage only actually executes once configured. This is expected, not a defect; note it in the Dev Agent Record.
 
-- [ ] Task 6: Tests (AC #1, #2, #3)
-  - [ ] `tests/auth.spec.ts`: add `"admin requires authentication"`, mirroring the existing `"dashboard requires authentication"` test exactly — `page.goto("/admin")`, expect redirect to `/sign-in`.
-  - [ ] New file `tests/admin.spec.ts` — new feature area, matches this repo's "one file per feature area" convention (`auth`, `dashboard`, `payment`, ... now `admin`); don't fold into `dashboard.spec.ts`, Admin is a distinct identity/route tree (AD-6), not a vendor-dashboard concern.
+- [x] Task 6: Tests (AC #1, #2, #3)
+  - [x] `tests/auth.spec.ts`: add `"admin requires authentication"`, mirroring the existing `"dashboard requires authentication"` test exactly — `page.goto("/admin")`, expect redirect to `/sign-in`.
+  - [x] New file `tests/admin.spec.ts` — new feature area, matches this repo's "one file per feature area" convention (`auth`, `dashboard`, `payment`, ... now `admin`); don't fold into `dashboard.spec.ts`, Admin is a distinct identity/route tree (AD-6), not a vendor-dashboard concern.
     - **Two separate `test.describe` blocks, one per identity** — `test.use({ storageState })` applies per block, and this file is the first to need two different identities in one file:
-      - Block 1 (Vendor identity): `test.use({ storageState: vendorAuthFile })`, `test.skip(!existsSync(vendorAuthFile), ...)`. Case A — visiting `/admin` is denied (expect `404`, matching Task 4's `notFound()`). This is the "signed-in non-admin" case from AC #3 — the existing vendor fixture already proves it, since a Vendor's Clerk user has no `Admin` row. No new fixture needed for this case.
-      - Block 2 (Admin identity): `test.use({ storageState: adminAuthFile })`, `test.skip(!existsSync(adminAuthFile), ...)`. Case B — visiting `/admin` succeeds (expect `200`, page content renders). Proves AC #2's full round-trip.
+      - Block 1 (Vendor identity): Case A — visiting `/admin` is denied (expect `404`, matching Task 4's `notFound()`). This is the "signed-in non-admin" case from AC #3 — the existing vendor fixture already proves it, since a Vendor's Clerk user has no `Admin` row. No new fixture needed for this case.
+      - Block 2 (Admin identity): Case B — visiting `/admin` succeeds (expect `200`, page content renders). Proves AC #2's full round-trip.
     - **Two independent fixtures, two independent skip guards — do not conflate them.** Either fixture can be present without the other (e.g. a fresh clone with only `E2E_VENDOR_*` configured, or CI before `E2E_ADMIN_*` secrets are added per Task 5) — guarding both blocks on the same file-existence check would wrongly skip or wrongly run one of them.
     - `test.describe.configure({ mode: "serial" })` on **both** blocks — same Clerk/Playwright concurrency workaround already applied in `dashboard.spec.ts`/`products-api.spec.ts` (documented there as clerk/javascript#7891). Block 1 shares the vendor session with those two existing files, so it needs the same protection they already have, not just Block 2 (a fresh identity/session).
+    - **Discovered during implementation (not in the original plan):** `test.use({ storageState: authFile })` resolves the file at browser-context creation, *before* `beforeEach`'s `test.skip(!existsSync(authFile), ...)` ever runs — a missing file throws `ENOENT` and fails the test instead of skipping it. Confirmed empirically: `admin.json` genuinely doesn't exist in this dev environment (no real `E2E_ADMIN_EMAIL` configured), and the naive `test.use({ storageState: adminAuthFile })` failed with exactly that error. Fixed by conditionally passing `existsSync(authFile) ? authFile : undefined` into `test.use()` for both blocks, so a missing file yields an empty/unauthenticated context instead of a crash, and the `beforeEach` guard is what actually decides skip-vs-run. This is a latent defect this story's own new file exposed by being the first authenticated suite ever exercised without its credential configured — `dashboard.spec.ts`/`products-api.spec.ts` likely share the identical latent bug (never triggered there, since `vendor.json` has existed in every environment this codebase's tests have run in so far). Flagged in `deferred-work.md` rather than fixed in those files — out of this story's scope.
 
-- [ ] Task 7: Docs sync (housekeeping, matches established precedent from every prior story)
-  - [ ] `docs/data-models.md`: add an `Admin` entity section, same table shape as the existing `Vendor` section (`id`, `clerkUserId`, `createdAt`, `updatedAt`).
-  - [ ] `docs/architecture.md`: update the "Data architecture" section's table count ("Five tables" → "Six tables"), naming `Admin`. No change needed to "API design" (no new JSON route ships this story) or "Component overview" (no new `"use client"` component).
+- [x] Task 7: Docs sync (housekeeping, matches established precedent from every prior story)
+  - [x] `docs/data-models.md`: add an `Admin` entity section, same table shape as the existing `Vendor` section (`id`, `clerkUserId`, `createdAt`, `updatedAt`).
+  - [x] `docs/architecture.md`: update the "Data architecture" section's table count ("Five tables" → "Six tables"), naming `Admin`. No change needed to "API design" (no new JSON route ships this story) or "Component overview" (no new `"use client"` component).
 
 ## Dev Notes
 
@@ -112,3 +113,49 @@ so that only trusted operators can manage vendors and inventory.
 - [Source: tests/dashboard.spec.ts, tests/products-api.spec.ts] — existing `test.describe.configure({ mode: "serial" })` Clerk-concurrency workaround and `existsSync(authFile)` skip-guard pattern (read for this story) — both reused verbatim in `tests/admin.spec.ts`.
 - [Source: _bmad-output/implementation-artifacts/sprint-status.yaml] — Epic 1's open action item naming this exact story as the blocker for the Admin test-fixture half of that work.
 - [Source: docs/data-models.md, docs/architecture.md] — doc sections Task 7 updates.
+
+## Dev Agent Record
+
+### Agent Model Used
+
+Claude Sonnet 5 (claude-sonnet-5)
+
+### Debug Log References
+
+- Migration: `npx prisma migrate dev --name add_admin_table` — plain additive table, no backfill, no `--create-only`/hand-editing needed. Applied and verified directly (`CREATE TABLE "Admin"` + unique index on `clerkUserId`).
+- `npx tsc --noEmit` — clean.
+- `npm run lint` — clean.
+- `npm run test:unit` — 66/66 passed (unaffected — no pure-function surface touched by this story).
+- `npx playwright test` (full suite) — 82 passed, 1 skipped. The skip is `"an admin visiting /admin is granted access"`, correctly self-skipping via `test.skip(!existsSync(adminAuthFile), ...)` since `E2E_ADMIN_EMAIL`/`E2E_ADMIN_CLERK_ID` aren't configured in this dev environment yet (Task 5's documented, expected out-of-reach step). All other admin.spec.ts/auth.spec.ts cases passed, including the non-admin-denial case (reuses the already-configured vendor fixture).
+- `npm run build` — succeeds; `/admin` appears in the route table as a new dynamic (`ƒ`) route.
+
+### Completion Notes List
+
+- New `Admin` table (`clerkUserId`-unique only — deliberately no `phone`, per Story 3.2's AC), `src/lib/admin.ts`'s `getCurrentAdmin()` (mirrors `getCurrentVendor()` exactly), `middleware.ts` matcher extended to `/admin(.*)`, minimal `src/app/admin/page.tsx` stub gating via `notFound()`.
+- Admin Playwright auth fixture built end-to-end: `prisma/seed.ts` seeds an `Admin` row bound to `E2E_ADMIN_CLERK_ID`, `playwright/support/global-setup.ts` extended to independently sign in and save `playwright/.auth/admin.json`, `.env.example`/`.github/workflows/ci.yml` wired for the two new secrets — closing the Epic 1 retro's open action item that named this story as its blocker.
+- New `tests/admin.spec.ts` (two describe blocks, one per identity) plus one new case in `tests/auth.spec.ts`.
+- **Bug found and fixed during Task 6, not in the original plan:** `test.use({ storageState: authFile })` resolves the file at browser-context creation, before `beforeEach`'s `test.skip(!existsSync(authFile), ...)` guard runs — a missing file throws `ENOENT` instead of skipping. Caught because this is the first authenticated suite in the repo actually exercised without its credential configured (`admin.json` genuinely doesn't exist here). Fixed in `tests/admin.spec.ts` via `existsSync(authFile) ? authFile : undefined`. Flagged in `deferred-work.md` as a likely-latent, unfixed instance of the same bug in `dashboard.spec.ts`/`products-api.spec.ts` — out of this story's scope to fix there.
+- Docs synced: `docs/data-models.md` gained an `Admin` section, `docs/architecture.md`'s table count updated.
+- Full regression: typecheck clean, lint clean, 66/66 unit, 82/83 e2e (1 expected skip), build succeeds.
+
+### File List
+
+- `prisma/schema.prisma` (modified — new `Admin` model)
+- `prisma/migrations/20260821200021_add_admin_table/migration.sql` (new)
+- `src/lib/admin.ts` (new — `getCurrentAdmin()`)
+- `src/middleware.ts` (modified — matcher gains `/admin(.*)`)
+- `src/app/admin/page.tsx` (new — minimal gated stub)
+- `prisma/seed.ts` (modified — new seeded `Admin` row bound to `E2E_ADMIN_CLERK_ID`)
+- `.env.example` (modified — `E2E_ADMIN_EMAIL`/`E2E_ADMIN_CLERK_ID`)
+- `playwright/support/global-setup.ts` (modified — extended to independently sign in Admin and write `playwright/.auth/admin.json`)
+- `.github/workflows/ci.yml` (modified — `E2E_ADMIN_EMAIL`/`E2E_ADMIN_CLERK_ID` added to the e2e step's `env:` block)
+- `tests/auth.spec.ts` (modified — new `"admin requires authentication"` case)
+- `tests/admin.spec.ts` (new — vendor-denied and admin-granted cases)
+- `docs/data-models.md` (modified — new `Admin` section)
+- `docs/architecture.md` (modified — table count, `Admin` identity note)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (modified — new entry for the discovered `storageState`/`ENOENT` latent bug)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — status transitions)
+
+## Change Log
+
+- 2026-08-21: Implemented Story 2.1 in full. New `Admin` table (deliberately minimal — no `phone`, per Story 3.2's own AC), `getCurrentAdmin()` mirroring `getCurrentVendor()`, `middleware.ts` gating extended to `/admin/*`, and a minimal `/admin` stub page proving the gate end-to-end via `notFound()` denial. Built the Admin Playwright auth fixture (seed row, extended `global-setup.ts`, `.env.example`/CI wiring) that Epic 1's retro flagged as blocked on this story. Found and fixed a real bug while writing `tests/admin.spec.ts`: `test.use({ storageState })` throws before a `test.skip` guard can run if the auth file is missing — fixed here, flagged in `deferred-work.md` as a likely-latent instance in two pre-existing files. Full regression: typecheck clean, lint clean, 66/66 unit tests, 82/83 e2e (1 expected skip — no `E2E_ADMIN_EMAIL` configured in this dev environment yet), production build succeeds. Status → review.

@@ -16,6 +16,12 @@ test.describe("auth", () => {
     await expect(page).toHaveURL(/sign-in/);
   });
 
+  test("admin requires authentication", async ({ page }) => {
+    await page.goto("/admin");
+    // Same middleware.ts matcher covers /admin(.*) as of Story 2.1.
+    await expect(page).toHaveURL(/sign-in/);
+  });
+
   test("sign-up page renders", async ({ page }) => {
     await page.goto("/sign-up");
     // Same shallow "URL held" pattern as the sign-in test — Clerk owns the
