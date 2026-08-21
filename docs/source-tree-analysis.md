@@ -2,7 +2,7 @@
 
 ```
 local-food/
-├── middleware.ts                    # Clerk auth gate — protects /dashboard(.*), leaves everything else + all API routes public at the middleware layer (routes still self-check auth)
+├── middleware.ts                    # Clerk auth gate — protects /dashboard(.*) and /admin(.*), leaves everything else + all API routes public at the middleware layer (routes still self-check auth)
 ├── next.config.mjs
 ├── tailwind.config.ts                # defines the `brand` / `brand-dark` custom colors used throughout
 ├── playwright.config.ts              # webServer auto-starts `npm run dev`
@@ -65,7 +65,7 @@ local-food/
 ## Entry points
 
 - **App bootstrap**: `src/app/layout.tsx` — every page passes through `ClerkProvider` → `CartProvider` → `Navbar`.
-- **Auth gate**: `middleware.ts` — runs before any route; only `/dashboard(.*)` is hard-protected, but API routes are matched too (they self-check via `getCurrentVendor()`).
+- **Auth gate**: `middleware.ts` — runs before any route; `/dashboard(.*)` and `/admin(.*)` are hard-protected, but API routes are matched too (they self-check via `getCurrentVendor()`/`getCurrentAdmin()`).
 - **Payment entry**: `src/app/api/checkout/route.ts` — the only place an `Order` is created.
 - **Payment confirmation entry**: `src/app/api/webhooks/stripe/route.ts` — the only place an `Order` moves to `PAID`.
 

@@ -5,9 +5,10 @@ All routes live under `src/app/api/` (Next.js App Router route handlers). None u
 ## Auth model
 
 - **Vendor-scoped routes** (`products`, `pickup-slots`) call `getCurrentVendor()` (`src/lib/vendor.ts`), which reads the Clerk session and looks up the `Vendor` row by `clerkUserId`. No vendor row → `401 Unauthorized`. There is no separate authorization check beyond "does a Vendor row exist for this Clerk user" — a signed-in vendor can only ever see/write their own data because every query filters `where: { vendorId: vendor.id }`.
+- **Admin-scoped routes/pages** (`/admin/*`, Story 2.1) call `getCurrentAdmin()` (`src/lib/admin.ts`), which reads the Clerk session and looks up the `Admin` row by `clerkUserId` — the same shape as `getCurrentVendor()`, a distinct identity/table. `src/app/admin/page.tsx` calls `notFound()` when no admin resolves; a future mutating admin route should return `401 Unauthorized` instead, mirroring the vendor-scoped routes' pattern.
 - **Public routes** (`checkout`) take no auth — anyone can place an order against any `vendorId`, which is the intended storefront behavior.
 - **Webhook route** (`webhooks/stripe`) authenticates the *caller* (Stripe) via HMAC signature (`stripe-signature` header + `STRIPE_WEBHOOK_SECRET`), not via Clerk.
-- `middleware.ts` additionally hard-blocks unauthenticated access to `/dashboard(.*)` at the edge, before any page/route code runs.
+- `middleware.ts` additionally hard-blocks unauthenticated access to `/dashboard(.*)` and `/admin(.*)` at the edge, before any page/route code runs.
 
 ---
 

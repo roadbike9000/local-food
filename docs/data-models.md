@@ -11,6 +11,8 @@ Vendor 1───* Product 1───* OrderItem *───1 Order *───1 V
                          (Order.pickupSlotId is optional)
 ```
 
+`Admin` isn't in this diagram — it has no Prisma relation to any other model as of Story 2.1 (see below).
+
 ## Models
 
 ### Admin

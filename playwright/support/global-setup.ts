@@ -31,16 +31,18 @@ async function signInAndSave(
   baseURL: string,
   email: string,
   outPath: string,
-) {
+): Promise<void> {
   const browser = await chromium.launch();
-  const page = await browser.newPage();
-  await page.goto(baseURL);
-  await clerk.signIn({ page, emailAddress: email });
+  try {
+    const page = await browser.newPage();
+    await page.goto(baseURL);
+    await clerk.signIn({ page, emailAddress: email });
 
-  mkdirSync(dirname(outPath), { recursive: true });
-  await page.context().storageState({ path: outPath });
-
-  await browser.close();
+    mkdirSync(dirname(outPath), { recursive: true });
+    await page.context().storageState({ path: outPath });
+  } finally {
+    await browser.close();
+  }
 }
 
 export default async function globalSetup(config: FullConfig) {
@@ -63,11 +65,20 @@ export default async function globalSetup(config: FullConfig) {
       "[global-setup] E2E_VENDOR_EMAIL not set - skipping vendor auth fixture.",
     );
   } else {
-    await signInAndSave(
-      baseURL,
-      vendorEmail,
-      join(__dirname, "../.auth/vendor.json"),
-    );
+    try {
+      await signInAndSave(
+        baseURL,
+        vendorEmail,
+        join(__dirname, "../.auth/vendor.json"),
+      );
+    } catch (err) {
+      // Caught, not rethrown - a transient sign-in failure for one identity
+      // (network blip, Clerk rate limit) must not abort globalSetup and
+      // take the other, independently-configured identity down with it.
+      // Both identities' own test.skip(!existsSync(authFile), ...) guards
+      // already handle a missing auth file gracefully.
+      console.warn("[global-setup] vendor sign-in failed, skipping vendor auth fixture:", err);
+    }
   }
 
   const adminEmail = process.env.E2E_ADMIN_EMAIL;
@@ -76,10 +87,14 @@ export default async function globalSetup(config: FullConfig) {
       "[global-setup] E2E_ADMIN_EMAIL not set - skipping admin auth fixture.",
     );
   } else {
-    await signInAndSave(
-      baseURL,
-      adminEmail,
-      join(__dirname, "../.auth/admin.json"),
-    );
+    try {
+      await signInAndSave(
+        baseURL,
+        adminEmail,
+        join(__dirname, "../.auth/admin.json"),
+      );
+    } catch (err) {
+      console.warn("[global-setup] admin sign-in failed, skipping admin auth fixture:", err);
+    }
   }
 }

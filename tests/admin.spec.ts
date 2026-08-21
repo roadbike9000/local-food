@@ -66,7 +66,12 @@ test.describe("admin gating (signed in as admin)", () => {
 
   test("an admin visiting /admin is granted access", async ({ page }) => {
     const response = await page.goto("/admin");
+    // A middleware redirect to /sign-in also resolves with a 200 (the
+    // sign-in page itself loads fine) - the status check alone can't tell
+    // "granted" from "bounced to sign-in", so also pin the URL and the
+    // page content, not just the response status.
     expect(response?.status()).toBe(200);
+    await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
   });
 });

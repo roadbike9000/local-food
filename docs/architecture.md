@@ -26,7 +26,7 @@ Browser
   │                                                  ├─► Stripe (Checkout session)
   │                                                  └─► Twilio (SMS, post-webhook)
   │
-  └─ Clerk middleware (edge)  — gates /dashboard(.*) before any of the above runs
+  └─ Clerk middleware (edge)  — gates /dashboard(.*) and /admin(.*) before any of the above runs
 ```
 
 There is no service layer, no repository pattern, no DTO mapping — route handlers and Server Components call `prisma.*` directly. This is appropriate at current scale; introducing an abstraction layer here would be premature (project convention: avoid unneeded indirection).

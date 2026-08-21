@@ -9,7 +9,8 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  // Clear existing data (children first because of foreign keys).
+  // Clear existing data (children first because of foreign keys - Admin has
+  // none, order doesn't matter for it, listed last for that reason).
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.pickupSlot.deleteMany();

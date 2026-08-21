@@ -17,7 +17,10 @@ import { getVendorBySlug, deleteProduct, prisma, createTestProduct } from "./hel
 const authFile = join(process.cwd(), "playwright/.auth/vendor.json");
 
 test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
-  test.use({ storageState: authFile });
+  // See the matching comment (and its "confirmed via repro" note) in
+  // dashboard.spec.ts - a missing authFile otherwise throws ENOENT here
+  // instead of letting the beforeEach test.skip guard below handle it.
+  test.use({ storageState: existsSync(authFile) ? authFile : undefined });
   // Serial, not parallel - see the matching comment in dashboard.spec.ts.
   test.describe.configure({ mode: "serial" });
 

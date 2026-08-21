@@ -45,7 +45,13 @@ const authFile = join(process.cwd(), "playwright/.auth/vendor.json");
 // and skips writing the file rather than failing the whole suite), same
 // pattern as payment.spec.ts's Stripe-keys check.
 test.describe("vendor dashboard (authenticated)", () => {
-  test.use({ storageState: authFile });
+  // `storageState` is resolved at browser-context creation, before the
+  // beforeEach test.skip(!existsSync(authFile), ...) guard below ever runs -
+  // a missing file throws ENOENT and fails the suite instead of skipping
+  // (confirmed via repro, Story 2.1 review). Passing undefined when the
+  // file doesn't exist yet gives an empty/unauthenticated context instead,
+  // so the beforeEach guard is what actually decides skip-vs-run.
+  test.use({ storageState: existsSync(authFile) ? authFile : undefined });
   // Serial, not parallel - @clerk/testing's dev-browser JWT mechanism
   // (used by playwright/support/global-setup.ts's Backend-API sign-in)
   // has a known issue with multiple simultaneous browser contexts sharing
