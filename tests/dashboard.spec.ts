@@ -46,6 +46,14 @@ const authFile = join(process.cwd(), "playwright/.auth/vendor.json");
 // pattern as payment.spec.ts's Stripe-keys check.
 test.describe("vendor dashboard (authenticated)", () => {
   test.use({ storageState: authFile });
+  // Serial, not parallel - @clerk/testing's dev-browser JWT mechanism
+  // (used by playwright/support/global-setup.ts's Backend-API sign-in)
+  // has a known issue with multiple simultaneous browser contexts sharing
+  // one signed-in session (clerk/javascript#7891) - manifests here as
+  // intermittent 401s under full-suite parallel load. Serializing this
+  // file's own tests (and products-api.spec.ts's) caps how many
+  // authenticated contexts can be open against Clerk at once.
+  test.describe.configure({ mode: "serial" });
 
   test.beforeEach(async ({ page }) => {
     test.skip(

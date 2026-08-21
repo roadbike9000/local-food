@@ -18,6 +18,8 @@ const authFile = join(process.cwd(), "playwright/.auth/vendor.json");
 
 test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
   test.use({ storageState: authFile });
+  // Serial, not parallel - see the matching comment in dashboard.spec.ts.
+  test.describe.configure({ mode: "serial" });
 
   test.beforeEach(async () => {
     test.skip(
