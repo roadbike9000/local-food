@@ -326,18 +326,31 @@ test.describe("vendor dashboard (authenticated)", () => {
     }
   });
 
-  test("[P1] a placeholder Stock Quantity or Low-Stock Threshold shows a 'Needs review' badge on its row (Story 1.6)", async ({
+  test("[P1] a placeholder Stock Quantity or Low-Stock Threshold shows a 'Needs review' badge on its row, with field-specific detail (Story 1.6)", async ({
     page,
   }) => {
     const vendor = await getVendorBySlug("corner-sourdough");
-    const flaggedName = `Playwright Placeholder ${Date.now()}`;
+    const stockFlaggedName = `Playwright Stock Placeholder ${Date.now()}`;
+    const thresholdFlaggedName = `Playwright Threshold Placeholder ${Date.now()}`;
+    const bothFlaggedName = `Playwright Both Placeholder ${Date.now()}`;
     const cleanName = `Playwright No Placeholder ${Date.now()}`;
 
-    // Two dedicated fixtures: one with a placeholder flag set, one without -
-    // proves the badge is conditional on the flag, not just always rendered.
-    const flagged = await createTestProduct(vendor.id, {
-      name: flaggedName,
+    // Four dedicated fixtures covering every branch of placeholderReason()
+    // (review round 1 finding: the original test only ever exercised the
+    // stock-only branch) - proves the badge is conditional on either flag,
+    // and that its title text differentiates which field(s) are flagged.
+    const stockFlagged = await createTestProduct(vendor.id, {
+      name: stockFlaggedName,
       stockIsPlaceholder: true,
+    });
+    const thresholdFlagged = await createTestProduct(vendor.id, {
+      name: thresholdFlaggedName,
+      thresholdIsPlaceholder: true,
+    });
+    const bothFlagged = await createTestProduct(vendor.id, {
+      name: bothFlaggedName,
+      stockIsPlaceholder: true,
+      thresholdIsPlaceholder: true,
     });
     const clean = await createTestProduct(vendor.id, {
       name: cleanName,
@@ -349,15 +362,29 @@ test.describe("vendor dashboard (authenticated)", () => {
         page.getByRole("heading", { name: "Products" }),
       ).toBeVisible();
 
-      const flaggedRow = page.getByRole("row", { name: new RegExp(flaggedName) });
+      const stockRow = page.getByRole("row", { name: new RegExp(stockFlaggedName) });
+      const thresholdRow = page.getByRole("row", { name: new RegExp(thresholdFlaggedName) });
+      const bothRow = page.getByRole("row", { name: new RegExp(bothFlaggedName) });
       const cleanRow = page.getByRole("row", { name: new RegExp(cleanName) });
-      await expect(flaggedRow).toBeVisible();
-      await expect(cleanRow).toBeVisible();
 
-      await expect(flaggedRow.getByText("Needs review")).toBeVisible();
       await expect(cleanRow.getByText("Needs review")).not.toBeVisible();
+
+      await expect(stockRow.getByText("Needs review")).toHaveAttribute(
+        "title",
+        "Stock Quantity is still a migration placeholder — update it.",
+      );
+      await expect(thresholdRow.getByText("Needs review")).toHaveAttribute(
+        "title",
+        "Low-Stock Threshold is still a migration placeholder — update it.",
+      );
+      await expect(bothRow.getByText("Needs review")).toHaveAttribute(
+        "title",
+        "Stock Quantity and Low-Stock Threshold are still migration placeholders — update both.",
+      );
     } finally {
-      await deleteProduct(flagged.id);
+      await deleteProduct(stockFlagged.id);
+      await deleteProduct(thresholdFlagged.id);
+      await deleteProduct(bothFlagged.id);
       await deleteProduct(clean.id);
     }
   });
@@ -391,10 +418,21 @@ test.describe("vendor dashboard (authenticated)", () => {
       ]);
       expect(response.status()).toBe(200);
 
-      // The existing edit path (setStock(), Story 1.2) already clears
-      // stockIsPlaceholder server-side on a genuine value change - this
-      // story adds no new write mechanism, so a hard reload should be
-      // enough for the badge to reflect the persisted state.
+      // Assert the badge is already gone from a live re-render, before any
+      // reload (review round 1 finding: the original version of this test
+      // only checked post-reload state, which would still pass even if
+      // EditStockControl's existing router.refresh() call - confirmed
+      // present at EditStockControl.tsx:96 - were silently broken). Story
+      // 1.2's setStock() already clears stockIsPlaceholder server-side on a
+      // genuine value change; this assertion proves the badge actually
+      // reacts to that live, not just after a hard refresh.
+      await expect(row.getByText("Needs review")).not.toBeVisible({
+        timeout: 15_000,
+      });
+
+      // A hard reload is still worth proving too - confirms the persisted
+      // state, not just client-side React state that a refresh alone
+      // wouldn't roll back.
       await page.reload();
       await expect(row.getByText("Needs review")).not.toBeVisible({
         timeout: 15_000,

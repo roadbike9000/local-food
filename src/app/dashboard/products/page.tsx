@@ -1,3 +1,4 @@
+import type { Product } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVendor } from "@/lib/vendor";
 import { formatPrice } from "@/lib/utils";
@@ -8,18 +9,22 @@ import { EditStockControl } from "@/components/dashboard/EditStockControl";
 // Story 1.6: one shared badge for either placeholder flag - never two
 // separate badges - naming which field(s) still hold a migration-backfilled
 // value (Story 1.2's stockIsPlaceholder/thresholdIsPlaceholder), not real
-// vendor-entered data yet.
-function placeholderReason(product: {
-  stockIsPlaceholder: boolean;
-  thresholdIsPlaceholder: boolean;
-}): string {
+// vendor-entered data yet. Correct on its own terms (not just for its one
+// gated call site below, review round 1 finding): returns "" if somehow
+// called with neither flag set, rather than fabricating a wrong claim.
+function placeholderReason(
+  product: Pick<Product, "stockIsPlaceholder" | "thresholdIsPlaceholder">,
+): string {
   if (product.stockIsPlaceholder && product.thresholdIsPlaceholder) {
     return "Stock Quantity and Low-Stock Threshold are still migration placeholders — update both.";
   }
   if (product.stockIsPlaceholder) {
     return "Stock Quantity is still a migration placeholder — update it.";
   }
-  return "Low-Stock Threshold is still a migration placeholder — update it.";
+  if (product.thresholdIsPlaceholder) {
+    return "Low-Stock Threshold is still a migration placeholder — update it.";
+  }
+  return "";
 }
 
 // Products tab: lists the vendor's products and lets them add new ones.
@@ -59,13 +64,22 @@ export default async function DashboardProductsPage() {
                 <td className="py-2">
                   {p.name}
                   {(p.stockIsPlaceholder || p.thresholdIsPlaceholder) && (
-                    <span
-                      id={`placeholder-badge-${p.id}`}
-                      title={placeholderReason(p)}
-                      className="ml-2 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
-                    >
-                      Needs review
-                    </span>
+                    <>
+                      <span
+                        aria-describedby={`placeholder-reason-${p.id}`}
+                        title={placeholderReason(p)}
+                        className="ml-2 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                      >
+                        Needs review
+                      </span>
+                      {/* title is mouse-hover-only - unreachable on touch
+                          devices and by most screen readers (review round
+                          1 finding). This sr-only span carries the same
+                          field-level detail via aria-describedby instead. */}
+                      <span id={`placeholder-reason-${p.id}`} className="sr-only">
+                        {placeholderReason(p)}
+                      </span>
+                    </>
                   )}
                 </td>
                 <td className="py-2">{formatPrice(p.priceCents)}</td>
