@@ -1,0 +1,93 @@
+# generated: 2026-08-17
+# last_updated: 2026-08-21
+# project: local-food
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+
+generated: 2026-08-17
+last_updated: 2026-08-21
+project: local-food
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  epic-1: done
+  1-1-verify-cart-line-removal-and-total-accuracy: done
+  1-2-stock-quantity-captured-at-creation-backfilled-for-existing-products: done
+  1-3-out-of-stock-products-are-marked-and-blocked: done
+  1-4-inventory-decrements-immediately-on-sale-completion: done
+  1-5-cart-quantity-stepper: done
+  1-6-vendor-notified-of-placeholder-stock-quantity: done
+  epic-1-retrospective: done
+
+  epic-2: backlog
+  2-1-admin-identity-and-access-gating: backlog
+  2-2-admin-adds-a-vendor: backlog
+  2-3-admin-deactivates-a-vendor: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-admin-inventory-dashboard: backlog
+  3-2-low-stock-sms-alert-to-admin: backlog
+  epic-3-retrospective: optional
+
+action_items:
+  - epic: 1
+    action: "Fix the stale Clerk vendor auth fixture (playwright/.auth/vendor.json) and build an equivalent Admin test-identity fixture before Epic 2's first story lands"
+    owner: "Dev"
+    status: in-progress
+    note: "Vendor half done 2026-08-21 - replaced with @clerk/testing Backend-API sign-in in playwright/support/global-setup.ts, regenerates automatically on every test run, no human/email step. Admin half blocked on Epic 2's Admin identity existing first."
+  - epic: 1
+    action: "Make npm run test:e2e:auth-style fixture generation self-sufficient (currently needs a dev server already running standalone)"
+    owner: "Dev"
+    status: done
+    note: "Superseded rather than patched - the old script was deleted entirely in favor of Playwright globalSetup, which already runs inside the standard playwright test lifecycle (webServer included), so the two-terminal problem no longer exists."
+  - epic: 1
+    action: "Verify Epic 2's migration against a real DB (or rolled-back transaction) before the first review round, given Story 1.2's precedent of shadow-DB/timezone/cardinality bugs only catchable that way"
+    owner: "Dev"
+    status: open
+  - epic: 1
+    action: "Before shipping any new interactive UI in Epic 2, check for touch/keyboard/screen-reader-reachable equivalents of any title-only tooltip content - this gap shipped twice in Epic 1 (Stories 1.5, 1.6)"
+    owner: "Dev"
+    status: open
+  - epic: 1
+    action: "Add npm run test:unit as a CI step (flagged in Story 1.2's round-2 review, still open)"
+    owner: "Dev"
+    status: open

@@ -25,7 +25,10 @@ export async function createTestProduct(
   overrides: Partial<{
     name: string;
     priceCents: number;
-    isAvailable: boolean;
+    stockQuantity: number;
+    lowStockThreshold: number;
+    stockIsPlaceholder: boolean;
+    thresholdIsPlaceholder: boolean;
   }> = {},
 ) {
   return prisma.product.create({
@@ -33,7 +36,10 @@ export async function createTestProduct(
       vendorId,
       name: overrides.name ?? "Test Product (Playwright)",
       priceCents: overrides.priceCents ?? 500,
-      isAvailable: overrides.isAvailable ?? true,
+      stockQuantity: overrides.stockQuantity ?? 50,
+      lowStockThreshold: overrides.lowStockThreshold ?? 5,
+      stockIsPlaceholder: overrides.stockIsPlaceholder ?? false,
+      thresholdIsPlaceholder: overrides.thresholdIsPlaceholder ?? false,
     },
   });
 }
@@ -50,6 +56,12 @@ export async function createTestOrder(
     totalCents: number;
     status: "PENDING" | "PAID" | "READY" | "COMPLETED" | "CANCELLED";
     smsNotified: boolean;
+    // Story 1.4: lets webhook/concurrency tests build a realistic
+    // order-with-line-items fixture (needed to exercise per-line
+    // decrementStock() calls) without hand-rolling raw Prisma calls in
+    // every spec file. Mirrors the nested-create pattern
+    // src/app/api/checkout/route.ts and prisma/seed.ts already use.
+    items: { productId: string; quantity: number; unitPriceCents: number }[];
   }> = {},
 ) {
   return prisma.order.create({
@@ -60,6 +72,7 @@ export async function createTestOrder(
       totalCents: overrides.totalCents ?? 1000,
       status: overrides.status ?? "PENDING",
       smsNotified: overrides.smsNotified ?? false,
+      ...(overrides.items ? { items: { create: overrides.items } } : {}),
     },
   });
 }

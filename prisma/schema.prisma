@@ -39,7 +39,17 @@ model Product {
   description  String?
   priceCents   Int // e.g. 1250 == $12.50
   imageUrl     String? // Cloudinary URL
-  isAvailable  Boolean  @default(true)
+  stockQuantity     Int // required at creation, no schema default - vendor must set it (Story 1.2)
+  lowStockThreshold Int // required at creation, no schema default - vendor must set it (Story 1.2)
+  // True only for the migration-backfilled 0 (Story 1.2 review). Cleared to
+  // false on any vendor-initiated write to lowStockThreshold, regardless of
+  // the value chosen - this is what lets Story 1.6 tell a placeholder 0
+  // apart from a vendor's deliberate 0.
+  thresholdIsPlaceholder Boolean @default(false)
+  // Same idea as thresholdIsPlaceholder, for the migration-backfilled 100 -
+  // a vendor's deliberate stockQuantity of 100 is at least as plausible as
+  // the threshold's deliberate 0, so it needs the identical guard.
+  stockIsPlaceholder     Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -76,6 +86,7 @@ model Order {
   totalCents        Int
   stripeSessionId   String?     @unique // links back to Stripe Checkout
   smsNotified       Boolean     @default(false)
+  stockDecremented  Boolean     @default(false) // set inside the same $transaction as the per-line decrements (Story 1.4) - a separate guard from `status` so a retry after a transient failure (deadlock, dropped connection) between the PAID commit and the decrement re-attempts cleanly instead of finding status already PAID and giving up
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 

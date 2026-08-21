@@ -14,12 +14,19 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { clampQuantity } from "@/lib/cart";
 
 export type CartItem = {
   productId: string;
   name: string;
   priceCents: number;
   quantity: number;
+  // Stock Quantity known at add-to-cart time (Story 1.5). A UX hint only for
+  // the cart stepper's ceiling - never re-validated against the server, may
+  // go stale, and is never authoritative. Checkout's own per-line
+  // sufficiency check is the sole enforcement point regardless of this
+  // value (architecture AD-3).
+  stockQuantity: number;
 };
 
 type CartContextValue = {
@@ -33,6 +40,7 @@ type CartContextValue = {
     item: Omit<CartItem, "quantity">,
   ) => void;
   removeItem: (productId: string) => void;
+  updateQuantity: (productId: string, delta: number) => void;
   clear: () => void;
 };
 
@@ -61,9 +69,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) => {
       const existing = prev.find((i) => i.productId === item.productId);
       if (existing) {
+        // Refresh every field to this click's fresh values (not just
+        // stockQuantity - review round 1 finding: cherry-picking one field
+        // left name/priceCents silently stale if a vendor edited them
+        // between two "Add" clicks) and clamp the increment against the
+        // fresh ceiling, so repeat-"Add" can't exceed the same limit the
+        // cart stepper enforces (AC #6).
         return prev.map((i) =>
           i.productId === item.productId
-            ? { ...i, quantity: i.quantity + 1 }
+            ? { ...item, quantity: clampQuantity(i.quantity + 1, item.stockQuantity) }
             : i,
         );
       }
@@ -73,6 +87,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   function removeItem(productId: string) {
     setItems((prev) => prev.filter((i) => i.productId !== productId));
+  }
+
+  // Takes a delta (+1/-1), not an absolute target, and computes the next
+  // quantity from `prev` inside the updater - review round 1 finding: a
+  // caller passing a precomputed `currentQuantity + delta` bakes in a
+  // stale render-time value, so two clicks landing before a re-render
+  // commits could silently drop one step. Mirrors addItem's existing-item
+  // branch, which already reads from `prev` for the same reason.
+  function updateQuantity(productId: string, delta: number) {
+    setItems((prev) =>
+      prev.map((i) =>
+        i.productId === productId
+          ? { ...i, quantity: clampQuantity(i.quantity + delta, i.stockQuantity) }
+          : i,
+      ),
+    );
   }
 
   function clear() {
@@ -93,6 +123,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     totalCents,
     addItem,
     removeItem,
+    updateQuantity,
     clear,
   };
 

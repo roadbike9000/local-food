@@ -7,6 +7,9 @@ import {
   deletePickupSlotByLocation,
   createTestOrder,
   deleteOrder,
+  createTestProduct,
+  deleteProduct,
+  prisma,
 } from "./helpers/db";
 
 // The dashboard is auth-protected. Without a session, all tabs redirect to
@@ -35,17 +38,19 @@ test.describe("vendor dashboard (unauthenticated)", () => {
 
 const authFile = join(process.cwd(), "playwright/.auth/vendor.json");
 
-// Requires playwright/support/generate-vendor-auth.ts to have been run once
-// (see that file — it needs a human to read an emailed Clerk verification
-// code, so it can't run unattended in CI). Skips gracefully when missing,
-// same pattern as payment.spec.ts's Stripe-keys check.
+// playwright/support/global-setup.ts authenticates the E2E vendor via
+// Clerk's Backend API and writes this file fresh before every test run — no
+// human, no email code, can't go stale between runs. Still skips gracefully
+// if E2E_VENDOR_EMAIL/CLERK_SECRET_KEY aren't configured (global setup warns
+// and skips writing the file rather than failing the whole suite), same
+// pattern as payment.spec.ts's Stripe-keys check.
 test.describe("vendor dashboard (authenticated)", () => {
   test.use({ storageState: authFile });
 
   test.beforeEach(async ({ page }) => {
     test.skip(
       !existsSync(authFile),
-      "No saved vendor session — run `npm run test:e2e:auth` first",
+      "No vendor session — E2E_VENDOR_EMAIL/CLERK_SECRET_KEY not configured",
     );
     // Clerk's saved session needs one full page load to become valid against
     // the middleware; without this warm-up, the very first navigation after
@@ -137,8 +142,18 @@ test.describe("vendor dashboard (authenticated)", () => {
       await page.goto("/dashboard/products");
       await page.getByRole("button", { name: "Add product" }).click();
 
-      await page.getByLabel("Name").fill(productName);
-      await page.getByLabel("Price (USD)").fill("4.50");
+      // Scoped to the add-product form by its accessible name —
+      // EditStockControl's per-row inputs (also labeled "Stock
+      // Quantity"/"Low-Stock Threshold") live in table cells, not inside
+      // this form, but an unscoped getByLabel would match every row plus
+      // the form and hit Playwright's strict-mode ambiguity. Anchoring by
+      // role/name (rather than the bare "form" tag) survives a second
+      // <form> being added to the page later.
+      const form = page.getByRole("form", { name: "Add product" });
+      await form.getByLabel("Name").fill(productName);
+      await form.getByLabel("Price (USD)").fill("4.50");
+      await form.getByLabel("Stock Quantity", { exact: true }).fill("25");
+      await form.getByLabel("Low-Stock Threshold").fill("5");
 
       // Network-first: register the response listener before the click that
       // triggers it, then wait on the create request itself. A second,
@@ -150,7 +165,14 @@ test.describe("vendor dashboard (authenticated)", () => {
         page.getByRole("button", { name: "Save product" }).click(),
       ]);
 
-      await expect(page.getByText(productName)).toBeVisible({ timeout: 15_000 });
+      // getByRole("cell", ...), not getByText - EditStockControl's
+      // accessibility fix (Story 1.2 round 2) added a sr-only "for
+      // {productName}" span in the same row, which getByText's substring
+      // match also matches once this test actually runs (previously masked
+      // since it never ran at all - blocked by the stale auth fixture).
+      await expect(
+        page.getByRole("cell", { name: productName, exact: true }),
+      ).toBeVisible({ timeout: 15_000 });
     } finally {
       await deleteProductByName(vendor.id, productName);
     }
@@ -235,12 +257,202 @@ test.describe("vendor dashboard (authenticated)", () => {
 
     await page.goto("/dashboard/products");
     await page.getByRole("button", { name: "Add product" }).click();
-    await page.getByLabel("Name").fill("Session Expiry Check");
-    await page.getByLabel("Price (USD)").fill("4.50");
+    // Scoped to the add-product form by its accessible name - see the
+    // identical comment on the "vendor can add a new product" test above.
+    const form = page.getByRole("form", { name: "Add product" });
+    await form.getByLabel("Name").fill("Session Expiry Check");
+    await form.getByLabel("Price (USD)").fill("4.50");
+    await form.getByLabel("Stock Quantity", { exact: true }).fill("25");
+    await form.getByLabel("Low-Stock Threshold").fill("5");
     await page.getByRole("button", { name: "Save product" }).click();
 
     await expect(
       page.getByText("Your session expired. Sign in again."),
     ).toBeVisible();
+  });
+
+  test("[P1] vendor can edit an existing product's Stock Quantity via the inline control", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const productName = `Playwright Stock Edit ${Date.now()}`;
+
+    // A dedicated fixture product, not a shared seeded one — seeded products
+    // (prisma/seed.ts) are shared across parallel tests, and mutating a
+    // shared product's stock here would pollute other tests running
+    // concurrently.
+    const product = await createTestProduct(vendor.id, {
+      name: productName,
+      stockQuantity: 20,
+      lowStockThreshold: 5,
+    });
+
+    try {
+      await page.goto("/dashboard/products");
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible();
+
+      // Scope to the fixture product's row so this doesn't collide with
+      // other rows/parallel test data on the same page.
+      const row = page.getByRole("row", { name: new RegExp(productName) });
+      await expect(row).toBeVisible();
+
+      const stockInput = row.getByRole("spinbutton", {
+        name: /stock quantity/i,
+      });
+      await expect(stockInput).toHaveValue("20");
+
+      await stockInput.fill("35");
+
+      // Network-first: register the response listener before the click that
+      // triggers the PATCH, same pattern as "vendor can add a new product".
+      const [response] = await Promise.all([
+        page.waitForResponse(`**/api/products/${product.id}`),
+        row.getByRole("button", { name: "Save" }).click(),
+      ]);
+      // This is the assertion the old version of this test lacked: without
+      // it, the test goes green even if the PATCH failed (409/500), because
+      // the input's value is React state that a router.refresh() alone
+      // doesn't roll back.
+      expect(response.status()).toBe(200);
+
+      // A hard reload, not another router.refresh() - proves the value was
+      // actually persisted server-side, not just held in client state.
+      await page.reload();
+      await expect(
+        row.getByRole("spinbutton", { name: /stock quantity/i }),
+      ).toHaveValue("35", { timeout: 15_000 });
+
+      // Direct DB read-back - the strongest form of "this actually
+      // persisted", independent of anything the UI renders.
+      const persisted = await prisma.product.findUnique({
+        where: { id: product.id },
+      });
+      expect(persisted?.stockQuantity).toBe(35);
+    } finally {
+      await deleteProduct(product.id);
+    }
+  });
+
+  test("[P1] a placeholder Stock Quantity or Low-Stock Threshold shows a 'Needs review' badge on its row, with field-specific detail (Story 1.6)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const stockFlaggedName = `Playwright Stock Placeholder ${Date.now()}`;
+    const thresholdFlaggedName = `Playwright Threshold Placeholder ${Date.now()}`;
+    const bothFlaggedName = `Playwright Both Placeholder ${Date.now()}`;
+    const cleanName = `Playwright No Placeholder ${Date.now()}`;
+
+    // Four dedicated fixtures covering every branch of placeholderReason()
+    // (review round 1 finding: the original test only ever exercised the
+    // stock-only branch) - proves the badge is conditional on either flag,
+    // and that its title text differentiates which field(s) are flagged.
+    const stockFlagged = await createTestProduct(vendor.id, {
+      name: stockFlaggedName,
+      stockIsPlaceholder: true,
+    });
+    const thresholdFlagged = await createTestProduct(vendor.id, {
+      name: thresholdFlaggedName,
+      thresholdIsPlaceholder: true,
+    });
+    const bothFlagged = await createTestProduct(vendor.id, {
+      name: bothFlaggedName,
+      stockIsPlaceholder: true,
+      thresholdIsPlaceholder: true,
+    });
+    const clean = await createTestProduct(vendor.id, {
+      name: cleanName,
+    });
+
+    try {
+      await page.goto("/dashboard/products");
+      await expect(
+        page.getByRole("heading", { name: "Products" }),
+      ).toBeVisible();
+
+      const stockRow = page.getByRole("row", { name: new RegExp(stockFlaggedName) });
+      const thresholdRow = page.getByRole("row", { name: new RegExp(thresholdFlaggedName) });
+      const bothRow = page.getByRole("row", { name: new RegExp(bothFlaggedName) });
+      const cleanRow = page.getByRole("row", { name: new RegExp(cleanName) });
+
+      await expect(cleanRow.getByText("Needs review")).not.toBeVisible();
+
+      await expect(stockRow.getByText("Needs review")).toHaveAttribute(
+        "title",
+        "Stock Quantity is still a migration placeholder — update it.",
+      );
+      await expect(thresholdRow.getByText("Needs review")).toHaveAttribute(
+        "title",
+        "Low-Stock Threshold is still a migration placeholder — update it.",
+      );
+      await expect(bothRow.getByText("Needs review")).toHaveAttribute(
+        "title",
+        "Stock Quantity and Low-Stock Threshold are still migration placeholders — update both.",
+      );
+    } finally {
+      await deleteProduct(stockFlagged.id);
+      await deleteProduct(thresholdFlagged.id);
+      await deleteProduct(bothFlagged.id);
+      await deleteProduct(clean.id);
+    }
+  });
+
+  test("[P1] the badge disappears once the flagged field is edited via the existing inline control (Story 1.6, AC #2)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const productName = `Playwright Placeholder Clear ${Date.now()}`;
+
+    const product = await createTestProduct(vendor.id, {
+      name: productName,
+      stockQuantity: 20,
+      stockIsPlaceholder: true,
+    });
+
+    try {
+      await page.goto("/dashboard/products");
+      const row = page.getByRole("row", { name: new RegExp(productName) });
+      await expect(row).toBeVisible();
+      await expect(row.getByText("Needs review")).toBeVisible();
+
+      const stockInput = row.getByRole("spinbutton", {
+        name: /stock quantity/i,
+      });
+      await stockInput.fill("35");
+
+      const [response] = await Promise.all([
+        page.waitForResponse(`**/api/products/${product.id}`),
+        row.getByRole("button", { name: "Save" }).click(),
+      ]);
+      expect(response.status()).toBe(200);
+
+      // Assert the badge is already gone from a live re-render, before any
+      // reload (review round 1 finding: the original version of this test
+      // only checked post-reload state, which would still pass even if
+      // EditStockControl's existing router.refresh() call - confirmed
+      // present at EditStockControl.tsx:96 - were silently broken). Story
+      // 1.2's setStock() already clears stockIsPlaceholder server-side on a
+      // genuine value change; this assertion proves the badge actually
+      // reacts to that live, not just after a hard refresh.
+      await expect(row.getByText("Needs review")).not.toBeVisible({
+        timeout: 15_000,
+      });
+
+      // A hard reload is still worth proving too - confirms the persisted
+      // state, not just client-side React state that a refresh alone
+      // wouldn't roll back.
+      await page.reload();
+      await expect(row.getByText("Needs review")).not.toBeVisible({
+        timeout: 15_000,
+      });
+
+      const persisted = await prisma.product.findUnique({
+        where: { id: product.id },
+      });
+      expect(persisted?.stockIsPlaceholder).toBe(false);
+    } finally {
+      await deleteProduct(product.id);
+    }
   });
 });

@@ -26,7 +26,7 @@ async function main() {
   const bakery = await prisma.vendor.create({
     data: {
       // Bound to E2E_VENDOR_CLERK_ID when set, so re-seeding doesn't break the
-      // authenticated Playwright fixture (playwright/support/generate-vendor-auth.ts).
+      // authenticated Playwright fixture (playwright/support/global-setup.ts).
       clerkUserId: process.env.E2E_VENDOR_CLERK_ID || "seed_user_bakery",
       name: "Corner Sourdough",
       slug: "corner-sourdough",
@@ -38,16 +38,22 @@ async function main() {
             name: "Classic Sourdough Loaf",
             description: "Crusty, tangy, 800g.",
             priceCents: 900,
+            stockQuantity: 50,
+            lowStockThreshold: 5,
           },
           {
             name: "Seeded Rye",
             description: "Caraway and sunflower seeds.",
             priceCents: 1100,
+            stockQuantity: 50,
+            lowStockThreshold: 5,
           },
           {
             name: "Cinnamon Morning Bun",
             description: "Laminated dough, sold by the half dozen.",
             priceCents: 1500,
+            stockQuantity: 50,
+            lowStockThreshold: 5,
           },
         ],
       },
@@ -77,11 +83,15 @@ async function main() {
             name: "Heirloom Tomato Box",
             description: "3 lbs, mixed varieties.",
             priceCents: 800,
+            stockQuantity: 50,
+            lowStockThreshold: 5,
           },
           {
             name: "Salad Greens Bag",
             description: "Freshly cut mixed lettuces.",
             priceCents: 600,
+            stockQuantity: 50,
+            lowStockThreshold: 5,
           },
         ],
       },

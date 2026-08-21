@@ -50,11 +50,13 @@ flowchart LR
 - **Prevents:** `isAvailable` and `stockQuantity` drifting out of sync through a missed write path; a builder re-adding a differently-named cached/derived boolean that reintroduces the same drift under a new name; checkout accepting an order for more units than are actually in stock (a `stockQuantity > 0` display check is not a sufficiency check).
 - **Rule:** The `Product.isAvailable` column is dropped, and no persisted boolean or cached field may re-derive availability under any name — it is computed at read time only. For **display** (storefront listing/detail, `src/app/dashboard/products/page.tsx:40`), availability is `stockQuantity > 0`. For **checkout** (`src/app/api/checkout/route.ts`), the existing `where: { isAvailable: true }` filter is replaced with a per-line check that `stockQuantity >= requestedQuantity` for every item — not merely `> 0` — rejecting the whole order if any line is short. Migration ordering: `stockQuantity` (FR-12) is backfilled and populated for every existing Product *before* the `isAvailable` column is dropped, so no window exists where availability is undefined.
 
-### AD-3 — Stock Quantity has exactly one write path; the low-stock flag is set only after the SMS actually sends
+### AD-3 — Stock Quantity has exactly one write path, with two modes; the low-stock flag is set only after the SMS actually sends
 
-- **Binds:** FR-7, FR-8, FR-10, FR-11, FR-12, any future manual stock adjustment
-- **Prevents:** Two independently-built call sites (e.g. the sale-decrement webhook and a future admin stock-edit form) racing on the last unit; a multi-item order partially decrementing when one line runs short; `lowStockAlerted` being marked true before the alert actually delivered (the same failure mode FR-10 explicitly calls out for `smsNotified`).
-- **Rule:** All writes to `Product.stockQuantity` go through one server-only function, `adjustStock()` (in `src/lib/inventory.ts` or equivalent). It performs a conditional update (`UPDATE ... WHERE stockQuantity >= :delta`, checking rows-affected) — never a bare `prisma.product.update({ stockQuantity })` from a route handler or Server Action. For a multi-item order, every line's decrement runs inside one DB transaction — all succeed or none do. A post-payment shortfall (money already captured, stock insufficient — should be rare since checkout already validated sufficiency per AD-2, but not impossible under a race) is not auto-resolved: `adjustStock()` returns a shortfall result and the order is flagged for manual admin review, not silently over-decremented or auto-refunded (auto-refund is out of scope — see Deferred). `lowStockAlerted` is a **separate** write from the stock decrement: `adjustStock()` returns whether the threshold was newly crossed, the caller then calls `sendSms()`, and only a *successful* send sets `lowStockAlerted = true` — same order of operations as the existing `smsNotified` pattern (never mark delivered before it's sent).
+- **Binds:** FR-7, FR-8, FR-10, FR-11, FR-12, FR-13, any future manual stock adjustment
+- **Prevents:** Two independently-built call sites (e.g. the sale-decrement webhook and a vendor stock-edit form) racing on the last unit; a multi-item order partially decrementing when one line runs short; `lowStockAlerted` being marked true before the alert actually delivered (the same failure mode FR-10 explicitly calls out for `smsNotified`); a vendor's manual correction silently clobbering a concurrent sale's decrement (lost update).
+- **Rule:** All writes to `Product.stockQuantity` go through one server-only module, `src/lib/inventory.ts` — never a bare `prisma.product.update({ stockQuantity })` from a route handler or Server Action. Two modes, both conditional updates, no exceptions:
+  - `decrementStock(productId, delta)` — the sale-completion path (FR-8). Conditional update `UPDATE ... WHERE stockQuantity >= :delta`, checking rows-affected.
+  - `setStock(productId, newValue, expectedCurrentValue)` — the vendor-direct-edit path (FR-12, FR-13's underlying edit). Conditional update `UPDATE ... SET stockQuantity = :newValue WHERE id = :productId AND stockQuantity = :expectedCurrentValue` (optimistic check against what the vendor's form last loaded); zero rows-affected means a concurrent change happened first (e.g. a sale decremented it) — the edit is rejected, vendor's form must refresh and retry, never silently overwritten. For a multi-item order, every line's decrement runs inside one DB transaction — all succeed or none do. A post-payment shortfall (money already captured, stock insufficient — should be rare since checkout already validated sufficiency per AD-2, but not impossible under a race) is not auto-resolved: `decrementStock()` returns a shortfall result and the caller sends an SMS to the admin's phone via the same mechanism as AD-3's low-stock alert (not a silent flag with no owner) — never silently over-decremented or auto-refunded (auto-refund is out of scope — see Deferred). `lowStockAlerted` is a **separate** write from the stock decrement: `decrementStock()` returns whether the threshold was newly crossed, the caller then calls `sendSms()`, and only a *successful* send sets `lowStockAlerted = true` — same order of operations as the existing `smsNotified` pattern (never mark delivered before it's sent).
 - On the client, `CartItem` carries the `stockQuantity` known at add-to-cart time so FR-11's stepper can show a sensible ceiling — this is a UX hint only, may go stale, and is never authoritative; checkout's per-line sufficiency check (AD-2) is the sole enforcement point regardless of what the client allowed.
 
 ### AD-4 — Vendor-deactivated is checked through one shared guard, with one contract
@@ -87,19 +89,22 @@ flowchart LR
 - **Prevents:** Two builders each guessing a different mechanism (a made-up invite token, a temporary password, an auto-generated Clerk account) for a flow the PRD never actually specified.
 - **Rule:** `Vendor.clerkUserId` becomes nullable (was required+unique). An admin-created Vendor has `clerkUserId: null` until someone (admin/ops) manually sets it once the vendor signs up with Clerk separately — no invite/claim flow is built. Every existing query assuming `clerkUserId` is always present (`getCurrentVendor()` and any vendor-facing route) must handle the null case as "not yet claimed," not crash.
 
-### AD-9 — The migration placeholder is one named constant, shared by the migration and the vendor-facing flag
+### AD-9 — Migration placeholders are named constants, shared by the migration and the vendor-facing flag
 
 - **Binds:** FR-12, FR-13
-- **Prevents:** The backfill migration and the dashboard banner check (FR-13) each hardcoding `100` independently, so a future change to the placeholder value silently desyncs them.
-- **Rule:** `PLACEHOLDER_STOCK_QUANTITY = 100` is defined once (e.g. `src/lib/inventory.ts`) and imported by both the migration script and the `/dashboard/products` banner condition (`stockQuantity === PLACEHOLDER_STOCK_QUANTITY`) — neither hardcodes the literal.
+- **Prevents:** The backfill migration and the dashboard banner check (FR-13) each hardcoding a placeholder literal independently, so a future change silently desyncs them.
+- **Rule:** Two constants, both defined once in `src/lib/inventory.ts` and imported everywhere they're checked — neither is ever hardcoded at the call site:
+  - `PLACEHOLDER_STOCK_QUANTITY = 100` — existing-product backfill for `stockQuantity` (`isAvailable: true` → 100, `false` → 0).
+  - `PLACEHOLDER_LOW_STOCK_THRESHOLD = 0` — existing-product backfill for `lowStockThreshold`. Vendor owns this value (per user direction, not an admin-picked business default), so the backfill is a neutral sentinel, not a real number: 0 means the low-stock alert (FR-10) never fires until the vendor sets a real positive threshold — silent by default, not a guessed business decision. New products require a vendor-supplied value on `AddProductForm`, no default.
+  - The `/dashboard/products` banner (FR-13, Story 1.6) checks **both** constants — a product flagged for either `stockQuantity === PLACEHOLDER_STOCK_QUANTITY` or `lowStockThreshold === PLACEHOLDER_LOW_STOCK_THRESHOLD` gets the same nudge-the-vendor treatment, same mechanism, same banner.
 
 ## Consistency Conventions
 
 | Concern | Convention |
 | --- | --- |
-| Naming (entities, files, interfaces, events) | `Admin` model; `adjustStock()`, `assertVendorActive()`, `getCurrentAdmin()`, `PLACEHOLDER_STOCK_QUANTITY` in `src/lib/`; admin routes under `src/app/admin/**` |
-| Data & formats (ids, dates, error shapes, envelopes) | `stockQuantity: Int`, non-negative (enforced by AD-3's conditional update, never by app-level validation alone); `lowStockThreshold: Int`, per-product; existing `cuid()` ids, cents-based money unchanged |
-| State & cross-cutting (mutation, errors, logging, config, auth) | All stock writes via `adjustStock()` (AD-3); all vendor-active checks via `assertVendorActive()` (AD-4); admin auth = middleware (authenticated) + `getCurrentAdmin()` (is-admin), never one without the other |
+| Naming (entities, files, interfaces, events) | `Admin` model; `decrementStock()`, `setStock()`, `assertVendorActive()`, `getCurrentAdmin()`, `PLACEHOLDER_STOCK_QUANTITY` in `src/lib/`; admin routes under `src/app/admin/**` |
+| Data & formats (ids, dates, error shapes, envelopes) | `stockQuantity: Int`, non-negative (enforced by AD-3's conditional updates, never by app-level validation alone); `lowStockThreshold: Int`, per-product; existing `cuid()` ids, cents-based money unchanged |
+| State & cross-cutting (mutation, errors, logging, config, auth) | All stock writes via `src/lib/inventory.ts`'s `decrementStock()`/`setStock()` (AD-3); all vendor-active checks via `assertVendorActive()` (AD-4); admin auth = middleware (authenticated) + `getCurrentAdmin()` (is-admin), never one without the other |
 
 ## Structural Seed
 
@@ -113,6 +118,7 @@ erDiagram
 
     Admin {
         string clerkUserId UK
+        string phone "required for FR-10 SMS delivery, mirrors Vendor.phone"
     }
     Vendor {
         string clerkUserId UK "nullable - unbound until claimed, AD-8"
@@ -138,11 +144,11 @@ src/app/
   cart/                # EXISTING - FR-1 (verify), FR-11 (new stepper)
   api/
     checkout/          # EXISTING - extend: stockQuantity check (FR-7), assertVendorActive() (AD-4)
-    webhooks/          # EXISTING - extend: adjustStock() call on payment confirmation (FR-8, AD-3)
+    webhooks/          # EXISTING - extend: decrementStock() call on payment confirmation (FR-8, AD-3)
 src/lib/
   vendor.ts            # EXISTING - add assertVendorActive() (AD-4)
   admin.ts             # NEW - getCurrentAdmin() (AD-1, AD-6)
-  inventory.ts         # NEW - adjustStock() (AD-3)
+  inventory.ts         # NEW - decrementStock() + setStock() (AD-3)
 ```
 
 ## Capability → Architecture Map

@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [1]
+stepsCompleted: [1, 2, "3-epic1", "3-epic2", "3-epic3", 4]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-local-food-2026-08-10/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-local-food-2026-08-10/ARCHITECTURE-SPINE.md
@@ -42,9 +42,9 @@ NFR4: No new external dependency is introduced — Admin auth reuses Clerk, stoc
 - No starter template applies — brownfield app, existing Next.js 14 App Router codebase ratified as-is (Architecture Design Paradigm).
 - Prisma schema changes: new `Admin` model (`clerkUserId` unique); `Vendor` gains `deletedAt`, `createdByAdminId`, `deletedByAdminId`, and `clerkUserId` becomes nullable; `Product` gains `stockQuantity`, `lowStockThreshold`, `lowStockAlerted` and drops `isAvailable`; `Vendor → Product` and `Vendor → Order` drop `onDelete: Cascade` (AD-1, AD-2, AD-4, AD-5, AD-8).
 - Migration ordering constraint: `stockQuantity` must be backfilled for every existing Product *before* `isAvailable` is dropped (AD-2).
-- New `src/lib` service functions: `getCurrentAdmin()` (AD-1/AD-6), `adjustStock()` + `PLACEHOLDER_STOCK_QUANTITY` constant (AD-3/AD-9), `assertVendorActive()` (AD-4, throws `VendorDeactivatedError`), `resolveVendorSlug()` (AD-7).
+- New `src/lib` service functions: `getCurrentAdmin()` (AD-1/AD-6), `decrementStock()` + `setStock()` + `PLACEHOLDER_STOCK_QUANTITY` constant (AD-3/AD-9), `assertVendorActive()` (AD-4, throws `VendorDeactivatedError`), `resolveVendorSlug()` (AD-7).
 - New route tree `src/app/admin/**` (`vendors/`, `inventory/`), separate from vendor's `src/app/dashboard/**`; every new admin route must be added to `middleware.ts`'s `isProtectedRoute` matcher (AD-6).
-- Existing routes requiring modification: `src/app/api/checkout/route.ts` (stock sufficiency check, `assertVendorActive()`), `src/app/api/webhooks/*` (call `adjustStock()` on payment confirmation), `src/app/dashboard/products/page.tsx` (drop direct `isAvailable` read, add FR-13 banner), storefront listing/detail pages (availability display).
+- Existing routes requiring modification: `src/app/api/checkout/route.ts` (stock sufficiency check, `assertVendorActive()`), `src/app/api/webhooks/*` (call `decrementStock()` on payment confirmation), `src/app/dashboard/products/page.tsx` (drop direct `isAvailable` read, add FR-13 banner, route stock edits through `setStock()`), storefront listing/detail pages (availability display).
 - Multi-item order stock decrements run inside one DB transaction — all lines succeed or none do; a post-payment shortfall is flagged for manual admin review, not auto-resolved (AD-3, Deferred: auto-refund out of scope).
 
 ### UX Design Requirements
@@ -53,8 +53,222 @@ None — no UX design contract exists for this feature set.
 
 ### FR Coverage Map
 
-{{requirements_coverage_map}}
+FR1: Epic 1 — cart line removal (verify, already implemented)
+FR6: Epic 1 — out-of-stock UI marking
+FR7: Epic 1 — out-of-stock blocks cart/checkout
+FR8: Epic 1 — post-sale stock decrement
+FR11: Epic 1 — cart quantity stepper
+FR12: Epic 1 — Stock Quantity creation + backfill
+FR13: Epic 1 — vendor placeholder-count notification
+FR2: Epic 2 — Admin identity/gating
+FR3: Epic 2 — admin adds vendor
+FR4: Epic 2 — admin deactivates vendor
+FR9: Epic 3 — admin inventory dashboard
+FR10: Epic 3 — low-stock SMS alert
 
 ## Epic List
 
-{{epics_list}}
+### Epic 1: Accurate Stock & Cart
+Customers only see and buy what's actually in stock, cart totals are always right, and vendors are told when their stock number is still a migration placeholder. Standalone — no admin dependency. FRs consolidated into one epic because they're tightly file-coupled around `Product.stockQuantity` / `src/lib/inventory.ts` / checkout / cart / storefront.
+**FRs covered:** FR1, FR6, FR7, FR8, FR11, FR12, FR13
+
+### Epic 2: Admin Vendor Lifecycle
+Admin can onboard and deactivate vendors on the platform without touching the database directly. Includes the foundational Admin-identity/gating work as its first story.
+**FRs covered:** FR2, FR3, FR4
+
+### Epic 3: Admin Inventory Oversight
+Admin can see stock levels across all vendors on demand and gets an SMS alert before something sells out. Builds on Epic 1 (needs `stockQuantity` to exist) and Epic 2 (needs Admin identity/gating) — both prior epics.
+**FRs covered:** FR9, FR10
+
+## Epic 1: Accurate Stock & Cart
+
+Customers only see and buy what's actually in stock, cart totals are always right, and vendors are told when their stock number is still a migration placeholder. Standalone — no admin dependency.
+
+### Story 1.1: Verify cart line removal and total accuracy
+
+As a customer,
+I want to remove an item from my cart and see the total update correctly,
+So that I only pay for what I actually want.
+
+**Acceptance Criteria:**
+
+**Given** a cart with 2+ line items
+**When** I remove one line
+**Then** it disappears immediately and the total recalculates to the sum of remaining lines (no tax/shipping)
+**And** removing the last item returns the cart to its empty state
+
+*(Verification/regression task — `CartProvider.removeItem` already implements this; no new code expected, write the test. FR1.)*
+
+### Story 1.2: Stock Quantity captured at creation, backfilled for existing products, and editable
+
+As a vendor,
+I want to set how many units of a product I have, and correct that number later,
+So that the system knows my real stock, on an ongoing basis — not just once.
+
+**Acceptance Criteria:**
+
+**Given** the vendor's `AddProductForm`
+**When** they create a new product
+**Then** Stock Quantity and Low-Stock Threshold are both required fields — no product can be created without them, no default offered for either (vendor owns their own stock, per explicit product direction)
+**And** on migration, every existing product's Stock Quantity is backfilled per `isAvailable` (`true` → 100, `false` → 0) and every existing product's Low-Stock Threshold is backfilled to 0 — both are named constants (`PLACEHOLDER_STOCK_QUANTITY`, `PLACEHOLDER_LOW_STOCK_THRESHOLD`, AD-9), never hardcoded at the call site
+**And** the Low-Stock Threshold backfill of 0 is a neutral sentinel, not a real business number — a 0 threshold means the low-stock alert (FR-10) never fires until the vendor sets a real positive value themselves
+**And** the vendor can edit an existing product's Stock Quantity and Low-Stock Threshold via a minimal inline control on `/dashboard/products` (not a full product-edit form — name/price/description editing is out of scope here) — this is the only way to correct either value after creation, and the only caller `setStock()` has
+**And** the edit goes through `setStock()` — a conditional update guarded against the value the form last loaded, never a bare write — so a concurrent sale decrementing the same product can't be silently clobbered by the vendor's edit
+
+*(FR12, AD-3, AD-9.)*
+
+### Story 1.3: Out-of-stock products are marked and blocked
+
+As a customer,
+I want to see when something's sold out and be stopped from ordering it,
+So that I never pay for something unavailable.
+
+**Acceptance Criteria:**
+
+**Given** a product with Stock Quantity 0
+**When** it's shown on the storefront (listing or detail)
+**Then** a visible out-of-stock badge renders and "add to cart" is disabled
+**And** `isAvailable` is dropped from the schema — availability is computed as `stockQuantity > 0` at every read site, including `src/app/dashboard/products/page.tsx`
+**And** checkout re-validates `stockQuantity >= requestedQuantity` per line server-side and rejects the whole order if any line is short, regardless of client state
+
+*(FR6, FR7, AD-2.)*
+
+### Story 1.4: Inventory decrements immediately on sale completion
+
+As the platform,
+I want stock to drop the moment a sale is confirmed,
+So that inventory never says "in stock" when it isn't.
+
+**Acceptance Criteria:**
+
+**Given** a Stripe webhook confirms payment
+**When** the order is marked paid
+**Then** each line item's Stock Quantity decrements through `decrementStock()` (conditional update, never negative)
+**And** a multi-item order's decrements happen inside one transaction — all succeed or none do
+**And** two customers racing for the last unit resolve to exactly one success, one rejection
+**And** stock never decrements at checkout-session creation — only on confirmed payment
+**And** `decrementStock()` returns a shortfall result when a post-payment race leaves the order short (money captured, stock insufficient) — it never silently over-decrements or auto-refunds; actually notifying anyone about it is out of Epic 1's scope (no Admin exists yet at this point) and is completed by Story 3.2 once it does
+
+*(FR8, AD-3, NFR1.)*
+
+### Story 1.5: Cart quantity stepper
+
+As a customer,
+I want to bump a cart line's quantity up or down directly,
+So that I don't have to remove and re-add it.
+
+**Acceptance Criteria:**
+
+**Given** a cart line
+**When** I use the stepper
+**Then** quantity moves between a floor of 1 and a ceiling of that product's Stock Quantity, and the total recalculates on every change
+**And** the client-side ceiling is a UX hint only — checkout's server-side sufficiency check (Story 1.3) is still the sole enforcement point
+
+*(FR11.)*
+
+### Story 1.6: Vendor notified of placeholder Stock Quantity or Low-Stock Threshold
+
+As a vendor,
+I want to know which of my products still has a migration-placeholder Stock Quantity or Low-Stock Threshold,
+So that I can enter the real numbers.
+
+**Acceptance Criteria:**
+
+**Given** a product whose Stock Quantity still equals `PLACEHOLDER_STOCK_QUANTITY`, or whose Low-Stock Threshold still equals `PLACEHOLDER_LOW_STOCK_THRESHOLD` (Story 1.2, AD-9)
+**When** the vendor views `/dashboard/products`
+**Then** a banner/badge flags that row — same banner mechanism for either placeholder, not two separate flags
+**And** the banner disappears the moment the vendor edits the flagged field to any value — via Story 1.2's `setStock()` path, same as any other vendor edit, no separate write mechanism for clearing this flag
+**And** no SMS/email is sent — dashboard-only
+
+*(FR13, AD-9.)*
+
+## Epic 2: Admin Vendor Lifecycle
+
+Admin can onboard and deactivate vendors on the platform without touching the database directly.
+
+### Story 2.1: Admin identity and access gating
+
+As the platform,
+I want a distinct Admin identity that gates admin-only routes and actions,
+So that only trusted operators can manage vendors and inventory.
+
+**Acceptance Criteria:**
+
+**Given** a new `Admin` table keyed by `clerkUserId`
+**When** a request hits any `/admin/*` route
+**Then** `getCurrentAdmin()` resolves identity via the `Admin` table only — never a Clerk session claim — and the route is registered in `middleware.ts`'s `isProtectedRoute` matcher
+**And** a signed-in user who is not in the `Admin` table is denied when hitting an `/admin/*` route or calling an admin action
+
+*(FR2, AD-1, AD-6.)*
+
+### Story 2.2: Admin adds a vendor
+
+As an admin,
+I want to onboard a new vendor onto the platform,
+So that they can start selling without self-registering.
+
+**Acceptance Criteria:**
+
+**Given** the admin vendor-creation form (`/admin/vendors`)
+**When** admin submits name, slug, and contact info
+**Then** a new `Vendor` record is created with `clerkUserId: null` (unbound until claimed, AD-8) and `createdByAdminId` set to the acting admin
+**And** a slug that collides with an existing vendor is rejected with a friendly error via `resolveVendorSlug()`, not a raw DB constraint failure
+**And** the new vendor gets a live storefront at `/vendors/{slug}`
+
+*(FR3, AD-5, AD-7, AD-8.)*
+
+### Story 2.3: Admin deactivates a vendor
+
+As an admin,
+I want to deactivate a vendor,
+So that they stop being orderable while their order history and fulfillment are preserved.
+
+**Acceptance Criteria:**
+
+**Given** an active vendor
+**When** admin deactivates them
+**Then** `Vendor.deletedAt` is set and `deletedByAdminId` records the acting admin, enforced through the shared `assertVendorActive()` guard (throws, never returns a boolean)
+**And** a customer visiting that vendor's storefront sees a "no longer available" message instead of listings, and checkout rejects any new order for that vendor's products
+**And** orders placed before deactivation, in any non-terminal status, continue their normal fulfillment lifecycle unchanged (pickup, SMS, status updates)
+**And** the vendor's Products remain queryable (not deleted) for order history and fulfillment — `onDelete: Cascade` is removed from `Vendor → Product` and `Vendor → Order`
+
+*(FR4, AD-4.)*
+
+## Epic 3: Admin Inventory Oversight
+
+Admin can see stock levels across all vendors on demand and gets an SMS alert before something sells out. Builds on Epic 1 (`stockQuantity` must exist) and Epic 2 (Admin identity/gating must exist).
+
+### Story 3.1: Admin inventory dashboard
+
+As an admin,
+I want to see current stock levels across all vendors,
+So that I can spot problems without asking each vendor.
+
+**Acceptance Criteria:**
+
+**Given** an admin is signed in
+**When** they visit `/admin/inventory`
+**Then** the page shows current Stock Quantity per product across all vendors, computed live at request time (Server Component fetch, no caching staleness)
+**And** any product at or below its Low-Stock Threshold, or at 0, is visually flagged
+**And** a non-admin visiting `/admin/inventory` is denied (reuses Story 2.1's `getCurrentAdmin()` gate)
+
+*(FR9, AD-1, AD-6.)*
+
+### Story 3.2: Low-stock SMS alert to admin
+
+As an admin,
+I want a text when a product's stock crosses its low-stock threshold,
+So that I can act before it sells out.
+
+**Acceptance Criteria:**
+
+**Given** `Admin` gains a `phone` field (mirrors `Vendor.phone`) — required to actually deliver this story, missing from the original schema
+**And** a product's Stock Quantity crosses at or below its Low-Stock Threshold as part of a Story 1.4 decrement
+**When** `decrementStock()` reports the crossing as newly detected
+**Then** the caller sends an SMS to the admin's phone via the existing `sendSms` module
+**And** `lowStockAlerted` is set true only after the send succeeds — never before, mirroring the existing `smsNotified` pattern
+**And** a failed send leaves `lowStockAlerted` false — it is never marked delivered
+**And** further sales while stock stays below threshold do not trigger repeat alerts, until stock is restocked above threshold and crosses again
+**And** a post-payment shortfall result from Story 1.4's `decrementStock()` (money captured, stock insufficient under a race) also triggers this same SMS mechanism to the admin's phone — closing the loop Epic 1 intentionally left open since Admin didn't exist yet at that point
+
+*(FR10, FR8's shortfall consequence, AD-3, NFR3.)*

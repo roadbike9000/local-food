@@ -40,7 +40,10 @@ Something a vendor sells.
 | description | String? | |
 | priceCents | Int | money always stored as integer cents; ~$21.4M ceiling (32-bit Int), no overflow check |
 | imageUrl | String? | Cloudinary URL |
-| isAvailable | Boolean | default `true` — **must** be filtered on (`true`) in every storefront/checkout query; checkout route already does this |
+| stockQuantity | Int | availability is derived, never stored (architecture AD-2) — `isInStock()` in `src/lib/availability.ts` is the single canonical check (`stockQuantity > 0`); checkout additionally requires `stockQuantity >= requestedQuantity` per line |
+| lowStockThreshold | Int | vendor-set threshold for the dashboard's low-stock indicator |
+| stockIsPlaceholder | Boolean | `true` for rows backfilled by Story 1.2's migration whose `stockQuantity` is still the migration sentinel, not a real vendor-entered value; cleared on the vendor's first genuine edit. Surfaced to the vendor as a "Needs review" badge on `/dashboard/products` (Story 1.6, FR13) |
+| thresholdIsPlaceholder | Boolean | same as `stockIsPlaceholder`, for `lowStockThreshold` |
 | createdAt / updatedAt | DateTime | |
 
 Relations: `vendor`, `orderItems[]`.
