@@ -183,11 +183,11 @@ test.describe("storefront and cart", () => {
     const cartLine = (name: string) =>
       page.getByRole("listitem").filter({ hasText: name });
 
-    // "Total" only appears in the cart summary row; .last() narrows to that
-    // specific div rather than the page-level wrapper div that also
-    // contains it transitively.
-    const totalRow = () =>
-      page.locator("div").filter({ hasText: "Total" }).last();
+    // data-testid="cart-total" on the total row (src/app/cart/page.tsx) -
+    // was a `.last()`-on-substring-match heuristic (deferred-work.md,
+    // Story 1.1) that would silently retarget this P0 assertion if a
+    // later-in-DOM-order div ever contained the word "Total" too.
+    const totalRow = () => page.getByTestId("cart-total");
 
     await page.goto("/vendors/corner-sourdough");
     await expect(
@@ -280,8 +280,7 @@ test.describe("storefront and cart", () => {
       const lineTotal = page
         .locator("li")
         .filter({ hasText: product.name });
-      const totalRow = () =>
-        page.locator("div").filter({ hasText: "Total" }).last();
+      const totalRow = () => page.getByTestId("cart-total");
 
       await expect(quantity).toHaveText("1");
       await expect(lineTotal).toContainText(dollars(product.priceCents));

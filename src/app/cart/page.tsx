@@ -72,7 +72,11 @@ export default function CartPage() {
                 >
                   −
                 </button>
-                <span aria-label={`Quantity of ${i.name}`} className="w-4 text-center">
+                <span
+                  aria-label={`Quantity of ${i.name}`}
+                  aria-live="polite"
+                  className="w-4 text-center"
+                >
                   {i.quantity}
                 </span>
                 <button
@@ -105,7 +109,10 @@ export default function CartPage() {
         ))}
       </ul>
 
-      <div className="mt-3 flex justify-between text-lg font-semibold">
+      <div
+        data-testid="cart-total"
+        className="mt-3 flex justify-between text-lg font-semibold"
+      >
         <span>Total</span>
         <span>{formatPrice(totalCents)}</span>
       </div>
