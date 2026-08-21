@@ -134,6 +134,29 @@ test.describe("setStock / setLowStockThreshold", () => {
     }
   });
 
+  test("clears stockIsPlaceholder on a same-value resubmission when forceClearPlaceholder is true (Confirm as-is, deferred-work.md)", async () => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, {
+      stockQuantity: 100,
+      lowStockThreshold: 5,
+      stockIsPlaceholder: true,
+    });
+
+    try {
+      // Same value as already stored - would normally leave the flag set
+      // (see the test above) - but the vendor's explicit "Confirm as-is"
+      // action forces the clear anyway.
+      const updated = await setStock(product.id, 100, 100, 0, true);
+      expect(updated).toBe(true);
+
+      const result = await prisma.product.findUnique({ where: { id: product.id } });
+      expect(result?.stockQuantity).toBe(100);
+      expect(result?.stockIsPlaceholder).toBe(false);
+    } finally {
+      await deleteProduct(product.id);
+    }
+  });
+
   test("clears thresholdIsPlaceholder when the vendor genuinely changes lowStockThreshold, even to 0", async () => {
     const vendor = await getVendorBySlug("corner-sourdough");
     const product = await createTestProduct(vendor.id, {
@@ -171,6 +194,26 @@ test.describe("setStock / setLowStockThreshold", () => {
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
       expect(result?.thresholdIsPlaceholder).toBe(true);
+    } finally {
+      await deleteProduct(product.id);
+    }
+  });
+
+  test("clears thresholdIsPlaceholder on a same-value resubmission when forceClearPlaceholder is true (Confirm as-is, deferred-work.md)", async () => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, {
+      stockQuantity: 20,
+      lowStockThreshold: 0,
+      thresholdIsPlaceholder: true,
+    });
+
+    try {
+      const updated = await setLowStockThreshold(product.id, 0, 0, true);
+      expect(updated).toBe(true);
+
+      const result = await prisma.product.findUnique({ where: { id: product.id } });
+      expect(result?.lowStockThreshold).toBe(0);
+      expect(result?.thresholdIsPlaceholder).toBe(false);
     } finally {
       await deleteProduct(product.id);
     }

@@ -90,6 +90,8 @@ export default async function DashboardProductsPage() {
                   initialStockQuantity={p.stockQuantity}
                   initialLowStockThreshold={p.lowStockThreshold}
                   initialStockVersion={p.stockVersion}
+                  stockIsPlaceholder={p.stockIsPlaceholder}
+                  thresholdIsPlaceholder={p.thresholdIsPlaceholder}
                 />
               </tr>
             ))}

@@ -32,9 +32,13 @@ export {
  * stockVersion is bumped on every write here and in decrementStock(), so
  * it always changes even when the value coincidentally doesn't.
  *
- * Clears stockIsPlaceholder only when newValue actually differs from the
- * row's current stockQuantity (read by the caller before this call). A
- * same-value resubmission - e.g. the vendor only touched Low-Stock
+ * Clears stockIsPlaceholder when newValue actually differs from the row's
+ * current stockQuantity (read by the caller before this call), or when the
+ * caller passes forceClearPlaceholder — the vendor's explicit "Confirm
+ * as-is" action (deferred-work.md, Story 1.2), for a value that genuinely
+ * is the placeholder default and would otherwise have no single-save way
+ * to stop being flagged. A same-value resubmission that is *not* an
+ * explicit confirmation - e.g. the vendor only touched Low-Stock
  * Threshold, but the form always posts both fields together - must not
  * clear a flag Story 1.6 depends on for a field the vendor never actually
  * edited (review round 2, finding D3).
@@ -44,13 +48,16 @@ export async function setStock(
   newValue: number,
   currentValue: number,
   expectedVersion: number,
+  forceClearPlaceholder = false,
 ): Promise<boolean> {
   const result = await prisma.product.updateMany({
     where: { id: productId, stockVersion: expectedVersion },
     data: {
       stockQuantity: newValue,
       stockVersion: { increment: 1 },
-      ...(newValue !== currentValue ? { stockIsPlaceholder: false } : {}),
+      ...(newValue !== currentValue || forceClearPlaceholder
+        ? { stockIsPlaceholder: false }
+        : {}),
     },
   });
   return result.count === 1;
@@ -110,20 +117,25 @@ export async function decrementStock(
  * updateMany (returns a count) rather than a plain update (which would
  * throw P2025 on a missing row).
  *
- * Clears thresholdIsPlaceholder only when newValue actually differs from
- * currentValue (the value already stored) - see setStock's doc for why a
- * same-value resubmission must not clear the flag.
+ * Clears thresholdIsPlaceholder when newValue actually differs from
+ * currentValue (the value already stored), or when the caller passes
+ * forceClearPlaceholder - see setStock's doc for both this and why a
+ * same-value resubmission that isn't an explicit confirmation must not
+ * clear the flag.
  */
 export async function setLowStockThreshold(
   productId: string,
   newValue: number,
   currentValue: number,
+  forceClearPlaceholder = false,
 ): Promise<boolean> {
   const result = await prisma.product.updateMany({
     where: { id: productId },
     data: {
       lowStockThreshold: newValue,
-      ...(newValue !== currentValue ? { thresholdIsPlaceholder: false } : {}),
+      ...(newValue !== currentValue || forceClearPlaceholder
+        ? { thresholdIsPlaceholder: false }
+        : {}),
     },
   });
   return result.count === 1;

@@ -463,4 +463,52 @@ test.describe("vendor dashboard (authenticated)", () => {
       await deleteProduct(product.id);
     }
   });
+
+  test("[P1] 'Confirm as-is' clears the badge without changing the flagged value (deferred-work.md, Story 1.2)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const productName = `Playwright Confirm As-Is ${Date.now()}`;
+
+    // A vendor who deliberately wants the placeholder value itself (here,
+    // stockQuantity genuinely is 100) previously had no single-save way to
+    // clear the badge - Save only clears it on a real value change.
+    const product = await createTestProduct(vendor.id, {
+      name: productName,
+      stockQuantity: 100,
+      stockIsPlaceholder: true,
+    });
+
+    try {
+      await page.goto("/dashboard/products");
+      const row = page.getByRole("row", { name: new RegExp(productName) });
+      await expect(row).toBeVisible();
+      await expect(row.getByText("Needs review")).toBeVisible();
+
+      // Deliberately not touching the stock input - proving the flag clears
+      // even though the posted value is unchanged from what's stored.
+      // Matched by its aria-label prefix, not the visible "Confirm as-is"
+      // text - that text is also a substring of the Save button's own
+      // aria-label once it's suffixed with this test's product name
+      // ("...for Playwright Confirm As-Is ...", case-insensitive), which
+      // would otherwise make this locator ambiguous.
+      const [response] = await Promise.all([
+        page.waitForResponse(`**/api/products/${product.id}`),
+        row.getByRole("button", { name: /^Confirm the values shown/i }).click(),
+      ]);
+      expect(response.status()).toBe(200);
+
+      await expect(row.getByText("Needs review")).not.toBeVisible({
+        timeout: 15_000,
+      });
+
+      const persisted = await prisma.product.findUnique({
+        where: { id: product.id },
+      });
+      expect(persisted?.stockQuantity).toBe(100); // value itself untouched
+      expect(persisted?.stockIsPlaceholder).toBe(false);
+    } finally {
+      await deleteProduct(product.id);
+    }
+  });
 });

@@ -20,6 +20,8 @@ type EditStockControlProps = {
   initialStockQuantity: number;
   initialLowStockThreshold: number;
   initialStockVersion: number;
+  stockIsPlaceholder: boolean;
+  thresholdIsPlaceholder: boolean;
 };
 
 function parseWholeNumber(raw: string): number | null {
@@ -34,6 +36,8 @@ export function EditStockControl({
   initialStockQuantity,
   initialLowStockThreshold,
   initialStockVersion,
+  stockIsPlaceholder,
+  thresholdIsPlaceholder,
 }: EditStockControlProps) {
   const router = useRouter();
   const [stockInput, setStockInput] = useState(String(initialStockQuantity));
@@ -54,7 +58,13 @@ export function EditStockControl({
     setThresholdInput(String(initialLowStockThreshold));
   }, [initialLowStockThreshold]);
 
-  async function handleSave() {
+  // Shared by the Save button (confirmPlaceholder: false - only a genuine
+  // value change clears either placeholder flag) and the "Confirm as-is"
+  // button (confirmPlaceholder: true - forces the flag clear even though
+  // the posted values match what's already stored). See
+  // src/lib/inventory.ts's setStock()/setLowStockThreshold() docs for why
+  // a same-value resubmission normally must NOT clear the flag on its own.
+  async function submit(confirmPlaceholder: boolean) {
     // Held as raw strings (not numbers) so an emptied input doesn't
     // silently coerce to 0 - Number("") === 0, which would otherwise
     // persist "sold out" the moment a vendor backspaces the field.
@@ -76,6 +86,7 @@ export function EditStockControl({
           stockQuantity,
           lowStockThreshold,
           expectedStockVersion: initialStockVersion,
+          confirmPlaceholder,
         }),
       });
 
@@ -119,6 +130,7 @@ export function EditStockControl({
   const stockLabelId = `stock-qty-label-${productId}`;
   const thresholdLabelId = `stock-threshold-label-${productId}`;
   const productNameId = `stock-product-name-${productId}`;
+  const isFlagged = stockIsPlaceholder || thresholdIsPlaceholder;
 
   return (
     <>
@@ -163,12 +175,24 @@ export function EditStockControl({
           <button
             type="button"
             disabled={submitting}
-            onClick={handleSave}
+            onClick={() => submit(false)}
             aria-label={`Save stock changes for ${productName}`}
             className="rounded-md bg-brand px-2 py-1 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50"
           >
             Save
           </button>
+          {isFlagged ? (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => submit(true)}
+              aria-label={`Confirm the values shown for ${productName} are correct as-is`}
+              title="The value(s) shown are correct - stop flagging for review."
+              className="rounded-md border border-stone-300 px-2 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+            >
+              Confirm as-is
+            </button>
+          ) : null}
         </div>
         {error ? (
           <p role="alert" aria-live="polite" className="text-xs text-red-600">

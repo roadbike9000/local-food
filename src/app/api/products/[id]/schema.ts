@@ -14,4 +14,12 @@ export const UpdateProductStockSchema = z.object({
   // decrement-then-restock that returns stockQuantity to the same value
   // is still caught (ABA race - Story 1.2 deferred-work finding).
   expectedStockVersion: z.number().int().nonnegative().max(INT4_MAX),
+  // "Confirm as-is" (deferred-work.md, Story 1.2): a vendor whose value
+  // genuinely is the placeholder default has no other way to clear
+  // stockIsPlaceholder/thresholdIsPlaceholder without a two-step
+  // change-then-revert workaround, since both flags normally only clear on
+  // a real value change. When true, the route clears whichever flag(s) are
+  // currently set even though the posted values match what's already
+  // stored. Optional - every other PATCH omits it, defaulting to false.
+  confirmPlaceholder: z.boolean().optional(),
 });

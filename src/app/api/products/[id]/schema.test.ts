@@ -103,4 +103,22 @@ describe("UpdateProductStockSchema", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("accepts a body with confirmPlaceholder omitted", () => {
+    expect(UpdateProductStockSchema.safeParse(validBody).success).toBe(true);
+  });
+
+  it("accepts confirmPlaceholder: true", () => {
+    expect(
+      UpdateProductStockSchema.safeParse({ ...validBody, confirmPlaceholder: true })
+        .success,
+    ).toBe(true);
+  });
+
+  it("rejects a non-boolean confirmPlaceholder", () => {
+    expect(
+      UpdateProductStockSchema.safeParse({ ...validBody, confirmPlaceholder: "true" })
+        .success,
+    ).toBe(false);
+  });
 });

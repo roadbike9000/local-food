@@ -173,4 +173,46 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
       }
     },
   );
+
+  test(
+    "[P1] confirmPlaceholder clears both placeholder flags on a same-value resubmission ('Confirm as-is', deferred-work.md)",
+    async ({ request }) => {
+      // A vendor whose value genuinely is the placeholder default has no
+      // other single-save way to clear the flag - the normal Save path
+      // only clears it on a genuine value change (the 409 test above's
+      // sibling cases, and inventory.spec.ts, cover that). This proves the
+      // explicit override actually clears it without changing the value.
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, {
+        name: "Confirm As-Is Test Product",
+        stockQuantity: 100,
+        lowStockThreshold: 0,
+        stockIsPlaceholder: true,
+        thresholdIsPlaceholder: true,
+      });
+
+      try {
+        const response = await request.patch(`/api/products/${product.id}`, {
+          data: {
+            stockQuantity: 100, // unchanged
+            lowStockThreshold: 0, // unchanged
+            expectedStockVersion: 0,
+            confirmPlaceholder: true,
+          },
+        });
+
+        expect(response.status()).toBe(200);
+
+        const persisted = await prisma.product.findUnique({
+          where: { id: product.id },
+        });
+        expect(persisted?.stockQuantity).toBe(100);
+        expect(persisted?.lowStockThreshold).toBe(0);
+        expect(persisted?.stockIsPlaceholder).toBe(false);
+        expect(persisted?.thresholdIsPlaceholder).toBe(false);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
 });

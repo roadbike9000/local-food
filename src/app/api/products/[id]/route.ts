@@ -40,19 +40,26 @@ export async function PATCH(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const { stockQuantity, lowStockThreshold, expectedStockVersion } =
-      parsed.data;
+    const {
+      stockQuantity,
+      lowStockThreshold,
+      expectedStockVersion,
+      confirmPlaceholder,
+    } = parsed.data;
 
     // Threshold has no concurrent writer of its own (see setLowStockThreshold's
     // doc), so it's written unconditionally - a stock conflict below must
     // not silently discard this half of the vendor's edit. Passing the
     // product's current value lets setLowStockThreshold tell a genuine edit
     // apart from a same-value resubmission (every PATCH posts both fields).
+    // confirmPlaceholder forces the flag clear even on a same-value
+    // resubmission - the vendor's explicit "this value is correct" action.
     const thresholdChanged = lowStockThreshold !== product.lowStockThreshold;
     const thresholdUpdated = await setLowStockThreshold(
       params.id,
       lowStockThreshold,
       product.lowStockThreshold,
+      confirmPlaceholder,
     );
     if (!thresholdUpdated) {
       // The product was deleted between the lookup above and this write.
@@ -64,6 +71,7 @@ export async function PATCH(
       stockQuantity,
       product.stockQuantity,
       expectedStockVersion,
+      confirmPlaceholder,
     );
     if (!stockUpdated) {
       // setStock returning false means either a lock conflict or the
