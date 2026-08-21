@@ -4,7 +4,7 @@ baseline_commit: b581db2eedb96c889cc0c95de798b7c92f85a594
 
 # Story 1.1: Verify cart line removal and total accuracy
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -116,3 +116,4 @@ Claude Sonnet 5 (claude-sonnet-5)
 
 - 2026-08-18: Activated (un-skipped) the ATDD red-phase test in `tests/storefront-cart.spec.ts`, confirmed green on first run against the existing implementation. No production code changed.
 - 2026-08-18: Code review (Opus, independent) found the total assertions used quantity-1 lines throughout, so they couldn't detect a dropped `* quantity` multiplier in `CartProvider.totalCents` — confirmed by mutation test. Fixed: productA is now added twice (quantity 2), and assertions check `2 * priceCents + ...`. Verified the fix actually catches the mutation (reverted the mutation after confirming). Also matched the test's local `dollars()` helper to `formatPrice()`'s `Intl.NumberFormat` output (was a `toFixed()` string that would've diverged at totals >= $1,000). Full regression run surfaced 10 pre-existing, unrelated failures (stale vendor auth session in `dashboard.spec.ts`) — independently reverified by the reviewer, not addressed here (out of scope for this story, tracked as follow-up).
+- 2026-08-21: All Review Findings confirmed resolved on re-audit (3 Patch fixed, 2 Defer properly tracked in `deferred-work.md`, 2 dismissed) — no unchecked items remained. Status was never flipped past `review` despite completion; corrected. Status → done.
