@@ -44,6 +44,7 @@ Something a vendor sells.
 | lowStockThreshold | Int | vendor-set threshold for the dashboard's low-stock indicator |
 | stockIsPlaceholder | Boolean | `true` for rows backfilled by Story 1.2's migration whose `stockQuantity` is still the migration sentinel, not a real vendor-entered value; cleared on the vendor's first genuine edit. Surfaced to the vendor as a "Needs review" badge on `/dashboard/products` (Story 1.6, FR13) |
 | thresholdIsPlaceholder | Boolean | same as `stockIsPlaceholder`, for `lowStockThreshold` |
+| stockVersion | Int, default 0 | monotonic counter bumped by every writer of `stockQuantity` (`setStock()`, `decrementStock()` in `src/lib/inventory.ts`). `setStock()`'s optimistic-lock guard checks this, not `stockQuantity` equality — closes an ABA gap a value-equality guard has (a decrement-then-restock can return `stockQuantity` to the exact value a vendor's stale page load saw). `setLowStockThreshold()` never bumps it — that field has no concurrent writer of its own |
 | createdAt / updatedAt | DateTime | |
 
 Relations: `vendor`, `orderItems[]`.

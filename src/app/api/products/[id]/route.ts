@@ -40,7 +40,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const { stockQuantity, lowStockThreshold, expectedStockQuantity } =
+    const { stockQuantity, lowStockThreshold, expectedStockVersion } =
       parsed.data;
 
     // Threshold has no concurrent writer of its own (see setLowStockThreshold's
@@ -62,7 +62,8 @@ export async function PATCH(
     const stockUpdated = await setStock(
       params.id,
       stockQuantity,
-      expectedStockQuantity,
+      product.stockQuantity,
+      expectedStockVersion,
     );
     if (!stockUpdated) {
       // setStock returning false means either a lock conflict or the

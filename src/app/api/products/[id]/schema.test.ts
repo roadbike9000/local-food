@@ -7,7 +7,7 @@ import { UpdateProductStockSchema } from "./schema";
 const validBody = {
   stockQuantity: 15,
   lowStockThreshold: 3,
-  expectedStockQuantity: 20,
+  expectedStockVersion: 20,
 };
 
 describe("UpdateProductStockSchema", () => {
@@ -73,33 +73,33 @@ describe("UpdateProductStockSchema", () => {
     ).toBe(false);
   });
 
-  it("rejects a missing expectedStockQuantity", () => {
+  it("rejects a missing expectedStockVersion", () => {
     const result = UpdateProductStockSchema.safeParse({
       ...validBody,
-      expectedStockQuantity: undefined,
+      expectedStockVersion: undefined,
     });
     expect(result.success).toBe(false);
   });
 
-  it("rejects a negative expectedStockQuantity", () => {
+  it("rejects a negative expectedStockVersion", () => {
     expect(
-      UpdateProductStockSchema.safeParse({ ...validBody, expectedStockQuantity: -1 })
+      UpdateProductStockSchema.safeParse({ ...validBody, expectedStockVersion: -1 })
         .success,
     ).toBe(false);
   });
 
-  it("rejects a non-integer expectedStockQuantity", () => {
+  it("rejects a non-integer expectedStockVersion", () => {
     expect(
-      UpdateProductStockSchema.safeParse({ ...validBody, expectedStockQuantity: 3.14 })
+      UpdateProductStockSchema.safeParse({ ...validBody, expectedStockVersion: 3.14 })
         .success,
     ).toBe(false);
   });
 
-  it("rejects an expectedStockQuantity above the Postgres INTEGER max", () => {
+  it("rejects an expectedStockVersion above the Postgres INTEGER max", () => {
     expect(
       UpdateProductStockSchema.safeParse({
         ...validBody,
-        expectedStockQuantity: 2_147_483_648,
+        expectedStockVersion: 2_147_483_648,
       }).success,
     ).toBe(false);
   });

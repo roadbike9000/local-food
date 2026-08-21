@@ -17,32 +17,40 @@ export {
 } from "@/lib/availability";
 
 /**
- * Conditional update: only writes if the row's current stockQuantity still
- * matches expectedCurrentValue. Returns false (not an error) when it
- * doesn't — someone/something else changed it first, e.g. a concurrent
+ * Conditional update: only writes if the row's current stockVersion still
+ * matches expectedVersion. Returns false (not an error) when it doesn't —
+ * someone/something else changed stockQuantity first, e.g. a concurrent
  * sale's decrement, or the product was deleted. Caller must not silently
  * retry; the vendor's edit was built against stale data and needs to
  * reload.
  *
+ * Keyed on stockVersion, not a stockQuantity-equality check: a plain
+ * value-equality guard is ABA-vulnerable — a decrement-then-restock
+ * between the vendor's page load and their save can return stockQuantity
+ * to the exact value the vendor's stale read saw, which value-equality
+ * can't tell apart from "unchanged" (Story 1.2 deferred-work finding).
+ * stockVersion is bumped on every write here and in decrementStock(), so
+ * it always changes even when the value coincidentally doesn't.
+ *
  * Clears stockIsPlaceholder only when newValue actually differs from the
- * value the vendor's form loaded (== the row's current value, guaranteed
- * by the where-clause matching). A same-value resubmission - e.g. the
- * vendor only touched Low-Stock Threshold, but the form always posts both
- * fields together - must not clear a flag Story 1.6 depends on for a
- * field the vendor never actually edited (review round 2, finding D3).
+ * row's current stockQuantity (read by the caller before this call). A
+ * same-value resubmission - e.g. the vendor only touched Low-Stock
+ * Threshold, but the form always posts both fields together - must not
+ * clear a flag Story 1.6 depends on for a field the vendor never actually
+ * edited (review round 2, finding D3).
  */
 export async function setStock(
   productId: string,
   newValue: number,
-  expectedCurrentValue: number,
+  currentValue: number,
+  expectedVersion: number,
 ): Promise<boolean> {
   const result = await prisma.product.updateMany({
-    where: { id: productId, stockQuantity: expectedCurrentValue },
+    where: { id: productId, stockVersion: expectedVersion },
     data: {
       stockQuantity: newValue,
-      ...(newValue !== expectedCurrentValue
-        ? { stockIsPlaceholder: false }
-        : {}),
+      stockVersion: { increment: 1 },
+      ...(newValue !== currentValue ? { stockIsPlaceholder: false } : {}),
     },
   });
   return result.count === 1;
@@ -87,7 +95,10 @@ export async function decrementStock(
 
   const result = await tx.product.updateMany({
     where: { id: productId, stockQuantity: { gte: quantity } },
-    data: { stockQuantity: { decrement: quantity } },
+    data: {
+      stockQuantity: { decrement: quantity },
+      stockVersion: { increment: 1 },
+    },
   });
   return result.count === 1;
 }

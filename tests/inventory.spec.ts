@@ -25,17 +25,18 @@ test.describe("setStock / setLowStockThreshold", () => {
     });
 
     try {
-      const updated = await setStock(product.id, 15, 20);
+      const updated = await setStock(product.id, 15, 20, 0);
       expect(updated).toBe(true);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
       expect(result?.stockQuantity).toBe(15);
+      expect(result?.stockVersion).toBe(1);
     } finally {
       await deleteProduct(product.id);
     }
   });
 
-  test("rejects the write and leaves the row unchanged when expectedCurrentValue is stale", async () => {
+  test("rejects the write and leaves the row unchanged when expectedVersion is stale", async () => {
     const vendor = await getVendorBySlug("corner-sourdough");
     const product = await createTestProduct(vendor.id, {
       stockQuantity: 20,
@@ -43,17 +44,51 @@ test.describe("setStock / setLowStockThreshold", () => {
     });
 
     try {
-      // Simulate a concurrent sale that already moved stock away from 20.
+      // Simulate a concurrent sale that already moved stock away from 20
+      // (and bumped the version, same as decrementStock() does for real).
       await prisma.product.update({
         where: { id: product.id },
-        data: { stockQuantity: 18 },
+        data: { stockQuantity: 18, stockVersion: { increment: 1 } },
       });
 
-      const updated = await setStock(product.id, 15, 20);
+      const updated = await setStock(product.id, 15, 20, 0);
       expect(updated).toBe(false);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
       expect(result?.stockQuantity).toBe(18);
+      expect(result?.stockVersion).toBe(1);
+    } finally {
+      await deleteProduct(product.id);
+    }
+  });
+
+  test("rejects a stale write even when a decrement-then-restock returns stockQuantity to the exact expected value (ABA race, deferred-work.md)", async () => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const product = await createTestProduct(vendor.id, {
+      stockQuantity: 20,
+      lowStockThreshold: 5,
+    });
+
+    try {
+      // A sale takes 20 -> 18, then a restock returns it 18 -> 20 - the
+      // exact value the vendor's stale page load saw. A stockQuantity-
+      // equality guard would let this stale edit through undetected; the
+      // version counter still caught both writes and moved to 2.
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { stockQuantity: 18, stockVersion: { increment: 1 } },
+      });
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { stockQuantity: 20, stockVersion: { increment: 1 } },
+      });
+
+      const updated = await setStock(product.id, 15, 20, 0);
+      expect(updated).toBe(false);
+
+      const result = await prisma.product.findUnique({ where: { id: product.id } });
+      expect(result?.stockQuantity).toBe(20);
+      expect(result?.stockVersion).toBe(2);
     } finally {
       await deleteProduct(product.id);
     }
@@ -68,7 +103,7 @@ test.describe("setStock / setLowStockThreshold", () => {
     });
 
     try {
-      await setStock(product.id, 42, 100);
+      await setStock(product.id, 42, 100, 0);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
       expect(result?.stockQuantity).toBe(42);
@@ -90,7 +125,7 @@ test.describe("setStock / setLowStockThreshold", () => {
       // The vendor's form always posts stockQuantity even if they only
       // touched the threshold field - resubmitting the unchanged value must
       // not tell Story 1.6 this was a deliberate stock=100 choice.
-      await setStock(product.id, 100, 100);
+      await setStock(product.id, 100, 100, 0);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
       expect(result?.stockIsPlaceholder).toBe(true);
@@ -188,6 +223,11 @@ test.describe("decrementStock (Story 1.4)", () => {
 
         const result = await prisma.product.findUnique({ where: { id: product.id } });
         expect(result?.stockQuantity).toBe(15);
+        // setStock()'s optimistic lock relies on decrementStock() bumping
+        // this on every real write, so a vendor's stale edit is always
+        // caught even if a decrement happens to leave stockQuantity looking
+        // unchanged (ABA race, deferred-work.md).
+        expect(result?.stockVersion).toBe(1);
       } finally {
         await deleteProduct(product.id);
       }

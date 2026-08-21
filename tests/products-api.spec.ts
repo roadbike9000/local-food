@@ -43,7 +43,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
           data: {
             stockQuantity: 15,
             lowStockThreshold: 3,
-            expectedStockQuantity: 20, // matches what was just seeded above
+            expectedStockVersion: 0, // freshly-created products start at version 0
           },
         });
 
@@ -80,7 +80,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
           data: {
             stockQuantity: 5,
             lowStockThreshold: 1,
-            expectedStockQuantity: 10,
+            expectedStockVersion: 0,
           },
         });
 
@@ -109,7 +109,7 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
           data: {
             stockQuantity: -5, // UpdateProductStockSchema requires nonnegative
             lowStockThreshold: 2,
-            expectedStockQuantity: 10,
+            expectedStockVersion: 0,
           },
         });
 
@@ -121,12 +121,12 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
   );
 
   test(
-    "[P0] returns 409 when expectedStockQuantity is stale (optimistic-lock conflict, AD-3)",
+    "[P0] returns 409 when expectedStockVersion is stale (optimistic-lock conflict, AD-3)",
     async ({ request }) => {
       // This is the entire point of AD-3's design: setStock()'s conditional
-      // UPDATE ... WHERE id = :productId AND stockQuantity = :expected must
-      // reject an edit built against a value someone else already changed
-      // (e.g. a concurrent sale's decrementStock() call), not silently
+      // UPDATE ... WHERE id = :productId AND stockVersion = :expected must
+      // reject an edit built against a version someone else already moved
+      // past (e.g. a concurrent sale's decrementStock() call), not silently
       // clobber it.
       const vendor = await getVendorBySlug("corner-sourdough");
       const product = await createTestProduct(vendor.id, {
@@ -137,17 +137,18 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
 
       try {
         // Simulate a concurrent change that happened after the vendor's
-        // form loaded stockQuantity=20 — e.g. a sale decrementing it.
+        // form loaded stockQuantity=20/version=0 — e.g. a sale decrementing
+        // it, which also bumps stockVersion the same way this update does.
         await prisma.product.update({
           where: { id: product.id },
-          data: { stockQuantity: 18 },
+          data: { stockQuantity: 18, stockVersion: { increment: 1 } },
         });
 
         const response = await request.patch(`/api/products/${product.id}`, {
           data: {
             stockQuantity: 15,
             lowStockThreshold: 9, // deliberately different from the seeded 2
-            expectedStockQuantity: 20, // stale: actual value is now 18
+            expectedStockVersion: 0, // stale: actual version is now 1
           },
         });
 

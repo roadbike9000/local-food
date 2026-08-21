@@ -50,6 +50,15 @@ model Product {
   // a vendor's deliberate stockQuantity of 100 is at least as plausible as
   // the threshold's deliberate 0, so it needs the identical guard.
   stockIsPlaceholder     Boolean @default(false)
+  // Monotonic counter, bumped by every writer of stockQuantity (setStock,
+  // decrementStock) - never by setLowStockThreshold, which has no
+  // concurrent writer of its own (see its doc comment). Closes the
+  // ABA gap a plain stockQuantity-equality optimistic lock has: a
+  // decrement-then-restock between the vendor's page load and their save
+  // can return stockQuantity to the exact value the vendor's stale read
+  // saw, which a value-equality guard can't tell apart from "unchanged"
+  // (Story 1.2 deferred-work finding).
+  stockVersion Int @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

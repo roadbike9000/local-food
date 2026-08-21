@@ -19,6 +19,7 @@ type EditStockControlProps = {
   productName: string;
   initialStockQuantity: number;
   initialLowStockThreshold: number;
+  initialStockVersion: number;
 };
 
 function parseWholeNumber(raw: string): number | null {
@@ -32,6 +33,7 @@ export function EditStockControl({
   productName,
   initialStockQuantity,
   initialLowStockThreshold,
+  initialStockVersion,
 }: EditStockControlProps) {
   const router = useRouter();
   const [stockInput, setStockInput] = useState(String(initialStockQuantity));
@@ -73,7 +75,7 @@ export function EditStockControl({
         body: JSON.stringify({
           stockQuantity,
           lowStockThreshold,
-          expectedStockQuantity: initialStockQuantity,
+          expectedStockVersion: initialStockVersion,
         }),
       });
 
