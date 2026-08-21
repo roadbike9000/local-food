@@ -96,6 +96,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // commits could silently drop one step. Mirrors addItem's existing-item
   // branch, which already reads from `prev` for the same reason.
   function updateQuantity(productId: string, delta: number) {
+    // Defence-in-depth (deferred-work.md, Story 1.5) - unreachable today
+    // (both call sites in cart/page.tsx always pass +1/-1), but a
+    // non-finite delta would otherwise propagate through clampQuantity's
+    // Math.min/max into a NaN quantity with no guard anywhere on this
+    // public context API.
+    if (!Number.isFinite(delta)) return;
+
     setItems((prev) =>
       prev.map((i) =>
         i.productId === productId

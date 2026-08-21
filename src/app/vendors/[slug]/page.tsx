@@ -5,6 +5,14 @@ import { formatPickupWindow } from "@/lib/utils";
 
 // A vendor's storefront. The [slug] folder name makes this a dynamic route:
 // /vendors/corner-sourdough -> params.slug === "corner-sourdough"
+//
+// Forces this route out of Next 14.2's route cache. Availability is
+// computed at read time from stockQuantity (AD-2) rather than filtered in
+// the query, so a cached render would fail unsafe - showing an enabled Add
+// button for a product that's since sold out - unlike the old isAvailable
+// filter, which failed safe by hiding it (deferred-work.md, Story 1.3).
+export const dynamic = "force-dynamic";
+
 export default async function StorefrontPage({
   params,
 }: {
