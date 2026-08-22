@@ -145,4 +145,5 @@ action_items:
   - epic: 3
     action: "Since epics.md's three-epic roadmap is now fully delivered, decide whether to groom a new epic or treat this roadmap as complete"
     owner: "Jeff"
-    status: open
+    status: in-progress
+    note: "Jeff: roadmap not complete - more scenarios to review, may become new epics. Not yet scoped into epics.md."
