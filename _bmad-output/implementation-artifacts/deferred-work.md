@@ -5,6 +5,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/2-2-admin-adds-a-vendor.md`
   summary: `resolveVendorSlug()` checks uniqueness against *all* `Vendor` rows, including any that Story 2.3 will later soft-delete (`deletedAt`). Once 2.3 ships, a deactivated vendor will permanently squat its slug — an admin trying to reuse it gets "already in use" for a vendor that no longer appears anywhere in the UI, a confusing dead end.
   evidence: Code review (round 1, Blind Hunter). `src/lib/vendor.ts`'s `resolveVendorSlug()` does a plain `prisma.vendor.findUnique({ where: { slug } })` with no `deletedAt` filter — correct today (the column doesn't exist yet), but will need revisiting the moment Story 2.3 adds it. Not a defect in this story; flagged forward so 2.3's own planning considers whether a soft-deleted vendor's slug should be reusable (and if so, how — a real design question, not a one-line fix, since `Vendor.slug` has no natural place to record "this slug was retired").
+  **DECIDED 2026-08-22 (Story 2.3 planning):** Human decision — leave `resolveVendorSlug()` unchanged. Slugs stay permanently reserved even after deactivation; no `deletedAt` filter added to the uniqueness check. Reasoning: a bookmarked/shared storefront URL suddenly showing an unrelated business (if the slug were ever recycled) is a worse outcome than a retired slug staying unavailable forever. No reactivate feature exists either, so there's no path back to needing the old slug for the same vendor.
 
 ## Deferred from: 2-1-admin-identity-and-access-gating (2026-08-21)
 
