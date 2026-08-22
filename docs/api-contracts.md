@@ -62,6 +62,30 @@ Creates a product for the signed-in vendor.
 
 ---
 
+### `POST /api/admin/vendors`
+Admin-only vendor onboarding (Story 2.2). Creates a `Vendor` unbound from any Clerk user.
+
+**Request body** (`CreateVendorSchema`):
+```ts
+{
+  name: string,          // min length 1
+  slug: string,          // min length 1 — format/uniqueness resolved server-side, not by this schema
+  phone?: string,
+  description?: string,
+}
+```
+
+**Auth:** `getCurrentAdmin()` — `401 { error: "Unauthorized" }` if no current admin. **Not covered by `middleware.ts`'s matcher** (`/admin(.*)` matches page routes under `/admin/*`, not this route's `/api/admin/vendors` path) — this self-check is the sole gate, same as every other API route in this codebase.
+
+**Behavior:**
+1. `req.json().catch(() => null)` then `safeParse` → `400 { error: "Invalid request" }` on failure.
+2. `resolveVendorSlug(slug)` (`src/lib/vendor.ts`, AD-7) normalizes the slug and checks it against existing `Vendor.slug` values. A collision → `409 { error: "The slug \"...\" is already in use — try a different one." }`, never a raw Prisma unique-constraint failure.
+3. Creates the `Vendor` with `clerkUserId: null` (unbound until claimed, AD-8 — binding happens manually, out-of-band, later) and `createdByAdminId` set to the acting admin's `Admin.id` (AD-5 — attribution targets the row id, not `clerkUserId`).
+
+**Response:** `201 { vendor: Vendor }`. The new vendor's storefront is live at `/vendors/{slug}` immediately — no separate publish step.
+
+---
+
 ### `GET /api/pickup-slots`
 Lists the signed-in vendor's pickup slots, ordered `startsAt asc`.
 

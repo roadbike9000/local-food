@@ -8,10 +8,6 @@ import { deleteVendorBySlug } from "./helpers/db";
  * form that creates a new Vendor row and gives it a live storefront
  * immediately (AC #3), plus the friendly slug-collision error (AC #2).
  *
- * RED PHASE: /admin/vendors, AddVendorForm, and POST /api/admin/vendors
- * don't exist yet (Tasks 4/5/6). Every test below is test.skip()'d — this
- * file exists to lock in the expected UX before the implementation lands.
- *
  * playwright/support/global-setup.ts authenticates the E2E admin via
  * Clerk's Backend API and writes playwright/.auth/admin.json fresh before
  * every test run (Story 2.1), same pattern tests/admin.spec.ts already
@@ -51,7 +47,7 @@ test.describe("admin vendor creation (authenticated as admin)", () => {
     await page.goto("/");
   });
 
-  test.skip(
+  test(
     "[P1] admin creates a vendor via the form and it gets a live storefront immediately (AC #3)",
     async ({ page }) => {
       const uniqueSuffix = Date.now();
@@ -111,7 +107,7 @@ test.describe("admin vendor creation (authenticated as admin)", () => {
     },
   );
 
-  test.skip(
+  test(
     "[P2] submitting a slug that collides with an existing vendor shows an inline error and stays on the form (AC #2)",
     async ({ page }) => {
       const uniqueSuffix = Date.now();

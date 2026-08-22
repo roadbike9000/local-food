@@ -25,15 +25,28 @@ model Admin {
   clerkUserId String   @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  createdVendors Vendor[] @relation("VendorCreatedByAdmin")
 }
 
-// A seller on the marketplace. Owned by one Clerk user (clerkUserId).
+// A seller on the marketplace. Owned by one Clerk user (clerkUserId) once
+// claimed - nullable because an admin-created vendor starts unbound
+// (AD-8, Story 2.2); binding happens manually, out-of-band, later.
 model Vendor {
   id          String   @id @default(cuid())
-  clerkUserId String   @unique // links this storefront to a signed-in user
+  clerkUserId String?  @unique // links this storefront to a signed-in user; null until claimed (AD-8)
   name        String
   slug        String   @unique // used in the URL: /vendors/{slug}
   description String?
+  // Nullable FK -> Admin.id (not Admin.clerkUserId - AD-5's attribution
+  // rule), set only for admin-created vendors. Named relation because
+  // Story 2.3 adds a second Vendor -> Admin relation (deletedByAdminId),
+  // and Prisma requires distinct names once there are two. onDelete:
+  // SetNull - losing attribution if an Admin row is ever deleted is
+  // acceptable (AD-5: informational, not an audit log); it must not block
+  // deleting the Admin row.
+  createdByAdminId String?
+  createdByAdmin   Admin?  @relation("VendorCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
   imageUrl    String? // Cloudinary URL for a banner/logo
   phone       String? // vendor contact number
   createdAt   DateTime @default(now())

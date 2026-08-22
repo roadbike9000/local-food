@@ -5,11 +5,7 @@ import { deleteVendorBySlug, prisma } from "./helpers/db";
 
 /**
  * API-level coverage for POST /api/admin/vendors — Story 2.2's new
- * admin-vendor-creation endpoint (AC #1, #2). Red-phase ATDD scaffold:
- * every test below is `test.skip`ped on purpose, and the route doesn't
- * exist yet (src/app/api/admin/vendors/route.ts lands in Task 4) - until
- * then, an unskipped run here would 404/network-error, not fail on an
- * assertion.
+ * admin-vendor-creation endpoint (AC #1, #2).
  *
  * Two identities are needed, same shape as admin.spec.ts: the success/
  * slug-collision/400 cases run as the seeded Admin (playwright/.auth/
@@ -45,7 +41,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
       );
     });
 
-    test.skip(
+    test(
       "[P0] creates a vendor with clerkUserId: null and createdByAdminId set to the acting admin (201)",
       async ({ request }) => {
         const unique = Date.now();
@@ -84,7 +80,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
       },
     );
 
-    test.skip(
+    test(
       "[P0] rejects a slug that collides with a seeded vendor (409, no duplicate row)",
       async ({ request }) => {
         // corner-sourdough is one of the two seeded vendors (prisma/
@@ -111,7 +107,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
       },
     );
 
-    test.skip(
+    test(
       "[P0] rejects a request body missing the required name field (400)",
       async ({ request }) => {
         const response = await request.post("/api/admin/vendors", {
@@ -143,7 +139,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
       );
     });
 
-    test.skip(
+    test(
       "[P0] a signed-in vendor (not an admin) is rejected (401)",
       async ({ request }) => {
         const response = await request.post("/api/admin/vendors", {

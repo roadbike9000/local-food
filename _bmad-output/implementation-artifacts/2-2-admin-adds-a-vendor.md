@@ -4,7 +4,7 @@ baseline_commit: be4f2ded307a91bd9cfea4d33fbcc843f007fc39
 
 # Story 2.2: Admin adds a vendor
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -25,55 +25,55 @@ so that they can start selling without self-registering.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Prisma schema + migration (AC #1)
-  - [ ] `Vendor.clerkUserId`: `String @unique` → `String? @unique` (AD-8 — admin-created vendors start unbound; Postgres/Prisma allow multiple `NULL`s under a unique index, so this doesn't break uniqueness for already-claimed vendors).
-  - [ ] Add `Vendor.createdByAdminId String?` + a relation to `Admin`. **Use an explicitly named relation now** (`@relation("VendorCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)`) — Story 2.3 adds a second `Vendor → Admin` relation (`deletedByAdminId`), and Prisma requires distinct names once there are two relations between the same two models. Naming this one now avoids a rename-migration when 2.3 lands. `onDelete: SetNull` (not `Restrict`/`Cascade`) — losing attribution if an `Admin` row were ever deleted is acceptable (AD-5: attribution is informational, not an audit log); it must not block deleting the `Admin` row or cascade-delete the `Vendor`.
-  - [ ] Prisma requires the back-relation on `Admin` too: add `createdVendors Vendor[] @relation("VendorCreatedByAdmin")`.
-  - [ ] No backfill needed — existing seeded vendors already have real `clerkUserId` values; this migration only relaxes a constraint and adds a new nullable column. Run `npx prisma migrate dev --name vendor_admin_creation` directly (no `--create-only`/hand-editing needed, unlike Story 1.2's required-column backfill).
-  - [ ] **Do not touch `Vendor.deletedAt`/`deletedByAdminId`** — those are Story 2.3's fields, not this story's.
+- [x] Task 1: Prisma schema + migration (AC #1)
+  - [x] `Vendor.clerkUserId`: `String @unique` → `String? @unique` (AD-8 — admin-created vendors start unbound; Postgres/Prisma allow multiple `NULL`s under a unique index, so this doesn't break uniqueness for already-claimed vendors).
+  - [x] Add `Vendor.createdByAdminId String?` + a relation to `Admin`. **Use an explicitly named relation now** (`@relation("VendorCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)`) — Story 2.3 adds a second `Vendor → Admin` relation (`deletedByAdminId`), and Prisma requires distinct names once there are two relations between the same two models. Naming this one now avoids a rename-migration when 2.3 lands. `onDelete: SetNull` (not `Restrict`/`Cascade`) — losing attribution if an `Admin` row were ever deleted is acceptable (AD-5: attribution is informational, not an audit log); it must not block deleting the `Admin` row or cascade-delete the `Vendor`.
+  - [x] Prisma requires the back-relation on `Admin` too: add `createdVendors Vendor[] @relation("VendorCreatedByAdmin")`.
+  - [x] No backfill needed — existing seeded vendors already have real `clerkUserId` values; this migration only relaxes a constraint and adds a new nullable column. Run `npx prisma migrate dev --name vendor_admin_creation` directly (no `--create-only`/hand-editing needed, unlike Story 1.2's required-column backfill).
+  - [x] **Do not touch `Vendor.deletedAt`/`deletedByAdminId`** — those are Story 2.3's fields, not this story's.
 
-- [ ] Task 2: `resolveVendorSlug()` in `src/lib/vendor.ts` (AC #2, AD-7)
-  - [ ] `resolveVendorSlug(desiredSlug: string): Promise<{ ok: true; slug: string } | { ok: false; error: string }>`. Normalize via the existing `slugify()` (`src/lib/utils.ts`) first, then check `prisma.vendor.findUnique({ where: { slug } })` — return `{ ok: false, error: "..." }` with a friendly message (e.g. `` `The slug "${slug}" is already in use — try a different one.` ``) if taken, else `{ ok: true, slug }`. Not a throwing function — a slug collision is an expected, common validation outcome, not an unexpected failure (`project-context.md`'s "reserve throws for actual unexpected failures" rule).
-  - [ ] Scope is the admin-create path only (AD-7 explicitly excludes retrofitting this to any other vendor-facing flow — there isn't one yet anyway).
+- [x] Task 2: `resolveVendorSlug()` in `src/lib/vendor.ts` (AC #2, AD-7)
+  - [x] `resolveVendorSlug(desiredSlug: string): Promise<{ ok: true; slug: string } | { ok: false; error: string }>`. Normalize via the existing `slugify()` (`src/lib/utils.ts`) first, then check `prisma.vendor.findUnique({ where: { slug } })` — return `{ ok: false, error: "..." }` with a friendly message (e.g. `` `The slug "${slug}" is already in use — try a different one.` ``) if taken, else `{ ok: true, slug }`. Not a throwing function — a slug collision is an expected, common validation outcome, not an unexpected failure (`project-context.md`'s "reserve throws for actual unexpected failures" rule).
+  - [x] Scope is the admin-create path only (AD-7 explicitly excludes retrofitting this to any other vendor-facing flow — there isn't one yet anyway).
 
-- [ ] Task 3: New Zod schema `src/app/api/admin/vendors/schema.ts` (AC #1)
-  - [ ] `CreateVendorSchema`: `name: z.string().min(1)`, `slug: z.string().min(1)` (format/uniqueness is `resolveVendorSlug()`'s job, not Zod's — don't duplicate that logic here), `phone: z.string().optional()`, `description: z.string().optional()`. Matches `Vendor.phone`/`description`'s existing optionality — don't make either required, the schema doesn't require them today either.
+- [x] Task 3: New Zod schema `src/app/api/admin/vendors/schema.ts` (AC #1)
+  - [x] `CreateVendorSchema`: `name: z.string().min(1)`, `slug: z.string().min(1)` (format/uniqueness is `resolveVendorSlug()`'s job, not Zod's — don't duplicate that logic here), `phone: z.string().optional()`, `description: z.string().optional()`. Matches `Vendor.phone`/`description`'s existing optionality — don't make either required, the schema doesn't require them today either.
 
-- [ ] Task 4: `POST /api/admin/vendors` route (AC #1, #2)
-  - [ ] New file `src/app/api/admin/vendors/route.ts`. Mirror `src/app/api/products/route.ts`'s `POST` shape exactly, but with `getCurrentAdmin()` instead of `getCurrentVendor()`: `if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })`.
-  - [ ] **This route is NOT covered by `middleware.ts`'s `isProtectedRoute` matcher** — `/admin(.*)` only matches paths starting with `/admin`, and this route's real path is `/api/admin/vendors`, a different prefix. This matches every existing API route in this codebase (`/api/products`, `/api/pickup-slots`, etc. — none are in the matcher either); they all self-check via `getCurrentVendor()`'s own 401 branch. Don't add `/api/admin(.*)` to the matcher to "fix" this — it would be new, inconsistent scope beyond what any existing route does, and the self-check above is already the established, sufficient pattern.
-  - [ ] `req.json().catch(() => null)` then `CreateVendorSchema.safeParse(...)` → `400 { error: "Invalid request" }` on failure (matches every other route's untrusted-input pattern).
-  - [ ] Call `resolveVendorSlug(parsed.data.slug)`. If `{ ok: false }`, return `409 { error: result.error }` — a duplicate-identifier conflict, distinct from a `400` malformed-request (no existing precedent for this exact case in this codebase; `409` is the deliberate, semantically-correct choice here, not `400`).
-  - [ ] `prisma.vendor.create({ data: { name: parsed.data.name, slug: result.slug, phone: parsed.data.phone, description: parsed.data.description, clerkUserId: null, createdByAdminId: admin.id } })`. Return `201 { vendor }`.
+- [x] Task 4: `POST /api/admin/vendors` route (AC #1, #2)
+  - [x] New file `src/app/api/admin/vendors/route.ts`. Mirror `src/app/api/products/route.ts`'s `POST` shape exactly, but with `getCurrentAdmin()` instead of `getCurrentVendor()`: `if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })`.
+  - [x] **This route is NOT covered by `middleware.ts`'s `isProtectedRoute` matcher** — `/admin(.*)` only matches paths starting with `/admin`, and this route's real path is `/api/admin/vendors`, a different prefix. This matches every existing API route in this codebase (`/api/products`, `/api/pickup-slots`, etc. — none are in the matcher either); they all self-check via `getCurrentVendor()`'s own 401 branch. Don't add `/api/admin(.*)` to the matcher to "fix" this — it would be new, inconsistent scope beyond what any existing route does, and the self-check above is already the established, sufficient pattern.
+  - [x] `req.json().catch(() => null)` then `CreateVendorSchema.safeParse(...)` → `400 { error: "Invalid request" }` on failure (matches every other route's untrusted-input pattern).
+  - [x] Call `resolveVendorSlug(parsed.data.slug)`. If `{ ok: false }`, return `409 { error: result.error }` — a duplicate-identifier conflict, distinct from a `400` malformed-request (no existing precedent for this exact case in this codebase; `409` is the deliberate, semantically-correct choice here, not `400`).
+  - [x] `prisma.vendor.create({ data: { name: parsed.data.name, slug: result.slug, phone: parsed.data.phone, description: parsed.data.description, clerkUserId: null, createdByAdminId: admin.id } })`. Return `201 { vendor }`.
 
-- [ ] Task 5: `/admin/vendors` page (AC #1)
-  - [ ] New file `src/app/admin/vendors/page.tsx` (Server Component). Same gate as `src/app/admin/page.tsx`: `getCurrentAdmin()`, `notFound()` if `null` — no shared layout guard exists yet (Story 2.1's deliberate per-page-gates-itself decision), match it here too.
-  - [ ] Renders a new client component, `AddVendorForm` (Task 6).
+- [x] Task 5: `/admin/vendors` page (AC #1)
+  - [x] New file `src/app/admin/vendors/page.tsx` (Server Component). Same gate as `src/app/admin/page.tsx`: `getCurrentAdmin()`, `notFound()` if `null` — no shared layout guard exists yet (Story 2.1's deliberate per-page-gates-itself decision), match it here too.
+  - [x] Renders a new client component, `AddVendorForm` (Task 6).
 
-- [ ] Task 6: `AddVendorForm.tsx` (AC #1, #2, #3)
-  - [ ] New file `src/components/admin/AddVendorForm.tsx` (new directory — first admin-specific component; mirrors `src/components/dashboard/`'s existing shape, not merged into it). Mirror `AddProductForm.tsx`'s state/error/submit shape exactly: `submitting`, `error` state, `fetch()` to `POST /api/admin/vendors`, `401` → "Your session expired. Sign in again.", other non-`ok` → surface `body.error` inline (`role="alert"`).
-  - [ ] Fields: name (required), slug (required — auto-suggest via `slugify(name)` on the name field's `onChange` **only until the admin manually edits the slug field themselves**, then stop overwriting it; a common "auto-fill until touched" pattern, not full auto-generation with no admin control, since AC #1 has the admin explicitly submitting a slug), phone (optional), description (optional).
-  - [ ] On success (`201`): don't just `router.refresh()` and reset like `AddProductForm` does — show a confirmation with a link to the new storefront, `` /vendors/{createdVendor.slug} `` (`<a href=...>`), giving the admin visible proof of AC #3 ("gets a live storefront") without them needing to guess the URL or navigate away to check.
+- [x] Task 6: `AddVendorForm.tsx` (AC #1, #2, #3)
+  - [x] New file `src/components/admin/AddVendorForm.tsx` (new directory — first admin-specific component; mirrors `src/components/dashboard/`'s existing shape, not merged into it). Mirror `AddProductForm.tsx`'s state/error/submit shape exactly: `submitting`, `error` state, `fetch()` to `POST /api/admin/vendors`, `401` → "Your session expired. Sign in again.", other non-`ok` → surface `body.error` inline (`role="alert"`).
+  - [x] Fields: name (required), slug (required — auto-suggest via `slugify(name)` on the name field's `onChange` **only until the admin manually edits the slug field themselves**, then stop overwriting it; a common "auto-fill until touched" pattern, not full auto-generation with no admin control, since AC #1 has the admin explicitly submitting a slug), phone (optional), description (optional).
+  - [x] On success (`201`): don't just `router.refresh()` and reset like `AddProductForm` does — show a confirmation with a link to the new storefront, `` /vendors/{createdVendor.slug} `` (`<a href=...>`), giving the admin visible proof of AC #3 ("gets a live storefront") without them needing to guess the URL or navigate away to check.
 
-- [ ] Task 7: Test helper (needed by Task 8)
-  - [ ] `tests/helpers/db.ts`: add `deleteVendorBySlug(slug: string)` (mirrors the existing `deleteProductByName` shape) — test cleanup for admin-created vendors.
+- [x] Task 7: Test helper (needed by Task 8)
+  - [x] `tests/helpers/db.ts`: add `deleteVendorBySlug(slug: string)` (mirrors the existing `deleteProductByName` shape) — test cleanup for admin-created vendors.
 
-- [ ] Task 8: Tests (AC #1, #2, #3)
-  - [ ] Unit (Vitest): new `src/app/api/admin/vendors/schema.test.ts` for `CreateVendorSchema` — mirrors `src/app/api/products/schema.test.ts`'s exact shape (one shared valid body, accepts-valid + one rejects-case per invalid value per required field).
-  - [ ] `resolveVendorSlug()` touches Prisma directly — per this codebase's own established convention (Story 1.2's review moved a DB-touching Vitest test into Playwright), its test belongs in Playwright, not Vitest.
-  - [ ] New file `tests/admin-vendors-api.spec.ts` (API-level, mirrors `products-api.spec.ts`'s shape: `request` fixture, admin auth from Story 2.1's `playwright/.auth/admin.json`, `test.skip(!existsSync(adminAuthFile), ...)`):
+- [x] Task 8: Tests (AC #1, #2, #3)
+  - [x] Unit (Vitest): new `src/app/api/admin/vendors/schema.test.ts` for `CreateVendorSchema` — mirrors `src/app/api/products/schema.test.ts`'s exact shape (one shared valid body, accepts-valid + one rejects-case per invalid value per required field).
+  - [x] `resolveVendorSlug()` touches Prisma directly — per this codebase's own established convention (Story 1.2's review moved a DB-touching Vitest test into Playwright), its test belongs in Playwright, not Vitest.
+  - [x] New file `tests/admin-vendors-api.spec.ts` (API-level, mirrors `products-api.spec.ts`'s shape: `request` fixture, admin auth from Story 2.1's `playwright/.auth/admin.json`, `test.skip(!existsSync(adminAuthFile), ...)`):
     - `[P0]` valid submission → `201`, response body has the created vendor with `clerkUserId: null` and `createdByAdminId` matching the seeded admin's id (verify via a direct `prisma.vendor.findUnique` read-back, not just the response body).
     - `[P0]` slug colliding with a seeded vendor (`corner-sourdough`) → `409`, error message matches `/already in use/i`, no duplicate row created (read-back count).
     - `[P0]` missing/invalid body (e.g. no `name`) → `400`.
     - `[P0]` request with **no** admin session (use the Story 2.1 vendor fixture — a signed-in non-admin) → `401`. This is the one case in this file that needs the *vendor* auth file, not the admin one — proves the route's own `getCurrentAdmin()` check, not just middleware (which doesn't even cover this path — see Task 4).
-  - [ ] New file `tests/admin-vendors.spec.ts` (UI-level, admin-authenticated):
+  - [x] New file `tests/admin-vendors.spec.ts` (UI-level, admin-authenticated):
     - `[P1]` admin fills the form, submits, sees the confirmation + storefront link; then navigates to `/vendors/{slug}` directly and confirms the vendor's name renders (proves AC #3 end to end, not just that the DB row exists).
     - `[P1]` submitting a colliding slug shows the inline error, no navigation away from the form.
 
-- [ ] Task 9: Docs sync (housekeeping, matches established precedent)
-  - [ ] `docs/api-contracts.md`: add a `POST /api/admin/vendors` section, same shape as the existing `POST /api/products` section (request body, behavior, response, auth note referencing `getCurrentAdmin()`).
-  - [ ] `docs/data-models.md`: update `Vendor`'s table — `clerkUserId` now nullable (note AD-8's "unbound until claimed" reasoning), add the new `createdByAdminId` row.
-  - [ ] `docs/source-tree-analysis.md`: add `admin/vendors/` under the `admin/` entry (already has one row from Story 2.1) and `api/admin/vendors/route.ts` under `api/` — same treatment Story 2.1 gave the two lines it touched there.
+- [x] Task 9: Docs sync (housekeeping, matches established precedent)
+  - [x] `docs/api-contracts.md`: add a `POST /api/admin/vendors` section, same shape as the existing `POST /api/products` section (request body, behavior, response, auth note referencing `getCurrentAdmin()`).
+  - [x] `docs/data-models.md`: update `Vendor`'s table — `clerkUserId` now nullable (note AD-8's "unbound until claimed" reasoning), add the new `createdByAdminId` row.
+  - [x] `docs/source-tree-analysis.md`: add `admin/vendors/` under the `admin/` entry (already has one row from Story 2.1) and `api/admin/vendors/route.ts` under `api/` — same treatment Story 2.1 gave the two lines it touched there.
 
 ## Dev Notes
 
@@ -131,3 +131,53 @@ so that they can start selling without self-registering.
 - [Source: tests/helpers/db.ts] — existing `getVendorBySlug`/`deleteProductByName` (read in full for this story) — `deleteVendorBySlug` mirrors the latter's shape.
 - [Source: tests/products-api.spec.ts, tests/admin.spec.ts] — existing API-level test pattern and the two-identity/two-skip-guard pattern (read for this story) — both reused by Task 8's new files.
 - [Source: _bmad-output/implementation-artifacts/deferred-work.md] — the "getCurrentAdmin() fails open" item this story's planning resolved (decision recorded there and in Dev Notes above).
+
+## Dev Agent Record
+
+### Agent Model Used
+
+Claude Sonnet 5 (claude-sonnet-5)
+
+### Debug Log References
+
+- Migration: `npx prisma migrate dev --name vendor_admin_creation` — plain nullable-constraint relax + one new nullable FK column, no backfill needed. Applied and verified directly (`ALTER COLUMN "clerkUserId" DROP NOT NULL`, `ADD COLUMN "createdByAdminId"`, FK to `Admin` with `ON DELETE SET NULL`).
+- ATDD scaffolds (12 tests across 3 files, generated in a prior workflow run) activated task-by-task as each landed, per the ATDD checklist's guidance — not all at once. Two of the three scaffold files had their `beforeEach`'s `test.skip(!existsSync(...), ...)` calls accidentally caught by a blanket `test.skip(` → `test(` activation script; caught immediately via a full-file read after each activation and fixed back to `test.skip(` (that call is Playwright's per-test conditional-skip API, not a test declaration, and must never be touched by activation).
+- `npx tsc --noEmit` — clean after every task.
+- `npm run lint` — clean.
+- `npm run test:unit` — 72/72 passed (6 newly activated `CreateVendorSchema` cases).
+- `npx playwright test tests/admin-vendors-api.spec.ts` — 1 passed for real (the 401 non-admin case, using the already-configured vendor fixture), 3 skipped (need `E2E_ADMIN_EMAIL`/`E2E_ADMIN_CLERK_ID`, not configured in this dev environment — Story 2.1's known out-of-reach step, unchanged).
+- `npx playwright test tests/admin-vendors.spec.ts` — 2 skipped (same admin-fixture gap); selectors verified by careful manual cross-check against `AddVendorForm.tsx`'s actual rendered markup (form `aria-label`, field labels, button text, confirmation link text/href, error role) since they can't run green locally without the fixture.
+- Full `npx playwright test` — 83 passed, 6 skipped (5 new admin-fixture-gated cases + the 1 pre-existing one from Story 2.1), 0 failures, 0 regressions.
+- `npm run build` — succeeds; `/admin/vendors` and `/api/admin/vendors` appear in the route table as new dynamic (`ƒ`) routes.
+- **Process note:** the ATDD scaffolds were pushed to `main` as a standalone commit before this implementation began, which broke CI's typecheck gate (the two intentional red-phase type errors). Implementation proceeded immediately to fix it rather than leaving `main` red — confirmed fixed by this story's own regression run above; CI should be green on the implementation commit.
+
+### Completion Notes List
+
+- `Vendor.clerkUserId` made nullable, `Vendor.createdByAdminId` added with a named relation (`VendorCreatedByAdmin`, forward-compatible with Story 2.3's `deletedByAdminId`), `resolveVendorSlug()` added to `src/lib/vendor.ts`, `CreateVendorSchema`, `POST /api/admin/vendors`, `/admin/vendors` page, `AddVendorForm.tsx`.
+- All 12 ATDD red-phase scaffolds activated: 6 Vitest (green), 4 API-level Playwright (1 green for real, 3 correctly skip pending the admin fixture), 2 E2E Playwright (correctly skip pending the admin fixture, selectors manually verified against the real implementation).
+- Docs synced: `docs/api-contracts.md` gained a full `POST /api/admin/vendors` section, `docs/data-models.md`'s `Vendor`/`Admin` sections updated (nullable `clerkUserId`, new `createdByAdminId`, `Admin.createdVendors` back-relation), `docs/source-tree-analysis.md` gained `admin/vendors/`, `api/admin/vendors/route.ts`, `admin/AddVendorForm.tsx`, `lib/admin.ts`, and `resolveVendorSlug()` entries.
+- Full regression: typecheck clean, lint clean, 72/72 unit, 83/89 e2e (6 expected skips, all needing the not-yet-configured Admin Clerk test credentials), build succeeds.
+
+### File List
+
+- `prisma/schema.prisma` (modified — `Vendor.clerkUserId` nullable, `Vendor.createdByAdminId` + relation, `Admin.createdVendors` back-relation)
+- `prisma/migrations/20260822003459_vendor_admin_creation/migration.sql` (new)
+- `src/lib/vendor.ts` (modified — `resolveVendorSlug()`)
+- `src/app/api/admin/vendors/schema.ts` (new — `CreateVendorSchema`)
+- `src/app/api/admin/vendors/schema.test.ts` (new — 6 cases, activated)
+- `src/app/api/admin/vendors/route.ts` (new — `POST` handler)
+- `src/app/admin/vendors/page.tsx` (new — gated page)
+- `src/components/admin/AddVendorForm.tsx` (new — first admin component)
+- `tests/admin-vendors-api.spec.ts` (new — 4 cases, activated)
+- `tests/admin-vendors.spec.ts` (new — 2 cases, activated)
+- `tests/helpers/db.ts` (modified — `deleteVendorBySlug`, built during the ATDD run)
+- `docs/api-contracts.md` (modified — new `POST /api/admin/vendors` section)
+- `docs/data-models.md` (modified — `Vendor`/`Admin` sections updated)
+- `docs/source-tree-analysis.md` (modified — `admin/vendors/`, `api/admin/vendors/`, `admin/AddVendorForm.tsx`, `lib/admin.ts`, `resolveVendorSlug()` entries)
+- `_bmad-output/test-artifacts/atdd-checklist-2-2-admin-adds-a-vendor.md` (new — ATDD checklist)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — status transitions)
+
+## Change Log
+
+- 2026-08-21: ATDD red-phase scaffolds generated (12 tests across 3 new files) via two parallel subagents, independently verified before landing. Pushed as a standalone commit — broke CI's typecheck gate (intentional red-phase errors), corrected by proceeding immediately to implementation rather than leaving `main` red.
+- 2026-08-21/22: Implemented Story 2.2 in full. New `Vendor.createdByAdminId` + nullable `clerkUserId` (AD-8), `resolveVendorSlug()` (AD-7), `POST /api/admin/vendors`, `/admin/vendors` page, `AddVendorForm.tsx`. All 12 ATDD scaffolds activated — 1 caught-and-fixed activation-script bug (two `beforeEach` skip guards briefly mis-converted, fixed immediately). Docs synced across three files. Full regression: typecheck clean, lint clean, 72/72 unit tests, 83/89 e2e (6 expected skips — no `E2E_ADMIN_EMAIL`/`E2E_ADMIN_CLERK_ID` configured in this dev environment), production build succeeds. Status → review.

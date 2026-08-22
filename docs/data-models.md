@@ -11,12 +11,12 @@ Vendor 1───* Product 1───* OrderItem *───1 Order *───1 V
                          (Order.pickupSlotId is optional)
 ```
 
-`Admin` isn't in this diagram — it has no Prisma relation to any other model as of Story 2.1 (see below).
+`Admin` isn't in this diagram — its one relation to `Vendor` (`createdVendors`, Story 2.2) is a one-to-many attribution FK, not part of the storefront/order chain above.
 
 ## Models
 
 ### Admin
-A platform operator, distinct from a Vendor. Not related to `Vendor` by a Prisma relation as of Story 2.1 — attribution FKs (`Vendor.createdByAdminId`/`deletedByAdminId`) land in Stories 2.2/2.3.
+A platform operator, distinct from a Vendor.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -24,20 +24,23 @@ A platform operator, distinct from a Vendor. Not related to `Vendor` by a Prisma
 | clerkUserId | String | `@unique` — sole source of admin identity (architecture AD-1); `getCurrentAdmin()` looks up by this, never a Clerk session claim |
 | createdAt / updatedAt | DateTime | |
 
+Relations: `createdVendors[]` (`Vendor.createdByAdminId`, Story 2.2) — named relation `VendorCreatedByAdmin`, since Story 2.3 adds a second `Vendor → Admin` relation (`deletedByAdminId`) and Prisma requires distinct names once there are two.
+
 No `phone` yet — Story 3.2 adds it (required to deliver that story's SMS alert, per its own AC).
 
 ### Vendor
-One seller, one Clerk user, one storefront.
+One seller, one storefront. `clerkUserId` may be `null` for an admin-created vendor not yet claimed by a signed-up Clerk user (AD-8, Story 2.2) — every vendor still has exactly one storefront regardless.
 
 | Field | Type | Notes |
 |---|---|---|
 | id | String (cuid) | PK |
-| clerkUserId | String | `@unique` — links storefront to signed-in user; `getCurrentVendor()` looks up by this |
+| clerkUserId | String? | `@unique` (nullable — Postgres/Prisma allow multiple `NULL`s under a unique index) — links storefront to a signed-in user once claimed; `getCurrentVendor()` looks up by this. `null` until an admin-created vendor is manually bound out-of-band (AD-8; no invite/claim flow exists) |
 | name | String | |
-| slug | String | `@unique` — used in URL `/vendors/{slug}`; no collision-handling beyond the DB constraint (duplicate slug → raw Prisma error) |
+| slug | String | `@unique` — used in URL `/vendors/{slug}`. Self-registration has no collision-handling beyond the DB constraint; the admin-create path (`POST /api/admin/vendors`) goes through `resolveVendorSlug()` (`src/lib/vendor.ts`, AD-7) instead, which returns a friendly `409` rather than a raw Prisma error |
 | description | String? | |
 | imageUrl | String? | Cloudinary URL — not yet populated by any UI flow |
 | phone | String? | vendor contact, not currently displayed anywhere |
+| createdByAdminId | String? | nullable FK → `Admin.id` (not `Admin.clerkUserId` — AD-5's attribution rule), named relation `VendorCreatedByAdmin`, `onDelete: SetNull`. Set only for admin-created vendors (`POST /api/admin/vendors`, Story 2.2) |
 | createdAt / updatedAt | DateTime | |
 
 Relations: `products[]`, `orders[]`, `pickupSlots[]`.
