@@ -27,12 +27,13 @@ Creates a `PENDING` order and a Stripe Checkout session.
 
 **Behavior:**
 1. `req.json().catch(() => null)` then `safeParse` — malformed JSON or schema mismatch → `400 { error: "Invalid request" }`.
-2. Quantities are aggregated per `productId` first (a cart can list the same product on multiple lines), then the distinct products are re-fetched from the DB, filtered by `vendorId`. If the count doesn't match the number of distinct requested products (one is deleted or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
-3. Stock sufficiency check: `stockQuantity >= totalRequestedQuantity` per product (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean; totaled across duplicate lines for the same product). Any short product rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created. **This check is a point-in-time read with no reservation or transaction** — it does not itself prevent two concurrent checkouts from both passing for the same last unit. Stock itself is never written here; the actual decrement happens later, in `POST /api/webhooks/stripe`, only once Stripe confirms payment (Story 1.4) — see that route's contract below.
-4. Computes `totalCents` from DB prices — the client-sent price (there is none in this schema) can never influence the charge.
-5. Creates `Order` (status `PENDING`) with nested `OrderItem` creates.
-6. Creates a Stripe Checkout session (`mode: "payment"`), `metadata: { orderId }` so the webhook can find it back, `success_url` → `/checkout/success`, `cancel_url` → `/cart`.
-7. Updates the `Order` with `stripeSessionId`.
+2. **Vendor lookup and active check (Story 2.3, AD-4), before anything else runs.** `prisma.vendor.findUnique({ where: { id: vendorId } })` — missing → `400 { error: "One or more items are unavailable" }` (the same message a missing/wrong-vendor product also produces, kept consistent). Found → `assertVendorActive(vendor)` in a `try/catch`; a deactivated vendor (`VendorDeactivatedError`) → `400 { error: "This vendor is no longer accepting orders" }`. Fails fast, before the product query below runs at all.
+3. Quantities are aggregated per `productId` first (a cart can list the same product on multiple lines), then the distinct products are re-fetched from the DB, filtered by `vendorId`. If the count doesn't match the number of distinct requested products (one is deleted or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
+4. Stock sufficiency check: `stockQuantity >= totalRequestedQuantity` per product (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean; totaled across duplicate lines for the same product). Any short product rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created. **This check is a point-in-time read with no reservation or transaction** — it does not itself prevent two concurrent checkouts from both passing for the same last unit. Stock itself is never written here; the actual decrement happens later, in `POST /api/webhooks/stripe`, only once Stripe confirms payment (Story 1.4) — see that route's contract below.
+5. Computes `totalCents` from DB prices — the client-sent price (there is none in this schema) can never influence the charge.
+6. Creates `Order` (status `PENDING`) with nested `OrderItem` creates.
+7. Creates a Stripe Checkout session (`mode: "payment"`), `metadata: { orderId }` so the webhook can find it back, `success_url` → `/checkout/success`, `cancel_url` → `/cart`.
+8. Updates the `Order` with `stripeSessionId`.
 
 **Response:** `200 { url: string }` — the Stripe-hosted checkout URL to redirect the browser to.
 
@@ -83,6 +84,27 @@ Admin-only vendor onboarding (Story 2.2). Creates a `Vendor` unbound from any Cl
 3. Creates the `Vendor` with `clerkUserId: null` (unbound until claimed, AD-8 — binding happens manually, out-of-band, later) and `createdByAdminId` set to the acting admin's `Admin.id` (AD-5 — attribution targets the row id, not `clerkUserId`). The create is wrapped in its own `try/catch`: a same-slug race between two concurrent requests (both pass step 2's check before either creates) is caught as a Prisma `P2002` and mapped to the identical friendly `409` — a raw Prisma unique-constraint failure should never reach the client either way. Any other DB failure → `500`, `Sentry.captureException`.
 
 **Response:** `201 { vendor: Vendor }` — the full row, including internal fields (`createdByAdminId`, timestamps). Fine today since this route is admin-only; reconsider before ever exposing an equivalent read endpoint outside `/admin/*`. The new vendor's storefront is live at `/vendors/{slug}` immediately — no separate publish step.
+
+---
+
+### `POST /api/admin/vendors/[id]/deactivate`
+Admin-only vendor deactivation (Story 2.3). Soft-deletes a `Vendor` — never a hard delete.
+
+**Request body:** none.
+
+**Auth:** `getCurrentAdmin()` — `401 { error: "Unauthorized" }` if no current admin. Not covered by `middleware.ts`'s matcher, same reasoning as `POST /api/admin/vendors`.
+
+**Behavior:**
+1. `prisma.vendor.findFirst({ where: { id: params.id } })` — `404 { error: "Not found" }` if missing. No ownership scoping (an admin route legitimately operates across all vendors).
+2. **Idempotent**: if the vendor is already deactivated (`deletedAt` already set), returns `200 { vendor }` with the row unchanged — does **not** reassign `deletedByAdminId` to whoever made this call. Only a genuinely active vendor gets updated: `deletedAt: <now>`, `deletedByAdminId: <acting admin's Admin.id>` (AD-5 — targets the row id, not `clerkUserId`).
+3. No un-deactivate/reactivate endpoint exists.
+
+**Response:** `200 { vendor: Vendor }` — the current (possibly just-updated) row.
+
+**Downstream effects** (`assertVendorActive()`, `src/lib/vendor.ts`, AD-4 — throws `VendorDeactivatedError`, never returns a boolean):
+- The vendor's storefront (`GET /vendors/{slug}`) stays reachable (`200`, name still shown) but replaces the listing/pickup-slot banner with a "no longer available" message — not a `404`.
+- `POST /api/checkout` rejects any new order for the vendor's products: `400 { error: "This vendor is no longer accepting orders" }`.
+- Existing orders in any non-terminal status continue their normal fulfillment lifecycle unchanged (pickup, SMS, status updates) — the vendor's own `/dashboard/*` access is completely untouched by deactivation.
 
 ---
 

@@ -11,7 +11,7 @@ Vendor 1───* Product 1───* OrderItem *───1 Order *───1 V
                          (Order.pickupSlotId is optional)
 ```
 
-`Admin` isn't in this diagram — its one relation to `Vendor` (`createdVendors`, Story 2.2) is a one-to-many attribution FK, not part of the storefront/order chain above.
+`Admin` isn't in this diagram — its two relations to `Vendor` (`createdVendors`, `deletedVendors` — Stories 2.2/2.3) are one-to-many attribution FKs, not part of the storefront/order chain above.
 
 ## Models
 
@@ -24,7 +24,7 @@ A platform operator, distinct from a Vendor.
 | clerkUserId | String | `@unique` — sole source of admin identity (architecture AD-1); `getCurrentAdmin()` looks up by this, never a Clerk session claim |
 | createdAt / updatedAt | DateTime | |
 
-Relations: `createdVendors[]` (`Vendor.createdByAdminId`, Story 2.2) — named relation `VendorCreatedByAdmin`, since Story 2.3 adds a second `Vendor → Admin` relation (`deletedByAdminId`) and Prisma requires distinct names once there are two.
+Relations: `createdVendors[]` (`Vendor.createdByAdminId`, Story 2.2, named relation `VendorCreatedByAdmin`), `deletedVendors[]` (`Vendor.deletedByAdminId`, Story 2.3, named relation `VendorDeletedByAdmin`) — two separate named relations to `Vendor`, since Prisma requires distinct names once there's more than one relation between the same two models.
 
 No `phone` yet — Story 3.2 adds it (required to deliver that story's SMS alert, per its own AC).
 
@@ -41,9 +41,11 @@ One seller, one storefront. `clerkUserId` may be `null` for an admin-created ven
 | imageUrl | String? | Cloudinary URL — not yet populated by any UI flow |
 | phone | String? | vendor contact, not currently displayed anywhere |
 | createdByAdminId | String? | nullable FK → `Admin.id` (not `Admin.clerkUserId` — AD-5's attribution rule), named relation `VendorCreatedByAdmin`, `onDelete: SetNull`. Set only for admin-created vendors (`POST /api/admin/vendors`, Story 2.2) |
+| deletedAt | DateTime? | soft-delete marker (Story 2.3, AD-4) — `null` means active. Never a hard delete; `assertVendorActive()` (`src/lib/vendor.ts`) is the sole check anywhere that cares, throws `VendorDeactivatedError` rather than returning a boolean. Slugs stay permanently reserved even after deactivation (human decision, Story 2.3 planning) — `resolveVendorSlug()` deliberately has no `deletedAt` filter |
+| deletedByAdminId | String? | nullable FK → `Admin.id`, named relation `VendorDeletedByAdmin`, `onDelete: SetNull`. Set only when `deletedAt` is set (`POST /api/admin/vendors/[id]/deactivate`, Story 2.3) — a retry/double-click on an already-deactivated vendor does **not** overwrite this |
 | createdAt / updatedAt | DateTime | |
 
-Relations: `products[]`, `orders[]`, `pickupSlots[]`, `createdByAdmin?` (`Admin.createdVendors`, Story 2.2).
+Relations: `products[]`, `orders[]`, `pickupSlots[]`, `createdByAdmin?` (`Admin.createdVendors`, Story 2.2), `deletedByAdmin?` (`Admin.deletedVendors`, Story 2.3).
 
 ### Product
 Something a vendor sells.
@@ -51,7 +53,7 @@ Something a vendor sells.
 | Field | Type | Notes |
 |---|---|---|
 | id | String (cuid) | PK |
-| vendorId | String | FK → Vendor, `onDelete: Cascade`, indexed |
+| vendorId | String | FK → Vendor, `onDelete: Restrict` (Story 2.3 — was `Cascade`; a hard-delete of a Vendor with existing Products now fails at the DB level instead of silently destroying them. Vendors are only ever soft-deleted via `Vendor.deletedAt`, so this should never actually fire in normal operation), indexed |
 | name | String | |
 | description | String? | |
 | priceCents | Int | money always stored as integer cents; ~$21.4M ceiling (32-bit Int), no overflow check |
@@ -85,7 +87,7 @@ One customer purchase.
 | Field | Type | Notes |
 |---|---|---|
 | id | String (cuid) | PK |
-| vendorId | String | FK → Vendor, `onDelete: Cascade`, indexed |
+| vendorId | String | FK → Vendor, `onDelete: Restrict` (Story 2.3 — was `Cascade`, same reasoning as `Product.vendorId`: order history must survive even an accidental hard-delete), indexed |
 | pickupSlotId | String? | FK → PickupSlot, optional |
 | customerName | String | |
 | customerPhone | String | used as the Twilio SMS destination |

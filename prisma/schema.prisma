@@ -27,6 +27,7 @@ model Admin {
   updatedAt   DateTime @updatedAt
 
   createdVendors Vendor[] @relation("VendorCreatedByAdmin")
+  deletedVendors Vendor[] @relation("VendorDeletedByAdmin")
 }
 
 // A seller on the marketplace. Owned by one Clerk user (clerkUserId) once
@@ -47,6 +48,17 @@ model Vendor {
   // deleting the Admin row.
   createdByAdminId String?
   createdByAdmin   Admin?  @relation("VendorCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  // Soft-delete (Story 2.3, AD-4) - null means active. Never a hard delete;
+  // assertVendorActive() is the sole check anywhere that cares. Slugs stay
+  // permanently reserved even after deactivation (human decision, Story
+  // 2.3 planning) - resolveVendorSlug() deliberately does not filter on
+  // this, to avoid a bookmarked/shared storefront URL ever resolving to a
+  // different, unrelated vendor.
+  deletedAt        DateTime?
+  // Second Vendor -> Admin relation, same shape as createdByAdminId above -
+  // this is exactly why that one was given an explicit name up front.
+  deletedByAdminId String?
+  deletedByAdmin   Admin?    @relation("VendorDeletedByAdmin", fields: [deletedByAdminId], references: [id], onDelete: SetNull)
   imageUrl    String? // Cloudinary URL for a banner/logo
   phone       String? // vendor contact number
   createdAt   DateTime @default(now())
@@ -88,7 +100,12 @@ model Product {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade (Story 2.3, AC #4) - a Vendor is only ever
+  // soft-deleted (deletedAt), never hard-deleted, so this should never
+  // actually fire in normal operation. It exists as a defense-in-depth
+  // guard: an accidental prisma.vendor.delete() must fail loudly (existing
+  // Products would block it) rather than silently destroy order history.
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   orderItems OrderItem[]
 
   @@index([vendorId])
@@ -125,7 +142,8 @@ model Order {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
-  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade - same reasoning as Product.vendor above.
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   pickupSlot PickupSlot? @relation(fields: [pickupSlotId], references: [id])
   items      OrderItem[]
 

@@ -31,15 +31,16 @@ local-food/
 │   │   │   ├── orders/page.tsx         # GET /dashboard/orders — read-only table, take: 50
 │   │   │   └── pickups/page.tsx        # GET /dashboard/pickups — read-only list; "Add slot" button unwired
 │   │   │
-│   │   ├── admin/                     # admin-only area (Story 2.1/2.2) — per-page gated via getCurrentAdmin()+notFound(), no shared layout guard
+│   │   ├── admin/                     # admin-only area (Stories 2.1/2.2/2.3) — per-page gated via getCurrentAdmin()+notFound(), no shared layout guard
 │   │   │   ├── page.tsx                # GET /admin — stub proving the gate (Story 2.1)
-│   │   │   └── vendors/page.tsx        # GET /admin/vendors — onboards a new unbound Vendor (Story 2.2)
+│   │   │   └── vendors/page.tsx        # GET /admin/vendors — onboards a new unbound Vendor + lists/deactivates existing ones (Stories 2.2/2.3)
 │   │   │
 │   │   └── api/                       # route handlers — INTEGRATION POINT for external services
-│   │       ├── checkout/route.ts         # POST — creates Order(PENDING) + Stripe session; recomputes prices server-side
+│   │       ├── checkout/route.ts         # POST — creates Order(PENDING) + Stripe session; recomputes prices server-side; rejects a deactivated vendor (Story 2.3)
 │   │       ├── products/route.ts         # GET/POST — vendor-scoped via getCurrentVendor()
 │   │       ├── pickup-slots/route.ts     # GET/POST — vendor-scoped via getCurrentVendor()
 │   │       ├── admin/vendors/route.ts    # POST — admin-scoped via getCurrentAdmin(); NOT covered by middleware's /admin(.*) matcher (different path prefix)
+│   │       ├── admin/vendors/[id]/deactivate/route.ts  # POST — admin-scoped, idempotent soft-delete (Story 2.3)
 │   │       └── webhooks/stripe/route.ts  # POST — Stripe signature verify (raw body) → Order PAID → Twilio SMS
 │   │
 │   ├── components/                    # top-level files are flat; admin/ is the first documented subfolder (Story 2.2) — components/dashboard/ (AddProductForm.tsx, AddSlotForm.tsx, EditStockControl.tsx) predates this doc's last full pass and was never added here either
@@ -47,14 +48,15 @@ local-food/
 │   │   ├── Navbar.tsx                  # "use client" — reads cart count + Clerk SignedIn/SignedOut
 │   │   ├── ProductCard.tsx             # "use client" — has the "Add" button calling useCart().addItem
 │   │   ├── VendorCard.tsx              # Server Component — pure display, no interactivity
-│   │   └── admin/AddVendorForm.tsx     # "use client" — POSTs /api/admin/vendors, confirms with a storefront link (Story 2.2)
+│   │   ├── admin/AddVendorForm.tsx     # "use client" — POSTs /api/admin/vendors, confirms with a storefront link (Story 2.2)
+│   │   └── admin/DeactivateVendorButton.tsx  # "use client" — window.confirm() then POSTs .../deactivate (Story 2.3, first confirm() precedent in this codebase)
 │   │
 │   └── lib/                           # one file per external service — CRITICAL BOUNDARY (secrets live here, never in "use client" files)
 │       ├── prisma.ts                   # singleton client, cached on globalThis to survive Next.js dev reloads
 │       ├── stripe.ts                   # Stripe client + a formatPrice() duplicate (see Notes below)
 │       ├── twilio.ts                   # sendSms() no-ops+logs if creds absent; swallows send failures (never throws)
 │       ├── cloudinary.ts               # uploadImage() helper — not yet called from any route/component
-│       ├── vendor.ts                   # getCurrentVendor() — the auth→Vendor lookup used by every dashboard route; resolveVendorSlug() (Story 2.2, AD-7)
+│       ├── vendor.ts                   # getCurrentVendor() — the auth→Vendor lookup used by every dashboard route; resolveVendorSlug() (Story 2.2, AD-7); assertVendorActive()/VendorDeactivatedError (Story 2.3, AD-4)
 │       ├── admin.ts                    # getCurrentAdmin() (Story 2.1) — mirrors getCurrentVendor()'s shape
 │       └── utils.ts                    # slugify, formatPrice, formatPickupWindow — the canonical formatPrice per project-context.md
 │

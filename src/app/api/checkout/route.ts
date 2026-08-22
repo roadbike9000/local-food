@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
+import { assertVendorActive, VendorDeactivatedError } from "@/lib/vendor";
 import { CheckoutSchema } from "./schema";
 
 export async function POST(req: Request) {
@@ -21,6 +22,28 @@ export async function POST(req: Request) {
   }
 
   const { vendorId, customerName, customerPhone, items } = parsed.data;
+
+  // Vendor-active check first (Story 2.3, AD-4) - fail fast before
+  // bothering to query products for a bad/deactivated vendor. This route
+  // never fetched the Vendor row before this story.
+  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  if (!vendor) {
+    return NextResponse.json(
+      { error: "One or more items are unavailable" },
+      { status: 400 },
+    );
+  }
+  try {
+    assertVendorActive(vendor);
+  } catch (err) {
+    if (err instanceof VendorDeactivatedError) {
+      return NextResponse.json(
+        { error: "This vendor is no longer accepting orders" },
+        { status: 400 },
+      );
+    }
+    throw err;
+  }
 
   // A cart can list the same product across multiple lines; aggregate the
   // requested quantity per product so both checks below evaluate total

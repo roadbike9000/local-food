@@ -3,6 +3,8 @@ import {
   getVendorBySlug,
   createTestProduct,
   deleteProduct,
+  createTestVendor,
+  deleteVendorBySlug,
   prisma,
 } from "./helpers/db";
 
@@ -414,4 +416,40 @@ test.describe("storefront and cart", () => {
       await deleteProduct(product.id);
     }
   });
+
+  test(
+    "[P0] a deactivated vendor's storefront shows a \"no longer available\" message instead of listings (Story 2.3, AC #2)",
+    async ({ page }) => {
+      // Throwaway fixture vendor only - never deactivate corner-sourdough or
+      // green-valley-produce; every other test in this suite depends on
+      // both staying orderable. This fixture also has zero products/pickup
+      // slots by default, which is what makes the "no listing/banner"
+      // assertions below meaningful without extra setup.
+      const vendor = await createTestVendor({ deletedAt: new Date() });
+
+      try {
+        await page.goto(`/vendors/${vendor.slug}`);
+
+        // AC #2 is explicit this is a real 200 with a message, not a 404 -
+        // the vendor's name still renders.
+        await expect(
+          page.getByRole("heading", { name: vendor.name, exact: true }),
+        ).toBeVisible();
+
+        // The "no longer available" message replaces the pickup-slot
+        // banner and product listing (exact copy per the story's Task 4).
+        await expect(
+          page.getByText(/this vendor is no longer available/i),
+        ).toBeVisible();
+
+        // No product listing (no "Add" buttons) and no pickup-slot banner.
+        await expect(page.getByRole("button", { name: "Add" })).toHaveCount(
+          0,
+        );
+        await expect(page.getByText(/next pickup/i)).not.toBeVisible();
+      } finally {
+        await deleteVendorBySlug(vendor.slug);
+      }
+    },
+  );
 });

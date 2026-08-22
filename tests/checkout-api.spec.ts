@@ -2,8 +2,10 @@ import { test, expect } from "@playwright/test";
 import {
   getVendorBySlug,
   createTestProduct,
+  createTestVendor,
   deleteProduct,
   deleteOrder,
+  deleteVendorBySlug,
   prisma,
 } from "./helpers/db";
 
@@ -162,6 +164,43 @@ test.describe("checkout API", () => {
         expect(body.error).toBe("One or more items don't have enough stock");
       } finally {
         await deleteProduct(lowStock.id);
+      }
+    },
+  );
+
+  // Throwaway fixture vendor/product only - never deactivate
+  // corner-sourdough/green-valley-produce, every other test in this suite
+  // depends on both staying orderable.
+  test(
+    "checkout rejects an order for a deactivated vendor's product (400) — Story 2.3, AC #2",
+    async ({ request }) => {
+      const vendor = await createTestVendor({ deletedAt: new Date() });
+      const product = await createTestProduct(vendor.id, { stockQuantity: 10 });
+
+      try {
+        const response = await request.post("/api/checkout", {
+          data: {
+            vendorId: vendor.id,
+            customerName: "Playwright Deactivated Vendor Check",
+            customerPhone: "+15005550096",
+            items: [{ productId: product.id, quantity: 1 }],
+          },
+        });
+
+        expect(response.status()).toBe(400);
+        // Pins the new, more specific message Task 5 adds - distinct from
+        // the existing "One or more items are unavailable" message used
+        // for a missing vendor/product.
+        const body = await response.json();
+        expect(body.error).toMatch(/no longer accepting orders/i);
+
+        const order = await prisma.order.findFirst({
+          where: { vendorId: vendor.id, customerPhone: "+15005550096" },
+        });
+        expect(order).toBeNull();
+      } finally {
+        await deleteProduct(product.id);
+        await deleteVendorBySlug(vendor.slug);
       }
     },
   );

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ProductCard } from "@/components/ProductCard";
 import { formatPickupWindow } from "@/lib/utils";
+import { assertVendorActive, VendorDeactivatedError } from "@/lib/vendor";
 
 // A vendor's storefront. The [slug] folder name makes this a dynamic route:
 // /vendors/corner-sourdough -> params.slug === "corner-sourdough"
@@ -27,6 +28,25 @@ export default async function StorefrontPage({
   });
 
   if (!vendor) notFound();
+
+  // Story 2.3, AC #2: a deactivated vendor's storefront stays reachable
+  // (real 200, name still shown) - not notFound(). Only the listing/banner
+  // is replaced with a message; the route itself must not 404.
+  try {
+    assertVendorActive(vendor);
+  } catch (err) {
+    if (err instanceof VendorDeactivatedError) {
+      return (
+        <div>
+          <h1 className="text-3xl font-bold">{vendor.name}</h1>
+          <p className="mt-1 text-stone-600">
+            This vendor is no longer available.
+          </p>
+        </div>
+      );
+    }
+    throw err;
+  }
 
   return (
     <div>

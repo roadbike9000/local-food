@@ -109,3 +109,30 @@ export async function deletePickupSlotByLocation(
 export async function deleteVendorBySlug(slug: string) {
   await prisma.vendor.deleteMany({ where: { slug } });
 }
+
+// Story 2.3: throwaway vendor fixtures for deactivation tests - never use
+// the seeded corner-sourdough/green-valley-produce vendors for this, every
+// other test in the suite assumes both stay orderable. Timestamped unique
+// name/slug by default, same convention as createTestProduct. deletedAt/
+// deletedByAdminId let a test start pre-deactivated directly (bypassing
+// the real deactivate route) when it only cares about the downstream
+// effects (storefront message, checkout rejection), not the deactivation
+// mechanism itself.
+export async function createTestVendor(
+  overrides: Partial<{
+    name: string;
+    slug: string;
+    deletedAt: Date | null;
+    deletedByAdminId: string | null;
+  }> = {},
+) {
+  const unique = Date.now();
+  return prisma.vendor.create({
+    data: {
+      name: overrides.name ?? `Test Vendor (Playwright) ${unique}`,
+      slug: overrides.slug ?? `test-vendor-playwright-${unique}`,
+      deletedAt: overrides.deletedAt ?? null,
+      deletedByAdminId: overrides.deletedByAdminId ?? null,
+    },
+  });
+}

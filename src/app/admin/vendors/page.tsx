@@ -1,17 +1,56 @@
 import { notFound } from "next/navigation";
 import { getCurrentAdmin } from "@/lib/admin";
+import { prisma } from "@/lib/prisma";
 import { AddVendorForm } from "@/components/admin/AddVendorForm";
+import { DeactivateVendorButton } from "@/components/admin/DeactivateVendorButton";
 
-// Admin vendor onboarding (Story 2.2, AD-6). Same per-page gate as
-// src/app/admin/page.tsx - no shared layout guard exists yet.
+// Admin vendor onboarding + deactivation (Stories 2.2/2.3, AD-6). Same
+// per-page gate as src/app/admin/page.tsx - no shared layout guard exists
+// yet.
 export default async function AdminVendorsPage() {
   const admin = await getCurrentAdmin();
   if (!admin) notFound();
+
+  // No deletedAt filter - the admin needs to see deactivated vendors too,
+  // not just active ones (Story 2.3, Task 6).
+  const vendors = await prisma.vendor.findMany({
+    orderBy: { createdAt: "desc" },
+  });
 
   return (
     <div>
       <h1 className="text-2xl font-bold">Add a vendor</h1>
       <AddVendorForm />
+
+      <h2 className="mb-3 mt-8 text-lg font-semibold">Vendors</h2>
+      {vendors.length === 0 ? (
+        <p className="text-stone-500">No vendors yet.</p>
+      ) : (
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-stone-200 text-left text-stone-500">
+              <th className="py-2">Name</th>
+              <th className="py-2">Slug</th>
+              <th className="py-2">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {vendors.map((v) => (
+              <tr key={v.id} className="border-b border-stone-100">
+                <td className="py-2">{v.name}</td>
+                <td className="py-2">{v.slug}</td>
+                <td className="py-2">
+                  {v.deletedAt ? (
+                    <span className="text-stone-500">Deactivated</span>
+                  ) : (
+                    <DeactivateVendorButton vendorId={v.id} vendorName={v.name} />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
