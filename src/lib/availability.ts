@@ -22,3 +22,20 @@ export const PLACEHOLDER_LOW_STOCK_THRESHOLD = 0;
 export function isInStock(product: { stockQuantity: number }): boolean {
   return product.stockQuantity > 0;
 }
+
+/**
+ * The single, canonical low-stock check (Story 3.1, AC #2) — same
+ * pure/dual-usable shape as isInStock above. The `=== 0` branch is
+ * defensive, not logically necessary given today's data (a threshold
+ * >= 0 already makes stockQuantity <= lowStockThreshold true at 0), but
+ * nothing in the schema enforces lowStockThreshold >= 0 at the DB level.
+ */
+export function isLowStock(product: {
+  stockQuantity: number;
+  lowStockThreshold: number;
+}): boolean {
+  return (
+    product.stockQuantity <= product.lowStockThreshold ||
+    product.stockQuantity === 0
+  );
+}

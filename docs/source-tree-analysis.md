@@ -31,9 +31,10 @@ local-food/
 │   │   │   ├── orders/page.tsx         # GET /dashboard/orders — read-only table, take: 50
 │   │   │   └── pickups/page.tsx        # GET /dashboard/pickups — read-only list; "Add slot" button unwired
 │   │   │
-│   │   ├── admin/                     # admin-only area (Stories 2.1/2.2/2.3) — per-page gated via getCurrentAdmin()+notFound(), no shared layout guard
-│   │   │   ├── page.tsx                # GET /admin — stub proving the gate (Story 2.1)
-│   │   │   └── vendors/page.tsx        # GET /admin/vendors — onboards a new unbound Vendor + lists/deactivates existing ones (Stories 2.2/2.3)
+│   │   ├── admin/                     # admin-only area (Stories 2.1/2.2/2.3/3.1) — per-page gated via getCurrentAdmin()+notFound(), no shared layout guard
+│   │   │   ├── page.tsx                # GET /admin — stub proving the gate (Story 2.1), links to /admin/vendors and /admin/inventory
+│   │   │   ├── vendors/page.tsx        # GET /admin/vendors — onboards a new unbound Vendor + lists/deactivates existing ones (Stories 2.2/2.3)
+│   │   │   └── inventory/page.tsx      # GET /admin/inventory — read-only cross-vendor stock-level dashboard, flags low-stock products (Story 3.1)
 │   │   │
 │   │   └── api/                       # route handlers — INTEGRATION POINT for external services
 │   │       ├── checkout/route.ts         # POST — creates Order(PENDING) + Stripe session; recomputes prices server-side; rejects a deactivated vendor (Story 2.3)
@@ -58,6 +59,7 @@ local-food/
 │       ├── cloudinary.ts               # uploadImage() helper — not yet called from any route/component
 │       ├── vendor.ts                   # getCurrentVendor() — the auth→Vendor lookup used by every dashboard route; resolveVendorSlug() (Story 2.2, AD-7); assertVendorActive()/VendorDeactivatedError (Story 2.3, AD-4)
 │       ├── admin.ts                    # getCurrentAdmin() (Story 2.1) — mirrors getCurrentVendor()'s shape
+│       ├── availability.ts             # isInStock()/isLowStock() (Story 3.1) — pure, Prisma-free stock-status checks; deliberately kept out of inventory.ts so client components can import them too
 │       └── utils.ts                    # slugify, formatPrice, formatPickupWindow — the canonical formatPrice per project-context.md
 │
 ├── tests/                             # flat, NOT mirrored to src/ — one file per feature area

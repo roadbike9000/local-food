@@ -64,7 +64,7 @@ development_status:
   epic-2-retrospective: done
 
   epic-3: in-progress
-  3-1-admin-inventory-dashboard: ready-for-dev
+  3-1-admin-inventory-dashboard: review
   3-2-low-stock-sms-alert-to-admin: backlog
   epic-3-retrospective: optional
 
