@@ -59,7 +59,7 @@ local-food/
 │       ├── cloudinary.ts               # uploadImage() helper — not yet called from any route/component
 │       ├── vendor.ts                   # getCurrentVendor() — the auth→Vendor lookup used by every dashboard route; resolveVendorSlug() (Story 2.2, AD-7); assertVendorActive()/VendorDeactivatedError (Story 2.3, AD-4)
 │       ├── admin.ts                    # getCurrentAdmin() (Story 2.1) — mirrors getCurrentVendor()'s shape
-│       ├── availability.ts             # isInStock()/isLowStock() (Story 3.1) — pure, Prisma-free stock-status checks; deliberately kept out of inventory.ts so client components can import them too
+│       ├── availability.ts             # isInStock() (Story 1.2/AD-2), isLowStock() (Story 3.1) — pure, Prisma-free stock-status checks; deliberately kept out of inventory.ts so client components can import them too. Both re-exported from inventory.ts for server-side callers.
 │       └── utils.ts                    # slugify, formatPrice, formatPickupWindow — the canonical formatPrice per project-context.md
 │
 ├── tests/                             # flat, NOT mirrored to src/ — one file per feature area

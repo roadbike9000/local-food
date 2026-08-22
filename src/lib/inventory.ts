@@ -14,6 +14,7 @@ export {
   PLACEHOLDER_STOCK_QUANTITY,
   PLACEHOLDER_LOW_STOCK_THRESHOLD,
   isInStock,
+  isLowStock,
 } from "@/lib/availability";
 
 /**

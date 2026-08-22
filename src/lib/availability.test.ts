@@ -42,4 +42,16 @@ describe("isLowStock", () => {
   it("returns true when stockQuantity is 0 with a positive threshold", () => {
     expect(isLowStock({ stockQuantity: 0, lowStockThreshold: 5 })).toBe(true);
   });
+
+  // The `|| stockQuantity === 0` branch is unreachable via the `<=`
+  // comparison alone unless lowStockThreshold is negative - nothing in
+  // the schema enforces >= 0. This is the one input class that actually
+  // distinguishes the two clauses; without it, deleting the `=== 0`
+  // clause entirely would leave every other case above still passing
+  // (review finding).
+  it("returns true when stockQuantity is 0 even with a negative threshold", () => {
+    expect(isLowStock({ stockQuantity: 0, lowStockThreshold: -1 })).toBe(
+      true,
+    );
+  });
 });
