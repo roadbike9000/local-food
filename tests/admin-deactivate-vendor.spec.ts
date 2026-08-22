@@ -83,16 +83,21 @@ test.describe("POST /api/admin/vendors/[id]/deactivate (ATDD, Story 2.3)", () =>
     test(
       "[P0] deactivating an already-deactivated vendor is idempotent: 200, deletedByAdminId unchanged (Task 3)",
       async ({ request }) => {
-        // Pre-deactivated by a different (fake) admin id via the test
+        // Pre-deactivated by a *different, real* admin row via the test
         // helper, bypassing the real route entirely - proves the route's
-        // check-then-conditionally-update guard doesn't reassign
-        // attribution to whoever double-clicks/retries the deactivate
-        // call. The real seeded admin below is a *different* admin than
-        // whoever "originally" deactivated this fixture.
-        const originalDeactivatorId = "some-other-admin-id";
+        // atomic-claim guard (updateMany({ where: { deletedAt: null } }))
+        // doesn't reassign attribution to whoever double-clicks/retries
+        // the deactivate call. Must be a real Admin row, not a fake id
+        // string: Vendor.deletedByAdminId has a real FK constraint
+        // (review finding - the original version of this test used a
+        // fake id and failed every run with P2003, invisible only because
+        // the whole block was skipped for want of admin credentials).
+        const originalDeactivator = await prisma.admin.create({
+          data: { clerkUserId: `test-original-deactivator-${Date.now()}` },
+        });
         const vendor = await createTestVendor({
           deletedAt: new Date(),
-          deletedByAdminId: originalDeactivatorId,
+          deletedByAdminId: originalDeactivator.id,
         });
 
         try {
@@ -108,9 +113,10 @@ test.describe("POST /api/admin/vendors/[id]/deactivate (ATDD, Story 2.3)", () =>
           expect(persisted?.deletedAt).not.toBeNull();
           // Attribution must stay with whoever deactivated it first, not
           // get overwritten by this retry's caller.
-          expect(persisted?.deletedByAdminId).toBe(originalDeactivatorId);
+          expect(persisted?.deletedByAdminId).toBe(originalDeactivator.id);
         } finally {
           await deleteVendorBySlug(vendor.slug);
+          await prisma.admin.delete({ where: { id: originalDeactivator.id } });
         }
       },
     );

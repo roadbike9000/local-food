@@ -106,6 +106,10 @@ export async function deletePickupSlotByLocation(
 // Story 2.2: test cleanup for admin-created Vendor rows. Scoped by slug
 // (not id) since the admin-creation flow's callers only know the slug they
 // chose - never the seeded corner-sourdough/green-valley-produce vendors.
+// Story 2.3: Product/Order now onDelete:Restrict on their vendor FK (was
+// Cascade) - a caller that created Products/Orders for this vendor must
+// delete them first (deleteProduct/deleteOrder), or this throws P2003
+// instead of cascading them away silently.
 export async function deleteVendorBySlug(slug: string) {
   await prisma.vendor.deleteMany({ where: { slug } });
 }
@@ -126,7 +130,11 @@ export async function createTestVendor(
     deletedByAdminId: string | null;
   }> = {},
 ) {
-  const unique = Date.now();
+  // Date.now() alone can collide between two workers under
+  // fullyParallel:true if they happen to create a vendor in the same
+  // millisecond (review finding) - add a random suffix so two concurrent
+  // callers can never land on the same default slug.
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   return prisma.vendor.create({
     data: {
       name: overrides.name ?? `Test Vendor (Playwright) ${unique}`,

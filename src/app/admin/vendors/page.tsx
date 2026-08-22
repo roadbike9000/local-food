@@ -12,9 +12,12 @@ export default async function AdminVendorsPage() {
   if (!admin) notFound();
 
   // No deletedAt filter - the admin needs to see deactivated vendors too,
-  // not just active ones (Story 2.3, Task 6).
+  // not just active ones (Story 2.3, Task 6). take: 50 matches the
+  // pagination precedent in src/app/dashboard/orders/page.tsx - this list
+  // has no pagination UI yet, just a sane upper bound.
   const vendors = await prisma.vendor.findMany({
     orderBy: { createdAt: "desc" },
+    take: 50,
   });
 
   return (

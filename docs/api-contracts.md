@@ -27,7 +27,7 @@ Creates a `PENDING` order and a Stripe Checkout session.
 
 **Behavior:**
 1. `req.json().catch(() => null)` then `safeParse` — malformed JSON or schema mismatch → `400 { error: "Invalid request" }`.
-2. **Vendor lookup and active check (Story 2.3, AD-4), before anything else runs.** `prisma.vendor.findUnique({ where: { id: vendorId } })` — missing → `400 { error: "One or more items are unavailable" }` (the same message a missing/wrong-vendor product also produces, kept consistent). Found → `assertVendorActive(vendor)` in a `try/catch`; a deactivated vendor (`VendorDeactivatedError`) → `400 { error: "This vendor is no longer accepting orders" }`. Fails fast, before the product query below runs at all.
+2. **Vendor lookup and active check (Story 2.3, AD-4), before the product query.** `prisma.vendor.findUnique({ where: { id: vendorId } })` — missing → `400 { error: "One or more items are unavailable" }` (the same message a missing/wrong-vendor product also produces, kept consistent). Found → `assertVendorActive(vendor)` in a `try/catch`; a deactivated vendor (`VendorDeactivatedError`) → `400 { error: "This vendor is no longer accepting orders" }`. Fails fast, before the product query below runs at all.
 3. Quantities are aggregated per `productId` first (a cart can list the same product on multiple lines), then the distinct products are re-fetched from the DB, filtered by `vendorId`. If the count doesn't match the number of distinct requested products (one is deleted or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
 4. Stock sufficiency check: `stockQuantity >= totalRequestedQuantity` per product (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean; totaled across duplicate lines for the same product). Any short product rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created. **This check is a point-in-time read with no reservation or transaction** — it does not itself prevent two concurrent checkouts from both passing for the same last unit. Stock itself is never written here; the actual decrement happens later, in `POST /api/webhooks/stripe`, only once Stripe confirms payment (Story 1.4) — see that route's contract below.
 5. Computes `totalCents` from DB prices — the client-sent price (there is none in this schema) can never influence the charge.
@@ -95,9 +95,10 @@ Admin-only vendor deactivation (Story 2.3). Soft-deletes a `Vendor` — never a 
 **Auth:** `getCurrentAdmin()` — `401 { error: "Unauthorized" }` if no current admin. Not covered by `middleware.ts`'s matcher, same reasoning as `POST /api/admin/vendors`.
 
 **Behavior:**
-1. `prisma.vendor.findFirst({ where: { id: params.id } })` — `404 { error: "Not found" }` if missing. No ownership scoping (an admin route legitimately operates across all vendors).
-2. **Idempotent**: if the vendor is already deactivated (`deletedAt` already set), returns `200 { vendor }` with the row unchanged — does **not** reassign `deletedByAdminId` to whoever made this call. Only a genuinely active vendor gets updated: `deletedAt: <now>`, `deletedByAdminId: <acting admin's Admin.id>` (AD-5 — targets the row id, not `clerkUserId`).
-3. No un-deactivate/reactivate endpoint exists.
+1. **Atomic claim, not check-then-act**: `prisma.vendor.updateMany({ where: { id: params.id, deletedAt: null }, data: { deletedAt: <now>, deletedByAdminId: <acting admin's Admin.id> } })` (AD-5 — targets the row id, not `clerkUserId`). The `deletedAt: null` guard in the `WHERE` clause means only a genuinely still-active row can be claimed — two concurrent requests can't both "win" and reassign attribution, matching `POST /api/webhooks/stripe`'s `stockDecremented` claim pattern.
+2. `prisma.vendor.findUnique({ where: { id: params.id } })` re-read — `404 { error: "Not found" }` if the vendor doesn't exist. No ownership scoping (an admin route legitimately operates across all vendors).
+3. **Idempotent**: if the vendor was already deactivated before this call, step 1's `updateMany` matches 0 rows and no-ops — the re-read in step 2 returns the row unchanged, still attributed to whoever deactivated it first.
+4. No un-deactivate/reactivate endpoint exists.
 
 **Response:** `200 { vendor: Vendor }` — the current (possibly just-updated) row.
 

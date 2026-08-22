@@ -23,22 +23,25 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const vendor = await prisma.vendor.findFirst({ where: { id: params.id } });
+  // Atomic claim, not check-then-act (review finding): the WHERE clause's
+  // `deletedAt: null` only matches a genuinely still-active row, so two
+  // concurrent requests can't both "win" - the second's updateMany matches
+  // 0 rows and correctly no-ops, leaving deletedByAdminId attributed to
+  // whoever deactivated it first. A plain findFirst-then-update (the
+  // original shape here) is a real race: two simultaneous double-clicks
+  // could both observe deletedAt: null and both write, the second
+  // silently reassigning attribution - exactly what AD-5 exists to
+  // prevent. Same pattern already established in
+  // src/app/api/webhooks/stripe/route.ts's stockDecremented claim.
+  await prisma.vendor.updateMany({
+    where: { id: params.id, deletedAt: null },
+    data: { deletedAt: new Date(), deletedByAdminId: admin.id },
+  });
+
+  const vendor = await prisma.vendor.findUnique({ where: { id: params.id } });
   if (!vendor) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Idempotent: an already-deactivated vendor is returned as-is, not
-  // re-updated - a retry/double-click must not reassign deletedByAdminId
-  // away from whoever actually deactivated it first (AD-5's attribution
-  // would otherwise silently lie about who did it).
-  if (vendor.deletedAt) {
-    return NextResponse.json({ vendor }, { status: 200 });
-  }
-
-  const updated = await prisma.vendor.update({
-    where: { id: vendor.id },
-    data: { deletedAt: new Date(), deletedByAdminId: admin.id },
-  });
-  return NextResponse.json({ vendor: updated }, { status: 200 });
+  return NextResponse.json({ vendor }, { status: 200 });
 }

@@ -422,10 +422,28 @@ test.describe("storefront and cart", () => {
     async ({ page }) => {
       // Throwaway fixture vendor only - never deactivate corner-sourdough or
       // green-valley-produce; every other test in this suite depends on
-      // both staying orderable. This fixture also has zero products/pickup
-      // slots by default, which is what makes the "no listing/banner"
-      // assertions below meaningful without extra setup.
-      const vendor = await createTestVendor({ deletedAt: new Date() });
+      // both staying orderable. Deliberately NOT deactivated at creation -
+      // gets a real product and pickup slot first, then is deactivated
+      // afterward, so the "no listing/banner" assertions below prove the
+      // deactivation branch actually suppresses them, rather than passing
+      // vacuously because there was nothing to list in the first place
+      // (review finding against an earlier zero-fixture version of this
+      // test).
+      const vendor = await createTestVendor();
+      const product = await createTestProduct(vendor.id, {
+        name: "Playwright Deactivated Vendor Product",
+      });
+      await prisma.pickupSlot.create({
+        data: {
+          vendorId: vendor.id,
+          startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          endsAt: new Date(Date.now() + 25 * 60 * 60 * 1000),
+        },
+      });
+      await prisma.vendor.update({
+        where: { id: vendor.id },
+        data: { deletedAt: new Date() },
+      });
 
       try {
         await page.goto(`/vendors/${vendor.slug}`);
@@ -442,12 +460,21 @@ test.describe("storefront and cart", () => {
           page.getByText(/this vendor is no longer available/i),
         ).toBeVisible();
 
-        // No product listing (no "Add" buttons) and no pickup-slot banner.
+        // The vendor has a real product and pickup slot - if the
+        // deactivation branch weren't suppressing them, both would render.
+        await expect(
+          page.getByText(product.name),
+        ).not.toBeVisible();
         await expect(page.getByRole("button", { name: "Add" })).toHaveCount(
           0,
         );
         await expect(page.getByText(/next pickup/i)).not.toBeVisible();
       } finally {
+        // Product first: onDelete:Restrict on Product.vendor (Story 2.3)
+        // means the vendor delete below would fail with P2003 otherwise.
+        // The pickup slot stays onDelete:Cascade, no explicit cleanup
+        // needed for it.
+        await deleteProduct(product.id);
         await deleteVendorBySlug(vendor.slug);
       }
     },

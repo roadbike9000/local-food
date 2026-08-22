@@ -4,7 +4,11 @@ import { VendorCard } from "@/components/VendorCard";
 // The homepage: a directory of vendors. This is a server component, so the
 // database query runs on the server and only HTML is sent to the browser.
 export default async function HomePage() {
+  // Deactivated vendors (Story 2.3) must not appear in the public directory
+  // - their storefront still resolves (shows a "no longer available"
+  // message) but shouldn't be discoverable from here.
   const vendors = await prisma.vendor.findMany({
+    where: { deletedAt: null },
     orderBy: { createdAt: "asc" },
     include: { _count: { select: { products: true } } },
   });

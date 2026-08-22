@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: 2-3-admin-deactivates-a-vendor (2026-08-22)
+
+- source_spec: `_bmad-output/implementation-artifacts/2-3-admin-deactivates-a-vendor.md`
+  summary: A deactivated vendor's own `/dashboard/*` access is completely untouched by this story (a deliberate scope decision, per the story's Dev Notes) - so a deactivated vendor can still sign in and create new `Product`/`PickupSlot` rows via `POST /api/products`/`POST /api/pickup-slots`, neither of which calls `assertVendorActive()`. Those new rows are inert (checkout still rejects the vendor, storefront still shows "no longer available"), but the vendor dashboard itself gives no indication anything is wrong.
+  evidence: Code review (round 1, Edge Case Hunter). Confirmed by reading `src/app/api/products/route.ts` and `src/app/api/pickup-slots/route.ts` in full - both `GET`/`POST` handlers call only `getCurrentVendor()`, never `assertVendorActive()`. Explicitly out of Story 2.3's stated scope (deactivation was scoped to storefront/checkout/admin-list only), so not fixed here - flagged forward for whichever story next touches vendor-dashboard write paths.
+
 ## Deferred from: 2-2-admin-adds-a-vendor (2026-08-22)
 
 - source_spec: `_bmad-output/implementation-artifacts/2-2-admin-adds-a-vendor.md`
