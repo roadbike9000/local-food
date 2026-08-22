@@ -103,6 +103,15 @@ so that they can start selling without self-registering.
 - `test.describe.configure({ mode: "serial" })` on any block using either shared session, same Clerk/Playwright concurrency workaround (clerk/javascript#7891) already applied everywhere else authenticated tests exist in this codebase.
 - Every test that creates a `Vendor` must clean up via `deleteVendorBySlug()` in a `finally`, using a timestamped unique slug/name per fixture (matches every other test's isolation convention under `fullyParallel: true`) — never reuse a fixed slug across test runs, and never touch the two seeded vendors (`corner-sourdough`, `green-valley-produce`) except as the deliberate collision target in the slug-conflict test.
 
+### ATDD Artifacts
+
+- Checklist: `_bmad-output/test-artifacts/atdd-checklist-2-2-admin-adds-a-vendor.md`
+- Unit tests: `src/app/api/admin/vendors/schema.test.ts` (new, 6 cases, `CreateVendorSchema`)
+- API tests: `tests/admin-vendors-api.spec.ts` (new, 4 cases — all P0)
+- E2E tests: `tests/admin-vendors.spec.ts` (new, 2 cases)
+- Fixture built ahead of schedule: `tests/helpers/db.ts`'s `deleteVendorBySlug()` (Task 7, already done — both new test files needed it immediately)
+- Activate task-by-task per the checklist's "Next Steps" section — not all at once. Note: Task 6's `AddVendorForm` selectors (`aria-label="Add vendor"`, button text `"Save vendor"`) were inferred by analogy to `AddProductForm.tsx` since the component didn't exist yet — match these strings or update the two E2E selectors when Task 6 lands.
+
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 2.2] — story definition, ACs, FR3 traceability.

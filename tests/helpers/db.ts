@@ -102,3 +102,10 @@ export async function deletePickupSlotByLocation(
 ) {
   await prisma.pickupSlot.deleteMany({ where: { vendorId, location } });
 }
+
+// Story 2.2: test cleanup for admin-created Vendor rows. Scoped by slug
+// (not id) since the admin-creation flow's callers only know the slug they
+// chose - never the seeded corner-sourdough/green-valley-produce vendors.
+export async function deleteVendorBySlug(slug: string) {
+  await prisma.vendor.deleteMany({ where: { slug } });
+}
