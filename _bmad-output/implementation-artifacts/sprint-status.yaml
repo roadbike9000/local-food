@@ -63,9 +63,9 @@ development_status:
   2-3-admin-deactivates-a-vendor: done
   epic-2-retrospective: done
 
-  epic-3: in-progress
+  epic-3: done
   3-1-admin-inventory-dashboard: done
-  3-2-low-stock-sms-alert-to-admin: review
+  3-2-low-stock-sms-alert-to-admin: done
   epic-3-retrospective: optional
 
 action_items:

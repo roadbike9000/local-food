@@ -55,7 +55,10 @@ export function stockShortfallMessage(
   vendorName: string,
   orderId: string,
   requested: number,
-  available: number,
+  // string accepted for the "product row no longer exists" case - a
+  // literal 0 would misleadingly read as "0 units in stock" rather
+  // than "this product was deleted" (review finding).
+  available: number | string,
 ): string {
   return `Stock shortfall: order #${orderId.slice(-6)} for ${productName} (${vendorName}) couldn't be fully fulfilled - requested ${requested}, only ${available} available. Payment was captured.`;
 }

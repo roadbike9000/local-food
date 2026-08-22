@@ -139,6 +139,37 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
   // fix from restructuring to updateMany + findUnique, not new scope.
   if (!order) return;
 
+  // Notify the customer once. Only record it as notified if the SMS
+  // actually sent — a Twilio failure must not mark this done, or the
+  // customer never gets retried. Also gated on status === "PAID"
+  // (deferred-work.md, Story 1.4 round 2): the smsNotified guard alone
+  // let a replayed webhook for an order that had since moved to
+  // CANCELLED still send "your order is confirmed" - correct, since
+  // stock is untouched for a CANCELLED order, but the message no
+  // longer matches the record.
+  //
+  // Runs before the stock-decrement/admin-alert block below (review
+  // finding, Story 3.2): that block can now issue several sequential
+  // SMS sends of its own (one per admin phone, per crossed/shortfalled
+  // product) - putting the customer's own confirmation first means a
+  // slow or hanging admin-alert loop can never delay it, and a
+  // serverless timeout mid-admin-loop still leaves the customer
+  // notified. Independent of stockDecremented - this is a separate
+  // retry-recovery path for the SMS specifically, not gated on whether
+  // this call is also the one that decrements stock.
+  if (order.status === "PAID" && !order.smsNotified) {
+    const sent = await sendSms(
+      order.customerPhone,
+      orderConfirmedMessage(order.vendor.name, order.id),
+    );
+    if (sent) {
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { smsNotified: true },
+      });
+    }
+  }
+
   // `stockDecremented` is the retry-safe guard for whether decrementing
   // still needs to happen - not whether *this* call made the PENDING ->
   // PAID transition. But a plain read-then-act check here (read the
@@ -272,7 +303,15 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
             currentStock.find((p) => p.id === s.productId)
               ?.stockQuantity ?? null,
         })),
-        crossedLowStockProductIds,
+        // Empty, not `crossedLowStockProductIds` (review finding): every
+        // entry in that list came from `applied`, and the compensation
+        // loop above just incremented *all* of `applied` back - a
+        // product that "crossed" on this pass was, on a shortfall,
+        // never actually left decremented. Returning the list here
+        // would send a false "down to N units" alert for a product
+        // sitting back at its pre-webhook stock, and permanently
+        // poison `lowStockAlerted` for a threshold it never crossed.
+        crossedLowStockProductIds: [] as string[],
       };
     });
 
@@ -300,31 +339,52 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
       // lowStockAlerted - each shortfall represents a real
       // already-charged order, worth surfacing every time it recurs,
       // not deduped like the routine crossing alert.
+      //
+      // Aggregated by productId before sending (review finding) - the
+      // same product can appear on two OrderItem lines of one order,
+      // and result.shortfalls is per-line; without this, two identical
+      // texts would go out for what the admin experiences as one event.
+      const shortfallByProduct = new Map<
+        string,
+        { requested: number; available: number | null }
+      >();
+      for (const s of result.shortfalls) {
+        const existing = shortfallByProduct.get(s.productId);
+        shortfallByProduct.set(s.productId, {
+          requested: (existing?.requested ?? 0) + s.requested,
+          available: s.available,
+        });
+      }
       const shortfallProducts = await prisma.product.findMany({
-        where: { id: { in: result.shortfalls.map((s) => s.productId) } },
+        where: { id: { in: [...shortfallByProduct.keys()] } },
         select: { id: true, name: true },
       });
-      const shortfallAdminPhones = await getAdminPhoneNumbers();
-      for (const shortfall of result.shortfalls) {
+      const adminPhones = await getAdminPhoneNumbers();
+      for (const [productId, agg] of shortfallByProduct) {
         const productName =
-          shortfallProducts.find((p) => p.id === shortfall.productId)
-            ?.name ?? shortfall.productId;
+          shortfallProducts.find((p) => p.id === productId)?.name ??
+          productId;
         const message = stockShortfallMessage(
           productName,
           order.vendor.name,
           order.id,
-          shortfall.requested,
-          shortfall.available ?? 0,
+          agg.requested,
+          // `null` means the product row no longer exists (see
+          // ShortfallDetail's own comment) - distinct from "0
+          // available," which the admin would otherwise misread as "go
+          // check current stock" instead of "this product was deleted"
+          // (review finding).
+          agg.available === null ? "unknown (product deleted)" : agg.available,
         );
         let anySent = false;
-        for (const phone of shortfallAdminPhones) {
+        for (const phone of adminPhones) {
           if (await sendSms(phone, message)) anySent = true;
         }
-        if (!anySent && shortfallAdminPhones.length > 0) {
+        if (!anySent && adminPhones.length > 0) {
           console.error(
             "[webhooks/stripe] shortfall alert failed to send",
             order.id,
-            shortfall.productId,
+            productId,
           );
         }
       }
@@ -333,11 +393,18 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
     // Story 3.2, AC #2, #3: a newly-crossed low-stock threshold alerts
     // the admin. Sent outside the transaction (an SMS is an external
     // network call and must never run while holding DB row locks).
-    // lowStockAlerted is only set after a successful send (AC #3, #4) -
-    // no atomic claim needed here, since crossedLowStock was already
-    // computed inside a transaction gated by the outer stockDecremented
-    // claim above, which guarantees only one concurrent delivery of a
-    // given event ever reaches this code path.
+    //
+    // Claimed atomically BEFORE sending, not after (review finding):
+    // the outer stockDecremented claim only guarantees one concurrent
+    // delivery of a *given order's* event reaches this code, not one
+    // concurrent crossing of a *given product* - two different orders
+    // for the same product can legitimately decrement concurrently
+    // (the normal shape of two customers racing for the last few
+    // units), each independently computing crossedLowStock: true
+    // before either has written the flag. Claiming first closes that
+    // race; if the send then fails, the claim is reverted so AC #4
+    // still holds (never left `true` without an actual successful
+    // send) and a later crossing can try again.
     if (result.crossedLowStockProductIds.length > 0) {
       const crossedProducts = await prisma.product.findMany({
         where: { id: { in: result.crossedLowStockProductIds } },
@@ -348,8 +415,14 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
           lowStockThreshold: true,
         },
       });
-      const lowStockAdminPhones = await getAdminPhoneNumbers();
+      const adminPhones = await getAdminPhoneNumbers();
       for (const product of crossedProducts) {
+        const claim = await prisma.product.updateMany({
+          where: { id: product.id, lowStockAlerted: false },
+          data: { lowStockAlerted: true },
+        });
+        if (claim.count === 0) continue; // another concurrent order already claimed this crossing
+
         const message = lowStockAlertMessage(
           product.name,
           order.vendor.name,
@@ -357,19 +430,20 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
           product.lowStockThreshold,
         );
         let anySent = false;
-        for (const phone of lowStockAdminPhones) {
+        for (const phone of adminPhones) {
           if (await sendSms(phone, message)) anySent = true;
         }
-        if (anySent) {
+        if (!anySent) {
           await prisma.product.update({
             where: { id: product.id },
-            data: { lowStockAlerted: true },
+            data: { lowStockAlerted: false },
           });
-        } else if (lowStockAdminPhones.length > 0) {
-          console.error(
-            "[webhooks/stripe] low-stock alert failed to send",
-            product.id,
-          );
+          if (adminPhones.length > 0) {
+            console.error(
+              "[webhooks/stripe] low-stock alert failed to send",
+              product.id,
+            );
+          }
         }
       }
     }
@@ -378,27 +452,6 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
     // which is not caught here - it propagates to a 5xx, Stripe
     // retries, and since nothing in that failed attempt committed
     // (including the claim), the retry re-attempts cleanly.
-  }
-
-  // Notify the customer once. Only record it as notified if the SMS
-  // actually sent — a Twilio failure must not mark this done, or the
-  // customer never gets retried. Also gated on status === "PAID"
-  // (deferred-work.md, Story 1.4 round 2): the smsNotified guard alone
-  // let a replayed webhook for an order that had since moved to
-  // CANCELLED still send "your order is confirmed" - correct, since
-  // stock is untouched for a CANCELLED order, but the message no
-  // longer matches the record.
-  if (order.status === "PAID" && !order.smsNotified) {
-    const sent = await sendSms(
-      order.customerPhone,
-      orderConfirmedMessage(order.vendor.name, order.id),
-    );
-    if (sent) {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { smsNotified: true },
-      });
-    }
   }
 }
 

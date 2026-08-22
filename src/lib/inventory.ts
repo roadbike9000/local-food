@@ -67,8 +67,16 @@ export async function setStock(
       // let the next sale-driven decrement fire a duplicate alert for
       // stock that was never actually restocked. Deliberately not
       // mirrored in setLowStockThreshold() - a threshold-only edit is
-      // not a restock event, out of this AC's scope.
-      ...(newValue > currentThreshold ? { lowStockAlerted: false } : {}),
+      // not a restock event, out of this AC's scope. Uses isLowStock()
+      // (the canonical check, AD-2) rather than a hand-rolled `>`
+      // comparison - `decrementStock()` already delegates to it, and a
+      // re-derived comparison had drifted from it at a negative
+      // threshold (review finding): `isLowStock` treats `stockQuantity
+      // === 0` as always-low regardless of threshold, which a plain
+      // `newValue > currentThreshold` check didn't.
+      ...(!isLowStock({ stockQuantity: newValue, lowStockThreshold: currentThreshold })
+        ? { lowStockAlerted: false }
+        : {}),
     },
   });
   return result.count === 1;

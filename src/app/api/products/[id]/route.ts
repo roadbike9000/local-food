@@ -70,7 +70,12 @@ export async function PATCH(
       params.id,
       stockQuantity,
       product.stockQuantity,
-      product.lowStockThreshold,
+      // The just-parsed new threshold, not `product.lowStockThreshold`
+      // (the pre-write value read at line 36-38) - the threshold write
+      // above already landed by this point, so the stale value would
+      // make setStock()'s restock-above-threshold check compare against
+      // a threshold the row no longer has (review finding).
+      lowStockThreshold,
       expectedStockVersion,
       confirmPlaceholder,
     );

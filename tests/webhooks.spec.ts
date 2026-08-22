@@ -898,7 +898,7 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
   // threshold also alerts THIS block's admin fixture, if that admin
   // still exists when the other test's webhook fires. Confirmed
   // directly, twice: (1) all 4 pass under `-g "low-stock/shortfall admin
-  // SMS alerts"` alone but fail unpredictably alongside the file's ~29
+  // SMS alerts"` alone but fail unpredictably alongside the file's 19
   // other webhook tests; (2) filtering by product name alone still
   // failed, because dozens of those other tests also use
   // createTestProduct's default name with a stockQuantity that
@@ -1023,6 +1023,7 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
       // failed send with no real Twilio call.
       const admin = await createTestAdmin({ phone: "+15005550001" });
       const product = await createTestProduct(vendor.id, {
+        name: `Playwright Failed Alert Product ${Date.now()}`,
         stockQuantity: 6,
         lowStockThreshold: 5,
       });
@@ -1044,6 +1045,21 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
 
         const updatedProduct = await prisma.product.findUnique({ where: { id: product.id } });
         expect(updatedProduct?.lowStockAlerted).toBe(false);
+
+        // Positive control (review finding): the assertion above alone
+        // can't distinguish "attempted and failed, correctly left
+        // false" from "the alert block never ran at all" - both leave
+        // lowStockAlerted false. The mock provider now records a
+        // failed attempt too (success: false), not just deliveries, so
+        // this proves sendSms() was actually called for this product.
+        const debug = await request.get("/api/debug/sms");
+        const { messages } = await debug.json();
+        const attempted = messages.filter(
+          (m: { to: string; body: string; success: boolean }) =>
+            m.to === admin.phone && m.body.includes(product.name),
+        );
+        expect(attempted).toHaveLength(1);
+        expect(attempted[0].success).toBe(false);
       } finally {
         await deleteOrder(order.id);
         await deleteProduct(product.id);
@@ -1102,6 +1118,74 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
       } finally {
         await deleteOrder(order.id);
         await deleteProduct(product.id);
+        await deleteTestAdmin(admin.id);
+      }
+    },
+  );
+
+  test(
+    "a multi-item order where one line crosses its threshold and another line shortfalls does NOT alert on the rolled-back crossing (review finding)",
+    async ({ request }) => {
+      // Regression test for a real bug found in round-1 review: the
+      // transaction's compensation loop rolls back EVERY applied
+      // decrement on any shortfall in the same order (see the
+      // "multi-item order where only one line is short" test above),
+      // but the low-stock crossing block originally ran unconditionally
+      // afterward - sending a false "down to N units" alert for a
+      // product that was never actually left decremented, and
+      // permanently setting lowStockAlerted on a product sitting back
+      // above its threshold (silencing all future genuine crossings).
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const admin = await createTestAdmin();
+      // Would cross (8 - 3 = 5, at threshold) if it committed alone.
+      const crossing = await createTestProduct(vendor.id, {
+        name: `Playwright Rollback No-Alert Product ${Date.now()}`,
+        stockQuantity: 8,
+        lowStockThreshold: 5,
+      });
+      const shortfalling = await createTestProduct(vendor.id, {
+        stockQuantity: 1,
+      });
+      const order = await createTestOrder(vendor.id, {
+        status: "PENDING",
+        items: [
+          { productId: crossing.id, quantity: 3, unitPriceCents: crossing.priceCents },
+          { productId: shortfalling.id, quantity: 5, unitPriceCents: shortfalling.priceCents },
+        ],
+      });
+
+      try {
+        const payload = buildCheckoutCompletedPayload(order.id);
+        const signature = signPayload(payload);
+        test.skip(!signature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+        const response = await request.post("/api/webhooks/stripe", {
+          headers: { "stripe-signature": signature! },
+          data: payload,
+        });
+        expect(response.status()).toBe(200);
+
+        // The whole order shortfalls (shortfalling needs 5, has 1), so
+        // crossing's decrement is rolled back too - it must be back at
+        // its original stock, comfortably above its own threshold, and
+        // never flagged.
+        const updatedCrossing = await prisma.product.findUnique({
+          where: { id: crossing.id },
+        });
+        expect(updatedCrossing?.stockQuantity).toBe(8);
+        expect(updatedCrossing?.lowStockAlerted).toBe(false);
+
+        const debug = await request.get("/api/debug/sms");
+        const { messages } = await debug.json();
+        const falseAlert = messages.filter(
+          (m: { to: string; body: string }) =>
+            m.to === admin.phone && m.body.includes(crossing.name),
+        );
+        expect(falseAlert).toHaveLength(0);
+      } finally {
+        await deleteOrder(order.id);
+        await deleteProduct(crossing.id);
+        await deleteProduct(shortfalling.id);
         await deleteTestAdmin(admin.id);
       }
     },

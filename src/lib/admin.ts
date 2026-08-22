@@ -22,11 +22,21 @@ export async function getCurrentAdmin() {
  * Nothing in this schema enforces exactly one Admin row. Returns an
  * empty array if none are configured - callers must treat that as the
  * expected, normal state, not an error.
+ *
+ * `phone: { not: null }` doesn't exclude an empty/whitespace-only
+ * string (nothing validates `Admin.phone`'s format at write time) - a
+ * blank value would otherwise still reach `sendSms()`, which the mock
+ * provider records as a successful send (review finding). Trimmed and
+ * filtered here. Deduplicated too - nothing prevents two Admin rows
+ * sharing one phone, which would otherwise double-send every alert.
  */
 export async function getAdminPhoneNumbers(): Promise<string[]> {
   const admins = await prisma.admin.findMany({
     where: { phone: { not: null } },
     select: { phone: true },
   });
-  return admins.map((a) => a.phone as string);
+  const phones = admins
+    .map((a) => (a.phone ?? "").trim())
+    .filter((p) => p.length > 0);
+  return [...new Set(phones)];
 }
