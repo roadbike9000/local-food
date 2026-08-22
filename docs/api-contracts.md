@@ -68,8 +68,8 @@ Admin-only vendor onboarding (Story 2.2). Creates a `Vendor` unbound from any Cl
 **Request body** (`CreateVendorSchema`):
 ```ts
 {
-  name: string,          // min length 1
-  slug: string,          // min length 1 — format/uniqueness resolved server-side, not by this schema
+  name: string,          // trimmed, min length 1 after trimming
+  slug: string,          // trimmed, min length 1 after trimming — format/normalization/uniqueness resolved server-side, not by this schema
   phone?: string,
   description?: string,
 }
@@ -78,11 +78,11 @@ Admin-only vendor onboarding (Story 2.2). Creates a `Vendor` unbound from any Cl
 **Auth:** `getCurrentAdmin()` — `401 { error: "Unauthorized" }` if no current admin. **Not covered by `middleware.ts`'s matcher** (`/admin(.*)` matches page routes under `/admin/*`, not this route's `/api/admin/vendors` path) — this self-check is the sole gate, same as every other API route in this codebase.
 
 **Behavior:**
-1. `req.json().catch(() => null)` then `safeParse` → `400 { error: "Invalid request" }` on failure.
-2. `resolveVendorSlug(slug)` (`src/lib/vendor.ts`, AD-7) normalizes the slug and checks it against existing `Vendor.slug` values. A collision → `409 { error: "The slug \"...\" is already in use — try a different one." }`, never a raw Prisma unique-constraint failure.
-3. Creates the `Vendor` with `clerkUserId: null` (unbound until claimed, AD-8 — binding happens manually, out-of-band, later) and `createdByAdminId` set to the acting admin's `Admin.id` (AD-5 — attribution targets the row id, not `clerkUserId`).
+1. `req.json().catch(() => null)` then `safeParse` → `400 { error: "Invalid request" }` on failure. `name`/`slug` are trimmed and must be non-empty after trimming.
+2. `resolveVendorSlug(slug)` (`src/lib/vendor.ts`, AD-7) normalizes the slug via `slugify()` — **the stored/returned `slug` can differ from what was submitted** (e.g. `"Corner Bakery"` → `"corner-bakery"`), and a submission that normalizes to an empty string (all-punctuation/whitespace input) is rejected rather than creating an unreachable vendor. Then checks the normalized slug against existing `Vendor.slug` values — a collision → `409 { error: "The slug \"...\" is already in use — try a different one." }`.
+3. Creates the `Vendor` with `clerkUserId: null` (unbound until claimed, AD-8 — binding happens manually, out-of-band, later) and `createdByAdminId` set to the acting admin's `Admin.id` (AD-5 — attribution targets the row id, not `clerkUserId`). The create is wrapped in its own `try/catch`: a same-slug race between two concurrent requests (both pass step 2's check before either creates) is caught as a Prisma `P2002` and mapped to the identical friendly `409` — a raw Prisma unique-constraint failure should never reach the client either way. Any other DB failure → `500`, `Sentry.captureException`.
 
-**Response:** `201 { vendor: Vendor }`. The new vendor's storefront is live at `/vendors/{slug}` immediately — no separate publish step.
+**Response:** `201 { vendor: Vendor }` — the full row, including internal fields (`createdByAdminId`, timestamps). Fine today since this route is admin-only; reconsider before ever exposing an equivalent read endpoint outside `/admin/*`. The new vendor's storefront is live at `/vendors/{slug}` immediately — no separate publish step.
 
 ---
 

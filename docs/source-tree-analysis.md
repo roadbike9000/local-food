@@ -42,7 +42,7 @@ local-food/
 │   │       ├── admin/vendors/route.ts    # POST — admin-scoped via getCurrentAdmin(); NOT covered by middleware's /admin(.*) matcher (different path prefix)
 │   │       └── webhooks/stripe/route.ts  # POST — Stripe signature verify (raw body) → Order PAID → Twilio SMS
 │   │
-│   ├── components/                    # flat, no subfolders — 4 files
+│   ├── components/                    # top-level files are flat; admin/ is the first documented subfolder (Story 2.2) — components/dashboard/ (AddProductForm.tsx, AddSlotForm.tsx, EditStockControl.tsx) predates this doc's last full pass and was never added here either
 │   │   ├── CartProvider.tsx            # "use client" — React Context, single-vendor cart, in-memory only (lost on refresh)
 │   │   ├── Navbar.tsx                  # "use client" — reads cart count + Clerk SignedIn/SignedOut
 │   │   ├── ProductCard.tsx             # "use client" — has the "Add" button calling useCart().addItem

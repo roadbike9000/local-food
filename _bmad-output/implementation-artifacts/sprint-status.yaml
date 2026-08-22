@@ -59,7 +59,7 @@ development_status:
 
   epic-2: in-progress
   2-1-admin-identity-and-access-gating: done
-  2-2-admin-adds-a-vendor: review
+  2-2-admin-adds-a-vendor: done
   2-3-admin-deactivates-a-vendor: backlog
   epic-2-retrospective: optional
 

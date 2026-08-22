@@ -29,6 +29,17 @@ export async function resolveVendorSlug(
 ): Promise<{ ok: true; slug: string } | { ok: false; error: string }> {
   const slug = slugify(desiredSlug);
 
+  // slugify() strips every non-alphanumeric character - a punctuation-only
+  // or whitespace-only input (e.g. "!!!") normalizes to "", which would
+  // otherwise pass Zod's min(1) (checked pre-normalization) and create a
+  // Vendor with an unreachable storefront (/vendors/ matches no route).
+  if (!slug) {
+    return {
+      ok: false,
+      error: "That slug contains no usable characters — try letters, numbers, or hyphens.",
+    };
+  }
+
   const existing = await prisma.vendor.findUnique({ where: { slug } });
   if (existing) {
     return {

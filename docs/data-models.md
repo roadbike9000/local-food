@@ -36,14 +36,14 @@ One seller, one storefront. `clerkUserId` may be `null` for an admin-created ven
 | id | String (cuid) | PK |
 | clerkUserId | String? | `@unique` (nullable — Postgres/Prisma allow multiple `NULL`s under a unique index) — links storefront to a signed-in user once claimed; `getCurrentVendor()` looks up by this. `null` until an admin-created vendor is manually bound out-of-band (AD-8; no invite/claim flow exists) |
 | name | String | |
-| slug | String | `@unique` — used in URL `/vendors/{slug}`. Self-registration has no collision-handling beyond the DB constraint; the admin-create path (`POST /api/admin/vendors`) goes through `resolveVendorSlug()` (`src/lib/vendor.ts`, AD-7) instead, which returns a friendly `409` rather than a raw Prisma error |
+| slug | String | `@unique` — used in URL `/vendors/{slug}`. The only path that creates a `Vendor` today, `POST /api/admin/vendors`, goes through `resolveVendorSlug()` (`src/lib/vendor.ts`, AD-7) — normalizes the slug, checks it, and returns a friendly `409` on collision. The route also catches the DB-level unique-constraint error as a fallback for a same-slug race between two concurrent requests, so a raw Prisma error should never reach the client either way |
 | description | String? | |
 | imageUrl | String? | Cloudinary URL — not yet populated by any UI flow |
 | phone | String? | vendor contact, not currently displayed anywhere |
 | createdByAdminId | String? | nullable FK → `Admin.id` (not `Admin.clerkUserId` — AD-5's attribution rule), named relation `VendorCreatedByAdmin`, `onDelete: SetNull`. Set only for admin-created vendors (`POST /api/admin/vendors`, Story 2.2) |
 | createdAt / updatedAt | DateTime | |
 
-Relations: `products[]`, `orders[]`, `pickupSlots[]`.
+Relations: `products[]`, `orders[]`, `pickupSlots[]`, `createdByAdmin?` (`Admin.createdVendors`, Story 2.2).
 
 ### Product
 Something a vendor sells.

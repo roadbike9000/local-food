@@ -47,6 +47,10 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
         const unique = Date.now();
         const name = `Test Vendor ${unique}`;
         const slug = `test-vendor-${unique}`;
+        // Cleanup must key off the *server-returned* slug, not the one
+        // sent - resolveVendorSlug() normalizes, so a future fixture whose
+        // input isn't already normalized would otherwise leak a row.
+        let createdSlug: string | undefined;
 
         try {
           const response = await request.post("/api/admin/vendors", {
@@ -60,6 +64,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
 
           expect(response.status()).toBe(201);
           const body = await response.json();
+          createdSlug = body.vendor.slug;
           expect(body.vendor).toMatchObject({ name, slug, clerkUserId: null });
 
           // AC #1: createdByAdminId must target Admin.id (the row id), not
@@ -71,11 +76,44 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
               clerkUserId: process.env.E2E_ADMIN_CLERK_ID || "seed_user_admin",
             },
           });
+          expect(actingAdmin).not.toBeNull();
           const persisted = await prisma.vendor.findUnique({ where: { slug } });
+          expect(persisted).not.toBeNull();
           expect(persisted?.clerkUserId).toBeNull();
           expect(persisted?.createdByAdminId).toBe(actingAdmin?.id);
         } finally {
-          await deleteVendorBySlug(slug);
+          await deleteVendorBySlug(createdSlug ?? slug);
+        }
+      },
+    );
+
+    test(
+      "[P0] normalizes a denormalized slug rather than storing it verbatim — review finding",
+      async ({ request }) => {
+        // slugify() lowercases, replaces non-alphanumeric runs with a
+        // single "-", and trims leading/trailing "-". A slug submitted as
+        // typed text (spaces, capitals) must come back normalized, not
+        // stored as-is - this is the whole point of resolveVendorSlug()
+        // normalizing *before* the uniqueness check, not after.
+        const unique = Date.now();
+        const submittedSlug = `  Test Vendor ${unique}!!  `;
+        const expectedSlug = `test-vendor-${unique}`;
+
+        try {
+          const response = await request.post("/api/admin/vendors", {
+            data: { name: `Test Vendor ${unique}`, slug: submittedSlug },
+          });
+
+          expect(response.status()).toBe(201);
+          const body = await response.json();
+          expect(body.vendor.slug).toBe(expectedSlug);
+
+          const persisted = await prisma.vendor.findUnique({
+            where: { slug: expectedSlug },
+          });
+          expect(persisted).not.toBeNull();
+        } finally {
+          await deleteVendorBySlug(expectedSlug);
         }
       },
     );
@@ -103,6 +141,28 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
         const afterCount = await prisma.vendor.count({
           where: { slug: collidingSlug },
         });
+        expect(afterCount).toBe(beforeCount);
+      },
+    );
+
+    test(
+      "[P0] rejects a slug that normalizes to empty (409, no unreachable vendor created) — review finding",
+      async ({ request }) => {
+        // slugify() strips every non-alphanumeric character, so an
+        // all-punctuation slug like "!!!" would otherwise normalize to ""
+        // and create a Vendor whose storefront (/vendors/) matches no
+        // route. resolveVendorSlug() rejects this before create() runs.
+        const beforeCount = await prisma.vendor.count({ where: { slug: "" } });
+
+        const response = await request.post("/api/admin/vendors", {
+          data: { name: `Test Vendor ${Date.now()}`, slug: "!!!" },
+        });
+
+        expect(response.status()).toBe(409);
+        const body = await response.json();
+        expect(body.error).toMatch(/no usable characters/i);
+
+        const afterCount = await prisma.vendor.count({ where: { slug: "" } });
         expect(afterCount).toBe(beforeCount);
       },
     );
@@ -152,5 +212,23 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
         expect(response.status()).toBe(401);
       },
     );
+  });
+
+  // No storageState at all - a genuinely anonymous caller, distinct from
+  // "signed in but not an admin" above. Needs no fixture, so it always
+  // runs regardless of E2E_VENDOR_*/E2E_ADMIN_* configuration (review
+  // finding: this case was previously untested even though nothing about
+  // it required the missing admin credentials).
+  test("[P0] a fully unauthenticated request is rejected (401)", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/admin/vendors", {
+      data: {
+        name: `Test Vendor ${Date.now()}`,
+        slug: `test-vendor-${Date.now()}`,
+      },
+    });
+
+    expect(response.status()).toBe(401);
   });
 });

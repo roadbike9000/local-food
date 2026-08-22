@@ -11,6 +11,8 @@
  * admin-only vendor creation, same as every other API route in this repo.
  */
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/admin";
 import { resolveVendorSlug } from "@/lib/vendor";
@@ -32,15 +34,40 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: result.error }, { status: 409 });
   }
 
-  const vendor = await prisma.vendor.create({
-    data: {
-      name: parsed.data.name,
-      slug: result.slug,
-      phone: parsed.data.phone,
-      description: parsed.data.description,
-      clerkUserId: null,
-      createdByAdminId: admin.id,
-    },
-  });
-  return NextResponse.json({ vendor }, { status: 201 });
+  try {
+    const vendor = await prisma.vendor.create({
+      data: {
+        name: parsed.data.name,
+        slug: result.slug,
+        phone: parsed.data.phone,
+        description: parsed.data.description,
+        clerkUserId: null,
+        createdByAdminId: admin.id,
+      },
+    });
+    return NextResponse.json({ vendor }, { status: 201 });
+  } catch (err) {
+    // resolveVendorSlug()'s findUnique above is a check, not a lock - two
+    // concurrent requests for the same new slug can both pass it, and the
+    // second create() then hits Vendor.slug's unique constraint here.
+    // Catch that specific race and map it to the same friendly 409
+    // resolveVendorSlug() already returns for the common case, rather
+    // than letting a raw Prisma error surface as an unhandled 500.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      return NextResponse.json(
+        {
+          error: `The slug "${result.slug}" is already in use — try a different one.`,
+        },
+        { status: 409 },
+      );
+    }
+    Sentry.captureException(err);
+    return NextResponse.json(
+      { error: "Could not create vendor. Try again." },
+      { status: 500 },
+    );
+  }
 }
