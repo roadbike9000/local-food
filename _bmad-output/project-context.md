@@ -91,6 +91,14 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Availability is derived, never stored** (architecture AD-2 — `Product.isAvailable` was dropped in Story 1.3). `isInStock()` in `src/lib/availability.ts` (`stockQuantity > 0`) is the single canonical check; storefront listings show out-of-stock products with a disabled Add button rather than hiding them, and checkout additionally requires `stockQuantity >= requestedQuantity` per line. Never re-derive availability under a new stored/cached field — any new read site must call `isInStock()`, not reinvent it. Import from `@/lib/availability`, not `@/lib/inventory`, in any `"use client"` component — `inventory.ts` pulls in Prisma
 - **Secrets only ever live in `src/lib/*` modules or server-side code** (route handlers, server components) — never in a `"use client"` file or exposed via a `NEXT_PUBLIC_*` var unless it's genuinely meant to be public (e.g. Clerk's publishable key)
 - **SMS is one-shot per order** via the `smsNotified` flag — don't add a second send path that skips checking/setting it, or customers get double-texted
+- **Before writing any conditional update against shared mutable state (a flag, a counter, a one-shot boolean), ask two questions, not one: "does this hold for one concurrent caller" AND "does this hold for two-or-more concurrent callers hitting the same code path."** Epic 2 shipped two check-then-act races (slug uniqueness, deactivate idempotency) that only asked the first question; Epic 3 shipped a variant where the write itself was correctly atomic *within* one order's transaction but didn't hold across two different orders racing the same product (`lowStockAlerted`) — same underlying gap, different shape. If the answer to either question isn't "yes, atomically," use the `updateMany({ where: { id, ...guardCondition } })` + re-read claim pattern (see `stockDecremented` above), not a plain read-then-write
+- **Before requesting review, re-read every doc line you just touched against the code you just wrote — a scoping decision ("this story needs no `api-contracts.md` change") is not the same check as a content-accuracy one.** Doc drift (stale attributions, stale execution-order claims, wrong counts) has shown up in a review finding in every review round across three epics, even in stories that scoped their doc tasks carefully
+
+## Actual State Log
+
+Real gaps found in this codebase after the fact, not caught by any story's own review — logged here so a future search finds them before rediscovering them:
+
+- Epic 2 retro tech debt (fixed 2026-08-22): `getCurrentVendor()` resolves by `clerkUserId` alone with no `deletedAt` filter, so a deactivated vendor's own dashboard could still `POST /api/products` and `POST /api/pickup-slots`. Fixed with the same `assertVendorActive()`/`VendorDeactivatedError` guard checkout and the storefront already use. **No e2e test proves this end-to-end** — doing so would require a signed-in session for a *deactivated* vendor, and this codebase's only vendor Clerk identity is the seeded, always-active Corner Sourdough fixture (test convention explicitly forbids deactivating it, since concurrent tests under `fullyParallel` depend on it staying orderable). Same class of gap as the admin e2e credential gap — a dedicated throwaway vendor Clerk identity would resolve it, external/Jeff-owned, not attempted here.
 
 ---
 
@@ -110,4 +118,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-07-19
+Last Updated: 2026-08-22

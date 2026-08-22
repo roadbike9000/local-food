@@ -8,7 +8,7 @@
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentVendor } from "@/lib/vendor";
+import { getCurrentVendor, assertVendorActive, VendorDeactivatedError } from "@/lib/vendor";
 import { CreateProductSchema } from "./schema";
 
 export async function GET() {
@@ -28,6 +28,23 @@ export async function POST(req: Request) {
   const vendor = await getCurrentVendor();
   if (!vendor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // getCurrentVendor() resolves by clerkUserId alone, with no deletedAt
+  // filter - a deactivated vendor's own session still resolves here, so
+  // this check must be explicit (Epic 2 retro tech debt: deactivated
+  // vendors could otherwise still create Products via their own untouched
+  // dashboard).
+  try {
+    assertVendorActive(vendor);
+  } catch (err) {
+    if (err instanceof VendorDeactivatedError) {
+      return NextResponse.json(
+        { error: "Your storefront is deactivated — you can no longer add products." },
+        { status: 403 },
+      );
+    }
+    throw err;
   }
 
   const parsed = CreateProductSchema.safeParse(await req.json().catch(() => null));

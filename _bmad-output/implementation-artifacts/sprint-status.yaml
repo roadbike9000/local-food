@@ -92,7 +92,8 @@ action_items:
   - epic: 1
     action: "Add npm run test:unit as a CI step (flagged in Story 1.2's round-2 review, still open)"
     owner: "Dev"
-    status: open
+    status: done
+    note: "2026-08-22: added to .github/workflows/ci.yml between lint and Playwright install. See Epic 3 action item of the same name for detail."
   - epic: 2
     action: "Provision the real E2E_ADMIN_EMAIL/E2E_ADMIN_CLERK_ID Clerk test user and GitHub Actions secrets - carried from Epic 1's retro, now blocking real e2e verification on 3 stories' worth of admin-authenticated tests"
     owner: "Jeff"
@@ -105,13 +106,13 @@ action_items:
   - epic: 2
     action: "Add a lightweight doc-accuracy self-check to the end of implementation, before requesting review - doc drift has been a review finding in every single round across both epics"
     owner: "Dev"
-    status: in-progress
-    note: "Both Epic 3 stories scoped doc tasks narrowly and deliberately, but review still found real content errors in both (misattribution in 3.1; stale arithmetic and a stale execution-order claim in 3.2). Scoping discipline improved; content accuracy didn't fully follow. Re-logged as Epic 3 action item 4."
+    status: done
+    note: "2026-08-22: codified as a durable rule in project-context.md. See Epic 3 action item of the same name for detail."
   - epic: 2
     action: "Treat check-then-act on shared mutable state as an implementation-time red flag, not just a review-time catch - this exact bug class shipped in 2 of Epic 2's 3 stories despite Epic 1 naming it explicitly"
     owner: "Dev"
-    status: in-progress
-    note: "No classic check-then-act shipped in Epic 3, but a related atomicity gap (cross-order race on lowStockAlerted) shipped and was only caught in review. Re-logged as Epic 3 action item 5."
+    status: done
+    note: "2026-08-22: codified as a durable rule in project-context.md, generalized to cross-request/cross-order atomicity. See Epic 3 action item of the same name for detail."
   - epic: 2
     action: "Decide on a fail-closed requireAdmin() helper before Story 3.2 (first admin action with a real external side effect)"
     owner: "Jeff"
@@ -120,8 +121,8 @@ action_items:
   - epic: 2
     action: "Deactivated vendor can still create Product/PickupSlot rows via their own untouched dashboard (logged in deferred-work.md from Story 2.3's review) - pick up when a story next touches vendor-dashboard write paths"
     owner: "Dev"
-    status: open
-    note: "Not applicable this epic - no Epic 3 story touched vendor-dashboard write paths. Still open, correctly untouched rather than a miss."
+    status: done
+    note: "2026-08-22: fixed directly (not as part of a story) - added assertVendorActive()/VendorDeactivatedError guards to POST /api/products and POST /api/pickup-slots, mirroring the existing checkout/storefront pattern exactly. Typecheck, lint, full unit suite (80/80), full e2e suite (100/114, 14 expected admin-credential skips), and production build all verified clean. No e2e test proves this end-to-end - would require a dedicated throwaway vendor Clerk identity, which doesn't exist yet (same class of gap as the admin e2e credential item, external/Jeff-owned); documented honestly in project-context.md's new Actual State Log rather than left unstated."
   - epic: 3
     action: "Provision the real E2E_ADMIN_EMAIL/E2E_ADMIN_CLERK_ID Clerk test user and GitHub Actions secrets, or make an explicit decision to accept the gap permanently now that no further admin-gated epic is currently planned - carried 3 epics running"
     owner: "Jeff"
@@ -129,7 +130,8 @@ action_items:
   - epic: 3
     action: "Add npm run test:unit as a CI step - open since Story 1.2's round-2 review, now 3 epics old"
     owner: "Dev"
-    status: open
+    status: done
+    note: "2026-08-22: added as its own CI step between lint and Playwright install, so a unit-test failure blocks e2e from running. Verified locally (80/80 green) before wiring in."
   - epic: 3
     action: "Make a real decision on the requireAdmin() fail-closed helper, even retroactively - decide whether to retrofit or explicitly accept the current fail-open-by-convention design"
     owner: "Jeff"
@@ -137,11 +139,13 @@ action_items:
   - epic: 3
     action: "Strengthen the doc-accuracy self-check beyond scoping doc tasks narrowly - e.g. a diff-against-claims pass - since two stories running the current process still leaked real content errors into review"
     owner: "Dev"
-    status: open
+    status: done
+    note: "2026-08-22: codified as an explicit rule in project-context.md's Critical Don't-Miss Rules - re-read every touched doc line against the actual code before requesting review, not just scope the doc task narrowly. Durable, applies to every future story."
   - epic: 3
     action: "When implementing any invariant enforced only within a single transaction or single request, explicitly ask whether it holds under two different concurrent orders/requests hitting the same code path, not just one"
     owner: "Dev"
-    status: open
+    status: done
+    note: "2026-08-22: codified as an explicit rule in project-context.md's Critical Don't-Miss Rules, naming both the Epic 2 check-then-act races and the Epic 3 cross-order lowStockAlerted race as the two prior instances. Durable, applies to every future story."
   - epic: 3
     action: "Since epics.md's three-epic roadmap is now fully delivered, decide whether to groom a new epic or treat this roadmap as complete"
     owner: "Jeff"

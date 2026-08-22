@@ -6,7 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentVendor } from "@/lib/vendor";
+import { getCurrentVendor, assertVendorActive, VendorDeactivatedError } from "@/lib/vendor";
 import { CreateSlotSchema } from "./schema";
 
 export async function GET() {
@@ -26,6 +26,20 @@ export async function POST(req: Request) {
   const vendor = await getCurrentVendor();
   if (!vendor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Same gap and same fix as POST /api/products (Epic 2 retro tech debt) -
+  // getCurrentVendor() doesn't filter by deletedAt, so this must be explicit.
+  try {
+    assertVendorActive(vendor);
+  } catch (err) {
+    if (err instanceof VendorDeactivatedError) {
+      return NextResponse.json(
+        { error: "Your storefront is deactivated — you can no longer add pickup slots." },
+        { status: 403 },
+      );
+    }
+    throw err;
   }
 
   const parsed = CreateSlotSchema.safeParse(await req.json().catch(() => null));
