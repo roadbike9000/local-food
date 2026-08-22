@@ -25,7 +25,7 @@ test.describe("setStock / setLowStockThreshold", () => {
     });
 
     try {
-      const updated = await setStock(product.id, 15, 20, 0);
+      const updated = await setStock(product.id, 15, 20, 5, 0);
       expect(updated).toBe(true);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
@@ -35,6 +35,67 @@ test.describe("setStock / setLowStockThreshold", () => {
       await deleteProduct(product.id);
     }
   });
+
+  // Story 3.2: setStock() gains a new 4th positional param, currentThreshold
+  // - the caller-supplied lowStockThreshold, used to decide whether this
+  // write is a genuine "restock above threshold" event that should
+  // re-arm a future low-stock alert. Deliberately narrow: only resets
+  // lowStockAlerted when the NEW value moves strictly above the
+  // threshold, never on a write that keeps stock at/below it.
+  test(
+    "resets lowStockAlerted to false when a restock brings stock back above the threshold (Story 3.2, AC #5)",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, {
+        stockQuantity: 2,
+        lowStockThreshold: 5,
+      });
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { lowStockAlerted: true },
+      });
+
+      try {
+        // 2 -> 20, threshold 5: 20 > 5, a genuine restock above threshold.
+        const updated = await setStock(product.id, 20, 2, 5, 0);
+        expect(updated).toBe(true);
+
+        const result = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(result?.lowStockAlerted).toBe(false);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test(
+    "does NOT reset an already-true lowStockAlerted when the write keeps stock at or below the threshold (Story 3.2, AC #5)",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, {
+        stockQuantity: 2,
+        lowStockThreshold: 5,
+      });
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { lowStockAlerted: true },
+      });
+
+      try {
+        // 2 -> 3, threshold 5: 3 is still <= 5, not a restock above
+        // threshold - a manual correction that stays low must not
+        // silently re-arm a repeat alert for stock that never actually
+        // recovered.
+        const updated = await setStock(product.id, 3, 2, 5, 0);
+        expect(updated).toBe(true);
+
+        const result = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(result?.lowStockAlerted).toBe(true);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
 
   test("rejects the write and leaves the row unchanged when expectedVersion is stale", async () => {
     const vendor = await getVendorBySlug("corner-sourdough");
@@ -51,7 +112,7 @@ test.describe("setStock / setLowStockThreshold", () => {
         data: { stockQuantity: 18, stockVersion: { increment: 1 } },
       });
 
-      const updated = await setStock(product.id, 15, 20, 0);
+      const updated = await setStock(product.id, 15, 20, 5, 0);
       expect(updated).toBe(false);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
@@ -83,7 +144,7 @@ test.describe("setStock / setLowStockThreshold", () => {
         data: { stockQuantity: 20, stockVersion: { increment: 1 } },
       });
 
-      const updated = await setStock(product.id, 15, 20, 0);
+      const updated = await setStock(product.id, 15, 20, 5, 0);
       expect(updated).toBe(false);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
@@ -103,7 +164,7 @@ test.describe("setStock / setLowStockThreshold", () => {
     });
 
     try {
-      await setStock(product.id, 42, 100, 0);
+      await setStock(product.id, 42, 100, 5, 0);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
       expect(result?.stockQuantity).toBe(42);
@@ -125,7 +186,7 @@ test.describe("setStock / setLowStockThreshold", () => {
       // The vendor's form always posts stockQuantity even if they only
       // touched the threshold field - resubmitting the unchanged value must
       // not tell Story 1.6 this was a deliberate stock=100 choice.
-      await setStock(product.id, 100, 100, 0);
+      await setStock(product.id, 100, 100, 5, 0);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
       expect(result?.stockIsPlaceholder).toBe(true);
@@ -146,7 +207,7 @@ test.describe("setStock / setLowStockThreshold", () => {
       // Same value as already stored - would normally leave the flag set
       // (see the test above) - but the vendor's explicit "Confirm as-is"
       // action forces the clear anyway.
-      const updated = await setStock(product.id, 100, 100, 0, true);
+      const updated = await setStock(product.id, 100, 100, 5, 0, true);
       expect(updated).toBe(true);
 
       const result = await prisma.product.findUnique({ where: { id: product.id } });
@@ -259,10 +320,10 @@ test.describe("decrementStock (Story 1.4)", () => {
       const product = await createTestProduct(vendor.id, { stockQuantity: 20 });
 
       try {
-        const succeeded = await prisma.$transaction((tx) =>
+        const { success } = await prisma.$transaction((tx) =>
           decrementStock(tx, product.id, 5),
         );
-        expect(succeeded).toBe(true);
+        expect(success).toBe(true);
 
         const result = await prisma.product.findUnique({ where: { id: product.id } });
         expect(result?.stockQuantity).toBe(15);
@@ -284,10 +345,10 @@ test.describe("decrementStock (Story 1.4)", () => {
       const product = await createTestProduct(vendor.id, { stockQuantity: 2 });
 
       try {
-        const succeeded = await prisma.$transaction((tx) =>
+        const { success } = await prisma.$transaction((tx) =>
           decrementStock(tx, product.id, 5),
         );
-        expect(succeeded).toBe(false);
+        expect(success).toBe(false);
 
         const result = await prisma.product.findUnique({ where: { id: product.id } });
         expect(result?.stockQuantity).toBe(2);
@@ -304,10 +365,10 @@ test.describe("decrementStock (Story 1.4)", () => {
       const product = await createTestProduct(vendor.id, { stockQuantity: 3 });
 
       try {
-        const succeeded = await prisma.$transaction((tx) =>
+        const { success } = await prisma.$transaction((tx) =>
           decrementStock(tx, product.id, 3),
         );
-        expect(succeeded).toBe(true);
+        expect(success).toBe(true);
 
         const result = await prisma.product.findUnique({ where: { id: product.id } });
         expect(result?.stockQuantity).toBe(0);
@@ -324,10 +385,10 @@ test.describe("decrementStock (Story 1.4)", () => {
       const product = await createTestProduct(vendor.id, { stockQuantity: 3 });
 
       try {
-        const succeeded = await prisma.$transaction((tx) =>
+        const { success } = await prisma.$transaction((tx) =>
           decrementStock(tx, product.id, 4),
         );
-        expect(succeeded).toBe(false);
+        expect(success).toBe(false);
 
         const result = await prisma.product.findUnique({ where: { id: product.id } });
         expect(result?.stockQuantity).toBe(3);
@@ -354,8 +415,8 @@ test.describe("decrementStock (Story 1.4)", () => {
         ]);
 
         const results = [first, second];
-        expect(results.filter((r) => r === true)).toHaveLength(1);
-        expect(results.filter((r) => r === false)).toHaveLength(1);
+        expect(results.filter((r) => r.success === true)).toHaveLength(1);
+        expect(results.filter((r) => r.success === false)).toHaveLength(1);
 
         const result = await prisma.product.findUnique({ where: { id: product.id } });
         expect(result?.stockQuantity).toBe(0);
@@ -382,15 +443,95 @@ test.describe("decrementStock (Story 1.4)", () => {
         const zero = await prisma.$transaction((tx) =>
           decrementStock(tx, product.id, 0),
         );
-        expect(zero).toBe(false);
+        expect(zero.success).toBe(false);
 
         const negative = await prisma.$transaction((tx) =>
           decrementStock(tx, product.id, -5),
         );
-        expect(negative).toBe(false);
+        expect(negative.success).toBe(false);
 
         const result = await prisma.product.findUnique({ where: { id: product.id } });
         expect(result?.stockQuantity).toBe(10);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  // Story 3.2: decrementStock() gains a new return shape,
+  // { success: boolean; crossedLowStock: boolean }, replacing the bare
+  // boolean. crossedLowStock is true only when this decrement newly
+  // brings the product to/below its threshold AND it wasn't already
+  // lowStockAlerted - "newly crossed," not just "currently low" (AC #5's
+  // no-repeat-alerts requirement, proven here at the decrementStock()
+  // level directly, not just via the webhook).
+  test(
+    "a decrement that brings stockQuantity to exactly lowStockThreshold reports crossedLowStock: true (Story 3.2, AC #2)",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, {
+        stockQuantity: 8,
+        lowStockThreshold: 5,
+      });
+
+      try {
+        const { success, crossedLowStock } = await prisma.$transaction((tx) =>
+          decrementStock(tx, product.id, 3),
+        );
+        expect(success).toBe(true);
+        expect(crossedLowStock).toBe(true);
+
+        const result = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(result?.stockQuantity).toBe(5);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test(
+    "a decrement that stays above lowStockThreshold reports crossedLowStock: false (Story 3.2, AC #2)",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, {
+        stockQuantity: 20,
+        lowStockThreshold: 5,
+      });
+
+      try {
+        const { success, crossedLowStock } = await prisma.$transaction((tx) =>
+          decrementStock(tx, product.id, 3),
+        );
+        expect(success).toBe(true);
+        expect(crossedLowStock).toBe(false);
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test(
+    "a decrement while already below threshold and lowStockAlerted is already true reports crossedLowStock: false (Story 3.2, AC #5)",
+    async () => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, {
+        stockQuantity: 4,
+        lowStockThreshold: 5,
+      });
+      // Simulate an earlier crossing that already alerted, bypassing the
+      // webhook entirely - this test only cares about decrementStock()'s
+      // own no-repeat logic.
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { lowStockAlerted: true },
+      });
+
+      try {
+        const { success, crossedLowStock } = await prisma.$transaction((tx) =>
+          decrementStock(tx, product.id, 1),
+        );
+        expect(success).toBe(true);
+        expect(crossedLowStock).toBe(false);
       } finally {
         await deleteProduct(product.id);
       }

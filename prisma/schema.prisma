@@ -18,11 +18,10 @@ datasource db {
 // exclusively through this table's clerkUserId (architecture AD-1) — never
 // a Clerk session claim. See src/lib/admin.ts's getCurrentAdmin().
 //
-// Deliberately minimal for Story 2.1: no `phone` yet (Story 3.2 adds it -
-// see that story's AC, which depends on this field being absent here).
 model Admin {
   id          String   @id @default(cuid())
   clerkUserId String   @unique
+  phone       String? // low-stock/shortfall SMS destination (Story 3.2) - nullable, mirrors Vendor.phone's shape; a zero-admins-with-a-phone state must degrade gracefully, not crash
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -97,6 +96,12 @@ model Product {
   // saw, which a value-equality guard can't tell apart from "unchanged"
   // (Story 1.2 deferred-work finding).
   stockVersion Int @default(0)
+  // One-shot flag, same shape as Order.smsNotified (Story 3.2). Set true
+  // only after a low-stock SMS actually sends (never before - a failed
+  // send must leave this false). Reset to false by setStock() when a
+  // genuine restock brings stockQuantity back above lowStockThreshold,
+  // so a future crossing can alert again (AC #5).
+  lowStockAlerted Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

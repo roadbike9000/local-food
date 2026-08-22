@@ -6,6 +6,8 @@ import {
   deleteOrder,
   createTestProduct,
   deleteProduct,
+  createTestAdmin,
+  deleteTestAdmin,
   prisma,
 } from "./helpers/db";
 import {
@@ -879,4 +881,230 @@ test.describe("stripe webhook - inventory decrement (Story 1.4)", () => {
       }
     },
   );
+
+  // Story 3.2: low-stock/shortfall SMS alerts to admin (FR-10, FR-8's
+  // shortfall consequence). Verified via GET /api/debug/sms's mock-provider
+  // message log (tests/sms.spec.ts's existing pattern) - filtered by the
+  // fixture admin's own unique phone, since sentMessages is process-global
+  // and never cleared between tests.
+  //
+  // Serial within this block, and every product below gets an explicit,
+  // unique name (never createTestProduct's shared default "Test Product
+  // (Playwright)") - two independent layers against the same root cause.
+  // getAdminPhoneNumbers() deliberately fans out to *every* Admin row
+  // with a phone set (Task 4's reasoning - production-correct, there's
+  // no per-order admin scoping), which means ANY concurrently-running
+  // webhook test in this file whose own product crosses its own
+  // threshold also alerts THIS block's admin fixture, if that admin
+  // still exists when the other test's webhook fires. Confirmed
+  // directly, twice: (1) all 4 pass under `-g "low-stock/shortfall admin
+  // SMS alerts"` alone but fail unpredictably alongside the file's ~29
+  // other webhook tests; (2) filtering by product name alone still
+  // failed, because dozens of those other tests also use
+  // createTestProduct's default name with a stockQuantity that
+  // transiently crosses 5 (its default lowStockThreshold) - the
+  // "Received array" from that failure showed 8 messages, all for "Test
+  // Product (Playwright)", from unrelated concurrent tests. A unique
+  // name per product is what actually isolates this block's assertions.
+  test.describe("low-stock/shortfall admin SMS alerts (Story 3.2)", () => {
+    test.describe.configure({ mode: "serial" });
+
+  test(
+    "a webhook delivery that decrements a product to at-or-below its threshold sends a low-stock SMS and sets lowStockAlerted (Story 3.2, AC #2, #3)",
+    async ({ request }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const admin = await createTestAdmin();
+      const product = await createTestProduct(vendor.id, {
+        name: `Playwright Low Stock Alert Product ${Date.now()}`,
+        stockQuantity: 6,
+        lowStockThreshold: 5,
+      });
+      const order = await createTestOrder(vendor.id, {
+        status: "PENDING",
+        items: [{ productId: product.id, quantity: 2, unitPriceCents: product.priceCents }],
+      });
+
+      try {
+        const payload = buildCheckoutCompletedPayload(order.id);
+        const signature = signPayload(payload);
+        test.skip(!signature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+        const response = await request.post("/api/webhooks/stripe", {
+          headers: { "stripe-signature": signature! },
+          data: payload,
+        });
+        expect(response.status()).toBe(200);
+
+        const updatedProduct = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(updatedProduct?.stockQuantity).toBe(4);
+        expect(updatedProduct?.lowStockAlerted).toBe(true);
+
+        const debug = await request.get("/api/debug/sms");
+        const { messages } = await debug.json();
+        // Filtered by product name too, not just admin.phone - see this
+        // block's header comment on why phone alone isn't enough under
+        // fullyParallel:true.
+        const sent = messages.filter(
+          (m: { to: string; body: string }) =>
+            m.to === admin.phone && m.body.includes(product.name),
+        );
+        expect(sent).toHaveLength(1);
+      } finally {
+        await deleteOrder(order.id);
+        await deleteProduct(product.id);
+        await deleteTestAdmin(admin.id);
+      }
+    },
+  );
+
+  test(
+    "a second webhook delivery for a different order against the same still-below-threshold product does not send a second SMS (Story 3.2, AC #5)",
+    async ({ request }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const admin = await createTestAdmin();
+      const product = await createTestProduct(vendor.id, {
+        name: `Playwright No Repeat Alert Product ${Date.now()}`,
+        stockQuantity: 6,
+        lowStockThreshold: 5,
+      });
+      const firstOrder = await createTestOrder(vendor.id, {
+        status: "PENDING",
+        items: [{ productId: product.id, quantity: 2, unitPriceCents: product.priceCents }],
+      });
+      const secondOrder = await createTestOrder(vendor.id, {
+        status: "PENDING",
+        items: [{ productId: product.id, quantity: 1, unitPriceCents: product.priceCents }],
+      });
+
+      try {
+        const firstPayload = buildCheckoutCompletedPayload(firstOrder.id);
+        const firstSignature = signPayload(firstPayload);
+        test.skip(!firstSignature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+        await request.post("/api/webhooks/stripe", {
+          headers: { "stripe-signature": firstSignature! },
+          data: firstPayload,
+        });
+        expect(
+          (await prisma.product.findUnique({ where: { id: product.id } }))
+            ?.lowStockAlerted,
+        ).toBe(true);
+
+        const secondPayload = buildCheckoutCompletedPayload(secondOrder.id);
+        const secondSignature = signPayload(secondPayload);
+        await request.post("/api/webhooks/stripe", {
+          headers: { "stripe-signature": secondSignature! },
+          data: secondPayload,
+        });
+
+        const debug = await request.get("/api/debug/sms");
+        const { messages } = await debug.json();
+        const sent = messages.filter(
+          (m: { to: string; body: string }) =>
+            m.to === admin.phone && m.body.includes(product.name),
+        );
+        // Exactly 1, not 2 - the second delivery crossed no new threshold
+        // (already alerted), so it must not re-send.
+        expect(sent).toHaveLength(1);
+      } finally {
+        await deleteOrder(firstOrder.id);
+        await deleteOrder(secondOrder.id);
+        await deleteProduct(product.id);
+        await deleteTestAdmin(admin.id);
+      }
+    },
+  );
+
+  test(
+    "a failed send leaves lowStockAlerted false (Story 3.2, AC #4)",
+    async ({ request }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      // The mock provider's documented MAGIC_FAILURE_NUMBER - simulates a
+      // failed send with no real Twilio call.
+      const admin = await createTestAdmin({ phone: "+15005550001" });
+      const product = await createTestProduct(vendor.id, {
+        stockQuantity: 6,
+        lowStockThreshold: 5,
+      });
+      const order = await createTestOrder(vendor.id, {
+        status: "PENDING",
+        items: [{ productId: product.id, quantity: 2, unitPriceCents: product.priceCents }],
+      });
+
+      try {
+        const payload = buildCheckoutCompletedPayload(order.id);
+        const signature = signPayload(payload);
+        test.skip(!signature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+        const response = await request.post("/api/webhooks/stripe", {
+          headers: { "stripe-signature": signature! },
+          data: payload,
+        });
+        expect(response.status()).toBe(200);
+
+        const updatedProduct = await prisma.product.findUnique({ where: { id: product.id } });
+        expect(updatedProduct?.lowStockAlerted).toBe(false);
+      } finally {
+        await deleteOrder(order.id);
+        await deleteProduct(product.id);
+        await deleteTestAdmin(admin.id);
+      }
+    },
+  );
+
+  test(
+    "a shortfall sends a shortfall SMS regardless of lowStockAlerted's state (Story 3.2, AC #6)",
+    async ({ request }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const admin = await createTestAdmin();
+      const product = await createTestProduct(vendor.id, {
+        name: `Playwright Shortfall Alert Product ${Date.now()}`,
+        stockQuantity: 5,
+      });
+      // Pre-set lowStockAlerted: true - proves the shortfall alert is
+      // never gated by it, unlike the routine low-stock alert above.
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { lowStockAlerted: true },
+      });
+      const order = await createTestOrder(vendor.id, {
+        status: "PENDING",
+        items: [{ productId: product.id, quantity: 3, unitPriceCents: product.priceCents }],
+      });
+
+      try {
+        // Simulate stock running out between checkout-session creation and
+        // this webhook processing, same shape as the existing shortfall
+        // test above.
+        await prisma.product.update({
+          where: { id: product.id },
+          data: { stockQuantity: 1 },
+        });
+
+        const payload = buildCheckoutCompletedPayload(order.id);
+        const signature = signPayload(payload);
+        test.skip(!signature, "STRIPE_WEBHOOK_SECRET not configured; skipping");
+
+        const response = await request.post("/api/webhooks/stripe", {
+          headers: { "stripe-signature": signature! },
+          data: payload,
+        });
+        expect(response.status()).toBe(200);
+
+        const debug = await request.get("/api/debug/sms");
+        const { messages } = await debug.json();
+        const sent = messages.filter(
+          (m: { to: string; body: string }) =>
+            m.to === admin.phone && m.body.includes(product.name),
+        );
+        expect(sent).toHaveLength(1);
+        expect(sent[0].body).toContain("Stock shortfall");
+      } finally {
+        await deleteOrder(order.id);
+        await deleteProduct(product.id);
+        await deleteTestAdmin(admin.id);
+      }
+    },
+  );
+  });
 });

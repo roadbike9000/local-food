@@ -144,3 +144,35 @@ export async function createTestVendor(
     },
   });
 }
+
+// Story 3.2: throwaway admin fixtures for low-stock/shortfall SMS tests -
+// never use the seeded E2E_ADMIN_CLERK_ID admin row for this, other tests
+// may depend on it staying exactly as seeded. Timestamped-unique
+// clerkUserId by default, same convention as createTestVendor. phone
+// also defaults to a unique-per-fixture number, not a fixed magic
+// string - GET /api/debug/sms's mock message log is process-global and
+// shared across every concurrently-running test under
+// fullyParallel:true (including createTestOrder's own customerPhone
+// messages), so a fixed default here would make any test asserting an
+// exact message count flaky. The mock provider doesn't validate real
+// Twilio phone formats, only special-cases the exact string
+// "+15005550001" (MAGIC_FAILURE_NUMBER) as a simulated failure - pass
+// that explicitly to test the failure path.
+export async function createTestAdmin(
+  overrides: Partial<{ clerkUserId: string; phone: string | null }> = {},
+) {
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return prisma.admin.create({
+    data: {
+      clerkUserId: overrides.clerkUserId ?? `test-admin-playwright-${unique}`,
+      phone:
+        overrides.phone === undefined
+          ? `+1555${Math.floor(1000000 + Math.random() * 9000000)}`
+          : overrides.phone,
+    },
+  });
+}
+
+export async function deleteTestAdmin(id: string) {
+  await prisma.admin.deleteMany({ where: { id } });
+}

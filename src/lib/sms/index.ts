@@ -30,3 +30,32 @@ export function orderConfirmedMessage(
 ): string {
   return `Your ${vendorName} order (#${orderId.slice(-6)}) is confirmed! We'll text you when it's ready for pickup.`;
 }
+
+/**
+ * Routine "getting low" alert to admin (Story 3.2, AC #2) - sent once
+ * per crossing event, deduped via Product.lowStockAlerted.
+ */
+export function lowStockAlertMessage(
+  productName: string,
+  vendorName: string,
+  stockQuantity: number,
+  lowStockThreshold: number,
+): string {
+  return `Low stock alert: ${productName} (${vendorName}) is down to ${stockQuantity} units (threshold: ${lowStockThreshold}).`;
+}
+
+/**
+ * Alert to admin when a paid order couldn't be fully decremented (Story
+ * 3.2, AC #6) - a distinct message from lowStockAlertMessage, and
+ * deliberately never deduped: each shortfall represents a real
+ * already-charged order.
+ */
+export function stockShortfallMessage(
+  productName: string,
+  vendorName: string,
+  orderId: string,
+  requested: number,
+  available: number,
+): string {
+  return `Stock shortfall: order #${orderId.slice(-6)} for ${productName} (${vendorName}) couldn't be fully fulfilled - requested ${requested}, only ${available} available. Payment was captured.`;
+}

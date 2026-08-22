@@ -39,8 +39,14 @@ import type Stripe from "stripe";
 import * as Sentry from "@sentry/nextjs";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
-import { sendSms, orderConfirmedMessage } from "@/lib/sms";
+import {
+  sendSms,
+  orderConfirmedMessage,
+  lowStockAlertMessage,
+  stockShortfallMessage,
+} from "@/lib/sms";
 import { decrementStock } from "@/lib/inventory";
+import { getAdminPhoneNumbers } from "@/lib/admin";
 
 // Carries every short line (not just the first) plus each one's current
 // stock, so the eventual report is actionable rather than a bare message
@@ -167,7 +173,11 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
         // `{ shortfalls: [] }` shape (deferred-work.md, round 3) -
         // harmless today, but any future logging/metrics keyed off
         // this result couldn't tell the two apart without re-querying.
-        return { claimed: false, shortfalls: [] as ShortfallDetail[] };
+        return {
+          claimed: false,
+          shortfalls: [] as ShortfallDetail[],
+          crossedLowStockProductIds: [] as string[],
+        };
       }
 
       // Stable lock-acquisition order across concurrent transactions
@@ -188,14 +198,22 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
       const applied: Array<{ productId: string; quantity: number }> = [];
       const shortfalls: Array<{ productId: string; requested: number }> =
         [];
+      // Story 3.2: productIds whose decrement newly crossed their
+      // low-stock threshold - collected here, sent after the
+      // transaction commits (an SMS is an external network call and
+      // must never run while holding DB row locks).
+      const crossedLowStockProductIds: string[] = [];
       for (const item of items) {
-        const decremented = await decrementStock(
+        const { success, crossedLowStock } = await decrementStock(
           tx,
           item.productId,
           item.quantity,
         );
-        if (decremented) {
+        if (success) {
           applied.push({ productId: item.productId, quantity: item.quantity });
+          if (crossedLowStock) {
+            crossedLowStockProductIds.push(item.productId);
+          }
         } else {
           shortfalls.push({
             productId: item.productId,
@@ -205,7 +223,11 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
       }
 
       if (shortfalls.length === 0) {
-        return { claimed: true, shortfalls: [] as ShortfallDetail[] };
+        return {
+          claimed: true,
+          shortfalls: [] as ShortfallDetail[],
+          crossedLowStockProductIds,
+        };
       }
 
       // Capture each short line's stock at the point of failure BEFORE
@@ -250,6 +272,7 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
             currentStock.find((p) => p.id === s.productId)
               ?.stockQuantity ?? null,
         })),
+        crossedLowStockProductIds,
       };
     });
 
@@ -270,6 +293,85 @@ async function handlePaymentSucceeded(session: Stripe.Checkout.Session) {
         err.orderId,
         err.shortfalls,
       );
+
+      // Story 3.2, AC #6: a shortfall also alerts the admin - a distinct
+      // message from the routine low-stock alert below (a paid order
+      // couldn't be fulfilled), and deliberately never gated on
+      // lowStockAlerted - each shortfall represents a real
+      // already-charged order, worth surfacing every time it recurs,
+      // not deduped like the routine crossing alert.
+      const shortfallProducts = await prisma.product.findMany({
+        where: { id: { in: result.shortfalls.map((s) => s.productId) } },
+        select: { id: true, name: true },
+      });
+      const shortfallAdminPhones = await getAdminPhoneNumbers();
+      for (const shortfall of result.shortfalls) {
+        const productName =
+          shortfallProducts.find((p) => p.id === shortfall.productId)
+            ?.name ?? shortfall.productId;
+        const message = stockShortfallMessage(
+          productName,
+          order.vendor.name,
+          order.id,
+          shortfall.requested,
+          shortfall.available ?? 0,
+        );
+        let anySent = false;
+        for (const phone of shortfallAdminPhones) {
+          if (await sendSms(phone, message)) anySent = true;
+        }
+        if (!anySent && shortfallAdminPhones.length > 0) {
+          console.error(
+            "[webhooks/stripe] shortfall alert failed to send",
+            order.id,
+            shortfall.productId,
+          );
+        }
+      }
+    }
+
+    // Story 3.2, AC #2, #3: a newly-crossed low-stock threshold alerts
+    // the admin. Sent outside the transaction (an SMS is an external
+    // network call and must never run while holding DB row locks).
+    // lowStockAlerted is only set after a successful send (AC #3, #4) -
+    // no atomic claim needed here, since crossedLowStock was already
+    // computed inside a transaction gated by the outer stockDecremented
+    // claim above, which guarantees only one concurrent delivery of a
+    // given event ever reaches this code path.
+    if (result.crossedLowStockProductIds.length > 0) {
+      const crossedProducts = await prisma.product.findMany({
+        where: { id: { in: result.crossedLowStockProductIds } },
+        select: {
+          id: true,
+          name: true,
+          stockQuantity: true,
+          lowStockThreshold: true,
+        },
+      });
+      const lowStockAdminPhones = await getAdminPhoneNumbers();
+      for (const product of crossedProducts) {
+        const message = lowStockAlertMessage(
+          product.name,
+          order.vendor.name,
+          product.stockQuantity,
+          product.lowStockThreshold,
+        );
+        let anySent = false;
+        for (const phone of lowStockAdminPhones) {
+          if (await sendSms(phone, message)) anySent = true;
+        }
+        if (anySent) {
+          await prisma.product.update({
+            where: { id: product.id },
+            data: { lowStockAlerted: true },
+          });
+        } else if (lowStockAdminPhones.length > 0) {
+          console.error(
+            "[webhooks/stripe] low-stock alert failed to send",
+            product.id,
+          );
+        }
+      }
     }
     // A genuine transient failure (deadlock, dropped connection, etc)
     // during any of the above throws a real error out of $transaction,

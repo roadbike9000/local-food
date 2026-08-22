@@ -42,7 +42,7 @@ local-food/
 │   │       ├── pickup-slots/route.ts     # GET/POST — vendor-scoped via getCurrentVendor()
 │   │       ├── admin/vendors/route.ts    # POST — admin-scoped via getCurrentAdmin(); NOT covered by middleware's /admin(.*) matcher (different path prefix)
 │   │       ├── admin/vendors/[id]/deactivate/route.ts  # POST — admin-scoped, idempotent soft-delete (Story 2.3)
-│   │       └── webhooks/stripe/route.ts  # POST — Stripe signature verify (raw body) → Order PAID → Twilio SMS
+│   │       └── webhooks/stripe/route.ts  # POST — Stripe signature verify (raw body) → Order PAID → stock decrement → admin low-stock/shortfall SMS (Story 3.2) → customer SMS
 │   │
 │   ├── components/                    # top-level files are flat; admin/ is the first documented subfolder (Story 2.2) — components/dashboard/ (AddProductForm.tsx, AddSlotForm.tsx, EditStockControl.tsx) predates this doc's last full pass and was never added here either
 │   │   ├── CartProvider.tsx            # "use client" — React Context, single-vendor cart, in-memory only (lost on refresh)
@@ -55,10 +55,11 @@ local-food/
 │   └── lib/                           # one file per external service — CRITICAL BOUNDARY (secrets live here, never in "use client" files)
 │       ├── prisma.ts                   # singleton client, cached on globalThis to survive Next.js dev reloads
 │       ├── stripe.ts                   # Stripe client + a formatPrice() duplicate (see Notes below)
-│       ├── twilio.ts                   # sendSms() no-ops+logs if creds absent; swallows send failures (never throws)
+│       ├── sms/index.ts                # sendSms() (provider-abstracted: providers/{twilioProvider,mockProvider}.ts, SMS_PROVIDER env picks one) — no-ops+logs on failure, never throws; orderConfirmedMessage()/lowStockAlertMessage()/stockShortfallMessage() (Story 3.2) message builders. Note: this superseded a formerly-documented src/lib/twilio.ts, which no longer exists — this doc's own reference to it was stale
 │       ├── cloudinary.ts               # uploadImage() helper — not yet called from any route/component
 │       ├── vendor.ts                   # getCurrentVendor() — the auth→Vendor lookup used by every dashboard route; resolveVendorSlug() (Story 2.2, AD-7); assertVendorActive()/VendorDeactivatedError (Story 2.3, AD-4)
-│       ├── admin.ts                    # getCurrentAdmin() (Story 2.1) — mirrors getCurrentVendor()'s shape
+│       ├── admin.ts                    # getCurrentAdmin() (Story 2.1) — mirrors getCurrentVendor()'s shape; getAdminPhoneNumbers() (Story 3.2) — every Admin row with a phone set, for low-stock/shortfall SMS fan-out
+│       ├── inventory.ts                # decrementStock()/setStock()/setLowStockThreshold() (Story 1.2/1.4, AD-3) — the sole write path for Product.stockQuantity/lowStockThreshold. decrementStock() returns { success, crossedLowStock } (Story 3.2); setStock() takes a currentThreshold param and resets lowStockAlerted on a genuine restock above threshold
 │       ├── availability.ts             # isInStock() (Story 1.2/AD-2), isLowStock() (Story 3.1) — pure, Prisma-free stock-status checks; deliberately kept out of inventory.ts so client components can import them too. Both re-exported from inventory.ts for server-side callers.
 │       └── utils.ts                    # slugify, formatPrice, formatPickupWindow — the canonical formatPrice per project-context.md
 │

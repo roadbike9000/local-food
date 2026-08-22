@@ -15,3 +15,18 @@ export async function getCurrentAdmin() {
     where: { clerkUserId: userId },
   });
 }
+
+/**
+ * Every Admin row with a phone configured (Story 3.2) - low-stock/
+ * shortfall SMS alerts fan out to all of them, not just "the" admin.
+ * Nothing in this schema enforces exactly one Admin row. Returns an
+ * empty array if none are configured - callers must treat that as the
+ * expected, normal state, not an error.
+ */
+export async function getAdminPhoneNumbers(): Promise<string[]> {
+  const admins = await prisma.admin.findMany({
+    where: { phone: { not: null } },
+    select: { phone: true },
+  });
+  return admins.map((a) => a.phone as string);
+}

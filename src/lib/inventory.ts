@@ -16,6 +16,7 @@ export {
   isInStock,
   isLowStock,
 } from "@/lib/availability";
+import { isLowStock } from "@/lib/availability";
 
 /**
  * Conditional update: only writes if the row's current stockVersion still
@@ -48,6 +49,7 @@ export async function setStock(
   productId: string,
   newValue: number,
   currentValue: number,
+  currentThreshold: number,
   expectedVersion: number,
   forceClearPlaceholder = false,
 ): Promise<boolean> {
@@ -59,6 +61,14 @@ export async function setStock(
       ...(newValue !== currentValue || forceClearPlaceholder
         ? { stockIsPlaceholder: false }
         : {}),
+      // Story 3.2, AC #5: only a genuine restock above the threshold
+      // re-arms a future low-stock alert. A manual edit that keeps
+      // stock at/below the threshold must not reset this - that would
+      // let the next sale-driven decrement fire a duplicate alert for
+      // stock that was never actually restocked. Deliberately not
+      // mirrored in setLowStockThreshold() - a threshold-only edit is
+      // not a restock event, out of this AC's scope.
+      ...(newValue > currentThreshold ? { lowStockAlerted: false } : {}),
     },
   });
   return result.count === 1;
@@ -89,7 +99,7 @@ export async function decrementStock(
   tx: Prisma.TransactionClient,
   productId: string,
   quantity: number,
-): Promise<boolean> {
+): Promise<{ success: boolean; crossedLowStock: boolean }> {
   // Defence-in-depth (deferred-work.md, Story 1.4 round 1): quantity: 0
   // matches `gte: 0` and writes nothing, and a negative value also matches
   // `gte` and would *increment* stock via `decrement: -N` — against this
@@ -98,7 +108,7 @@ export async function decrementStock(
   // OrderItem.quantity), but this primitive should be safe for any future
   // caller regardless.
   if (!Number.isInteger(quantity) || quantity <= 0) {
-    return false;
+    return { success: false, crossedLowStock: false };
   }
 
   const result = await tx.product.updateMany({
@@ -108,7 +118,25 @@ export async function decrementStock(
       stockVersion: { increment: 1 },
     },
   });
-  return result.count === 1;
+  if (result.count !== 1) {
+    return { success: false, crossedLowStock: false };
+  }
+
+  // Read back inside the same transaction (Story 3.2) - safe and
+  // consistent, not a new read-then-act race: the row lock the
+  // updateMany above acquired is still held until this transaction
+  // commits. "Newly crossed" (not just "currently low") means
+  // lowStockAlerted was false before this decrement - a product that's
+  // already alerted must not report a fresh crossing on every further
+  // sale while it stays below threshold (AC #5).
+  const updated = await tx.product.findUnique({
+    where: { id: productId },
+    select: { stockQuantity: true, lowStockThreshold: true, lowStockAlerted: true },
+  });
+  const crossedLowStock =
+    !!updated && !updated.lowStockAlerted && isLowStock(updated);
+
+  return { success: true, crossedLowStock };
 }
 
 /**

@@ -22,11 +22,10 @@ A platform operator, distinct from a Vendor.
 |---|---|---|
 | id | String (cuid) | PK |
 | clerkUserId | String | `@unique` — sole source of admin identity (architecture AD-1); `getCurrentAdmin()` looks up by this, never a Clerk session claim |
+| phone | String? | low-stock/shortfall SMS destination (Story 3.2, AD-3) — nullable, mirrors `Vendor.phone`'s shape. `getAdminPhoneNumbers()` (`src/lib/admin.ts`) fans out to every `Admin` row with a phone set, not just one — a zero-configured-phones state is expected, not an error |
 | createdAt / updatedAt | DateTime | |
 
 Relations: `createdVendors[]` (`Vendor.createdByAdminId`, Story 2.2, named relation `VendorCreatedByAdmin`), `deletedVendors[]` (`Vendor.deletedByAdminId`, Story 2.3, named relation `VendorDeletedByAdmin`) — two separate named relations to `Vendor`, since Prisma requires distinct names once there's more than one relation between the same two models.
-
-No `phone` yet — Story 3.2 adds it (required to deliver that story's SMS alert, per its own AC).
 
 ### Vendor
 One seller, one storefront. `clerkUserId` may be `null` for an admin-created vendor not yet claimed by a signed-up Clerk user (AD-8, Story 2.2) — every vendor still has exactly one storefront regardless.
@@ -63,6 +62,7 @@ Something a vendor sells.
 | stockIsPlaceholder | Boolean | `true` for rows backfilled by Story 1.2's migration whose `stockQuantity` is still the migration sentinel, not a real vendor-entered value; cleared on the vendor's first genuine edit. Surfaced to the vendor as a "Needs review" badge on `/dashboard/products` (Story 1.6, FR13) |
 | thresholdIsPlaceholder | Boolean | same as `stockIsPlaceholder`, for `lowStockThreshold` |
 | stockVersion | Int, default 0 | monotonic counter bumped by every writer of `stockQuantity` (`setStock()`, `decrementStock()` in `src/lib/inventory.ts`). `setStock()`'s optimistic-lock guard checks this, not `stockQuantity` equality — closes an ABA gap a value-equality guard has (a decrement-then-restock can return `stockQuantity` to the exact value a vendor's stale page load saw). `setLowStockThreshold()` never bumps it — that field has no concurrent writer of its own |
+| lowStockAlerted | Boolean, default false | one-shot flag, same shape as `Order.smsNotified` (Story 3.2, AD-3) — set `true` only after a low-stock SMS actually sends, never before a failed send. `decrementStock()` reports a newly-detected crossing (`crossedLowStock`) without setting this itself; the webhook sets it after a successful `sendSms()`. Reset to `false` by `setStock()` when a genuine restock brings `stockQuantity` back above `lowStockThreshold`, so a future crossing can alert again |
 | createdAt / updatedAt | DateTime | |
 
 Relations: `vendor`, `orderItems[]`.

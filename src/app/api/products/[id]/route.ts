@@ -70,6 +70,7 @@ export async function PATCH(
       params.id,
       stockQuantity,
       product.stockQuantity,
+      product.lowStockThreshold,
       expectedStockVersion,
       confirmPlaceholder,
     );
