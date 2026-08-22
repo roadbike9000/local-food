@@ -57,11 +57,11 @@ development_status:
   1-6-vendor-notified-of-placeholder-stock-quantity: done
   epic-1-retrospective: done
 
-  epic-2: in-progress
+  epic-2: done
   2-1-admin-identity-and-access-gating: done
   2-2-admin-adds-a-vendor: done
   2-3-admin-deactivates-a-vendor: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-admin-inventory-dashboard: backlog
@@ -82,12 +82,38 @@ action_items:
   - epic: 1
     action: "Verify Epic 2's migration against a real DB (or rolled-back transaction) before the first review round, given Story 1.2's precedent of shadow-DB/timezone/cardinality bugs only catchable that way"
     owner: "Dev"
-    status: open
+    status: done
+    note: "All three Epic 2 migrations were simple (additive table; nullable-constraint relax + FK; two nullable columns + two onDelete changes) and were applied directly against the real shared dev DB as standard practice, each verified per its Dev Agent Record. Outcome achieved (no migration-shape surprises reached review), though not elevated into its own deliberate pre-review gate."
   - epic: 1
     action: "Before shipping any new interactive UI in Epic 2, check for touch/keyboard/screen-reader-reachable equivalents of any title-only tooltip content - this gap shipped twice in Epic 1 (Stories 1.5, 1.6)"
     owner: "Dev"
-    status: open
+    status: done
+    note: "No title-only-tooltip pattern shipped anywhere in Epic 2 - DeactivateVendorButton and AddVendorForm both used aria-label/role=\"alert\" from the start. Not re-verified as its own explicit checklist step, but the gap didn't recur."
   - epic: 1
     action: "Add npm run test:unit as a CI step (flagged in Story 1.2's round-2 review, still open)"
+    owner: "Dev"
+    status: open
+  - epic: 2
+    action: "Provision the real E2E_ADMIN_EMAIL/E2E_ADMIN_CLERK_ID Clerk test user and GitHub Actions secrets - carried from Epic 1's retro, now blocking real e2e verification on 3 stories' worth of admin-authenticated tests"
+    owner: "Jeff"
+    status: open
+  - epic: 2
+    action: "Fix the ATDD scaffold-activation script's blanket test.skip( -> test( replacement - hit and fixed twice (Stories 2.2, 2.3) without the underlying method changing"
+    owner: "Dev"
+    status: open
+  - epic: 2
+    action: "Add a lightweight doc-accuracy self-check to the end of implementation, before requesting review - doc drift has been a review finding in every single round across both epics"
+    owner: "Dev"
+    status: open
+  - epic: 2
+    action: "Treat check-then-act on shared mutable state as an implementation-time red flag, not just a review-time catch - this exact bug class shipped in 2 of Epic 2's 3 stories despite Epic 1 naming it explicitly"
+    owner: "Dev"
+    status: open
+  - epic: 2
+    action: "Decide on a fail-closed requireAdmin() helper before Story 3.2 (first admin action with a real external side effect)"
+    owner: "Jeff"
+    status: open
+  - epic: 2
+    action: "Deactivated vendor can still create Product/PickupSlot rows via their own untouched dashboard (logged in deferred-work.md from Story 2.3's review) - pick up when a story next touches vendor-dashboard write paths"
     owner: "Dev"
     status: open
