@@ -1,5 +1,5 @@
 # generated: 2026-08-17
-# last_updated: 2026-08-22 (Epic 3 retro)
+# last_updated: 2026-08-23 (E2E admin creds provisioned)
 # project: local-food
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-08-17
-last_updated: 2026-08-22
+last_updated: 2026-08-23
 project: local-food
 project_key: NOKEY
 tracking_system: file-system
@@ -72,8 +72,8 @@ action_items:
   - epic: 1
     action: "Fix the stale Clerk vendor auth fixture (playwright/.auth/vendor.json) and build an equivalent Admin test-identity fixture before Epic 2's first story lands"
     owner: "Dev"
-    status: in-progress
-    note: "Vendor half done 2026-08-21 - replaced with @clerk/testing Backend-API sign-in in playwright/support/global-setup.ts, regenerates automatically on every test run, no human/email step. Admin half blocked on Epic 2's Admin identity existing first."
+    status: done
+    note: "Vendor half done 2026-08-21 - replaced with @clerk/testing Backend-API sign-in in playwright/support/global-setup.ts, regenerates automatically on every test run, no human/email step. Admin half was blocked only on credentials, not code - global-setup.ts's Admin branch existed since 2026-08-21 but had never run. 2026-08-23: E2E_ADMIN_EMAIL/E2E_ADMIN_CLERK_ID provisioned (see epic-3 action item), admin.json fixture now generates and signs in successfully."
   - epic: 1
     action: "Make npm run test:e2e:auth-style fixture generation self-sufficient (currently needs a dev server already running standalone)"
     owner: "Dev"
@@ -97,7 +97,8 @@ action_items:
   - epic: 2
     action: "Provision the real E2E_ADMIN_EMAIL/E2E_ADMIN_CLERK_ID Clerk test user and GitHub Actions secrets - carried from Epic 1's retro, now blocking real e2e verification on 3 stories' worth of admin-authenticated tests"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-23: see epic-3 action item of the same name for detail."
   - epic: 2
     action: "Fix the ATDD scaffold-activation script's blanket test.skip( -> test( replacement - hit and fixed twice (Stories 2.2, 2.3) without the underlying method changing"
     owner: "Dev"
@@ -116,8 +117,8 @@ action_items:
   - epic: 2
     action: "Decide on a fail-closed requireAdmin() helper before Story 3.2 (first admin action with a real external side effect)"
     owner: "Jeff"
-    status: open
-    note: "Not addressed - Story 3.2 shipped its SMS-triggering path without this decision being revisited. Nothing broke, but the decision point was skipped. Re-logged as Epic 3 action item 3."
+    status: done
+    note: "2026-08-23: see epic-3 action item of the same name for detail."
   - epic: 2
     action: "Deactivated vendor can still create Product/PickupSlot rows via their own untouched dashboard (logged in deferred-work.md from Story 2.3's review) - pick up when a story next touches vendor-dashboard write paths"
     owner: "Dev"
@@ -126,7 +127,8 @@ action_items:
   - epic: 3
     action: "Provision the real E2E_ADMIN_EMAIL/E2E_ADMIN_CLERK_ID Clerk test user and GitHub Actions secrets, or make an explicit decision to accept the gap permanently now that no further admin-gated epic is currently planned - carried 3 epics running"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-23: created a 2nd Clerk Development-instance test user (distinct from the vendor identity), bound to a seeded Admin row via prisma/seed.ts, set as E2E_ADMIN_EMAIL/E2E_ADMIN_CLERK_ID in both .env and GH Actions repo secrets. All 21 previously-always-skipped admin-authenticated e2e tests ran for the first time; caught and fixed one real bug along the way (admin-vendors.spec.ts:110's getByRole('alert') collided with Next.js's route-announcer div - scoped to the form). Full suite now green: 80/80 unit, 114/114 e2e."
   - epic: 3
     action: "Add npm run test:unit as a CI step - open since Story 1.2's round-2 review, now 3 epics old"
     owner: "Dev"
@@ -135,7 +137,8 @@ action_items:
   - epic: 3
     action: "Make a real decision on the requireAdmin() fail-closed helper, even retroactively - decide whether to retrofit or explicitly accept the current fail-open-by-convention design"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-23: decided to close the structural gap at the routing layer rather than adding a per-route helper (which wouldn't have closed 'a route forgot to call it'). src/middleware.ts now gates /admin(.*) and /api/admin(.*) for 'must be signed in' before any route code runs - /api/admin(.*) wasn't covered by middleware at all before this. Per-route getCurrentAdmin() checks (src/lib/admin.ts) still do the actual Admin-role check, unchanged - Prisma can't run in Next 14.2.13's Edge middleware runtime, so a full DB-backed structural gate wasn't available without a bigger prerequisite change (Next 15 Node middleware, or moving admin-role into Clerk publicMetadata as a second source of truth) - both rejected as out of scope for this decision. Caught and fixed a real behavior gap along the way: auth().protect()'s default signed-out response is a redirect to the sign-in page, which returned 404 for unauthenticated JSON API callers (Clerk dev-browser rewrite target doesn't exist as a route) instead of the 401 every admin route handler already contracts for - middleware now returns a matching 401 JSON body for /api/admin(.*) directly instead of calling protect(). Verified: lint, typecheck, production build, 80/80 unit, 114/114 e2e all clean."
   - epic: 3
     action: "Strengthen the doc-accuracy self-check beyond scoping doc tasks narrowly - e.g. a diff-against-claims pass - since two stories running the current process still leaked real content errors into review"
     owner: "Dev"

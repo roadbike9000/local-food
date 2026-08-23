@@ -131,7 +131,7 @@ test.describe("admin vendor creation (authenticated as admin)", () => {
       // conflict, distinct from a 400 malformed-request").
       expect(response.status()).toBe(409);
 
-      await expect(page.getByRole("alert")).toHaveText(/already in use/i);
+      await expect(form.getByRole("alert")).toHaveText(/already in use/i);
 
       // No navigation away from the form — the admin stays put to correct
       // the slug and resubmit.
