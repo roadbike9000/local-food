@@ -19,6 +19,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // getCurrentVendor() resolves by clerkUserId alone, with no deletedAt
+  // filter - a deactivated vendor's own session still resolves here, so
+  // this check must be explicit (Epic 2 retro tech debt, same as every
+  // other vendor-scoped write route in this codebase).
   try {
     assertVendorActive(vendor);
   } catch (err) {

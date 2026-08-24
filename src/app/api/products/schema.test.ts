@@ -24,9 +24,21 @@ describe("CreateProductSchema", () => {
     const result = CreateProductSchema.safeParse({
       ...validBody,
       description: "Crusty, tangy, 800g.",
-      imageUrl: "https://res.cloudinary.com/demo/image/upload/loaf.jpg",
+      imageUrl: `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload/loaf.jpg`,
     });
     expect(result.success).toBe(true);
+  });
+
+  // Story 4.1 review finding — the host check must scope to this app's own
+  // Cloudinary cloud, not just the shared res.cloudinary.com domain. "demo"
+  // is Cloudinary's own public demo cloud, a different account entirely.
+  it("rejects a res.cloudinary.com URL from a different Cloudinary cloud", () => {
+    expect(
+      CreateProductSchema.safeParse({
+        ...validBody,
+        imageUrl: "https://res.cloudinary.com/demo/image/upload/loaf.jpg",
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects an empty name", () => {

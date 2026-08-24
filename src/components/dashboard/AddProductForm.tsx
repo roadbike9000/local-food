@@ -7,14 +7,11 @@
  */
 import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent, type FormEvent } from "react";
+import { MAX_IMAGE_RAW_BYTES } from "@/app/api/products/upload-image/schema";
 
 // Postgres INTEGER max - priceCents/stockQuantity/lowStockThreshold are all
 // Int columns; matches the server-side Zod bound on each.
 const INT4_MAX = 2_147_483_647;
-
-// Matches the server-side 3MB-raw-file cap (UploadImageSchema's ~4M-char
-// base64 cap) - see Dev Notes, Story 4.1.
-const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -33,9 +30,18 @@ export function AddProductForm() {
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (file && file.size > MAX_IMAGE_BYTES) {
+    if (!file) return;
+
+    if (file.size === 0) {
+      setError("Selected file is empty. Choose a different image.");
+      event.target.value = "";
+    } else if (file.size > MAX_IMAGE_RAW_BYTES) {
       setError("Image is too large — max 3MB.");
       event.target.value = "";
+    } else {
+      // Clear a stale error from a previous oversized/empty selection now
+      // that a valid file has been chosen (Story 4.1 review finding).
+      setError(null);
     }
   }
 
@@ -56,13 +62,21 @@ export function AddProductForm() {
     const stockQuantity = Number(formData.get("stockQuantity") ?? "");
     const lowStockThreshold = Number(formData.get("lowStockThreshold") ?? "");
     const imageFile = formData.get("image");
-    const hasImage = imageFile instanceof File && imageFile.size > 0;
+    const imageSelected = imageFile instanceof File && imageFile.name !== "";
 
-    if (hasImage && imageFile.size > MAX_IMAGE_BYTES) {
+    if (imageSelected && imageFile.size === 0) {
+      setError("Selected file is empty. Choose a different image.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (imageSelected && imageFile.size > MAX_IMAGE_RAW_BYTES) {
       setError("Image is too large — max 3MB.");
       setSubmitting(false);
       return;
     }
+
+    const hasImage = imageSelected && imageFile.size > 0;
 
     try {
       let imageUrl: string | undefined;

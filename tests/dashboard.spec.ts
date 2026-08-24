@@ -195,6 +195,16 @@ test.describe("vendor dashboard (authenticated)", () => {
   test(
     "[P1] vendor uploads a product image and it's saved to the new product (Story 4.1)",
     async ({ page }) => {
+      // CLOUDINARY_* is not provisioned in this repo's CI secrets today -
+      // skip gracefully rather than hard-failing, same convention
+      // payment.spec.ts uses for Stripe test keys (Story 4.1 review finding).
+      test.skip(
+        !process.env.CLOUDINARY_CLOUD_NAME ||
+          !process.env.CLOUDINARY_API_KEY ||
+          !process.env.CLOUDINARY_API_SECRET,
+        "Cloudinary not configured — CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET missing",
+      );
+
       const vendor = await getVendorBySlug("corner-sourdough");
       const productName = `Playwright Image Product ${Date.now()}`;
 

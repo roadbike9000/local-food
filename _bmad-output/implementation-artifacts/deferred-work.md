@@ -1,5 +1,17 @@
 # Deferred Work
 
+## Deferred from: code review of 4-1-vendor-uploads-a-product-image (2026-08-24)
+
+- source_spec: `_bmad-output/implementation-artifacts/4-1-vendor-uploads-a-product-image.md`
+  summary: No cleanup for orphaned Cloudinary uploads if `POST /api/products` fails after the image upload already succeeded — the vendor's image sits permanently in Cloudinary storage with no `Product` row referencing it, and nothing deletes it. A retry re-uploads the same file, compounding the orphan.
+  evidence: Code review (round 1, Blind Hunter). `src/components/dashboard/AddProductForm.tsx`'s `handleSubmit` calls `POST /api/products/upload-image` first, then `POST /api/products` second — if the second call fails (a validation error, session expiry, network blip), the first call's Cloudinary asset is never cleaned up. This is a known, accepted tradeoff of the sequential-request design already discussed in the story's own Dev Notes ("Sequencing: upload, then create — not a combined single request"), which weighed this exact risk against the alternative (folding the upload into a single combined request) and chose sequential for other reasons. No compensating-transaction convention exists elsewhere in this codebase to reuse.
+  status: open — accepted for this story; worth a decision (delete-on-failure via a Cloudinary destroy call, or a periodic orphan-sweep job) if upload volume or Cloudinary cost ever makes it worth closing.
+
+- source_spec: `_bmad-output/implementation-artifacts/4-1-vendor-uploads-a-product-image.md`
+  summary: The live-Cloudinary E2E happy-path test uploads a real image to Cloudinary on every test run with no cleanup afterward — a small, permanent storage cost that accumulates with every CI/local run.
+  evidence: `tests/products-api.spec.ts`'s `[P0] uploads a real image as the signed-in vendor and returns a Cloudinary URL (200)` test calls the real `uploadImage()` (no mock exists), matching this codebase's established "no mocking of external services" convention (Stripe/Clerk/Twilio tests all hit real dev-mode services too). The uploaded fixture is a tiny 68-byte 1x1 PNG, so per-run cost is negligible, but nothing ever calls Cloudinary's `destroy` API to remove it afterward.
+  status: open — accepted as negligible for now; worth revisiting (add a `finally` block calling Cloudinary's destroy API with the returned `public_id`) if this pattern is copied by future stories with larger or more frequent uploads.
+
 ## Deferred from: scenario review with Jeff (2026-08-24)
 
 Source: `scenarios from Jeff/Local Food Scnearios from Jeff.rtf` (4 scenarios), reviewed via `bmad-review-edge-case-hunter` against actual code. Two of the four scenarios (vendor delete+re-add with exact name, ASCII punctuation in vendor/product names) were confirmed already handled correctly by existing code (`resolveVendorSlug()`, `slugify()`) and produced no new work item beyond this entry and a small adjacent finding below. The other two became Epic 4 (Vendor Product Images) and Epic 5 (Pickup Slot & Order Integrity) in `epics.md`.

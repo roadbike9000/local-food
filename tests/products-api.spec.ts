@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "@playwright/test";
 import { getVendorBySlug, deleteProduct, prisma, createTestProduct } from "./helpers/db";
+import { MAX_BASE64_LENGTH } from "../src/app/api/products/upload-image/schema";
 
 /**
  * API-level coverage for PATCH /api/products/[id] — Story 1.2's new
@@ -241,6 +242,16 @@ test.describe("POST /api/products/upload-image (Story 4.1)", () => {
   test(
     "[P0] uploads a real image as the signed-in vendor and returns a Cloudinary URL (200)",
     async ({ request }) => {
+      // CLOUDINARY_* is not provisioned in this repo's CI secrets today -
+      // skip gracefully rather than hard-failing, same convention
+      // payment.spec.ts uses for Stripe test keys (Story 4.1 review finding).
+      test.skip(
+        !process.env.CLOUDINARY_CLOUD_NAME ||
+          !process.env.CLOUDINARY_API_KEY ||
+          !process.env.CLOUDINARY_API_SECRET,
+        "Cloudinary not configured — CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET missing",
+      );
+
       const response = await request.post("/api/products/upload-image", {
         data: { image: `data:image/png;base64,${testImageBase64}` },
       });
@@ -252,22 +263,22 @@ test.describe("POST /api/products/upload-image (Story 4.1)", () => {
   );
 
   test(
-    "[P0] a malformed (non-image) value is rejected (400)",
+    "[P0] a malformed (non-image) value is rejected (400) with a format-specific error, distinct from the size error",
     async ({ request }) => {
       const response = await request.post("/api/products/upload-image", {
         data: { image: "not an image" },
       });
 
       expect(response.status()).toBe(400);
+      const body = await response.json();
+      expect(body.error).not.toMatch(/too large/i);
     },
   );
 
   test(
     "[P1] an oversized payload is rejected (400) with a size-specific error",
     async ({ request }) => {
-      // ~4,000,000 base64 characters ≈ the 3MB-raw-file cap's encoded size
-      // (Dev Notes, Story 4.1).
-      const oversized = "A".repeat(4_100_000);
+      const oversized = "A".repeat(MAX_BASE64_LENGTH + 1);
       const response = await request.post("/api/products/upload-image", {
         data: { image: `data:image/png;base64,${oversized}` },
       });
