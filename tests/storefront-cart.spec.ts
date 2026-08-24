@@ -498,7 +498,7 @@ test.describe("product image on storefront (Story 4.2)", () => {
   const BROKEN_IMAGE_URL =
     "https://res.cloudinary.com/demo/image/upload/story-4-2-does-not-exist.jpg";
 
-  test.skip(
+  test(
     "[P0] a product with imageUrl set renders its image on the storefront",
     async ({ page }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -519,7 +519,7 @@ test.describe("product image on storefront (Story 4.2)", () => {
     },
   );
 
-  test.skip(
+  test(
     "[P0] a product with no imageUrl shows a placeholder, not a broken image",
     async ({ page }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
@@ -544,7 +544,7 @@ test.describe("product image on storefront (Story 4.2)", () => {
     },
   );
 
-  test.skip(
+  test(
     "[P0] a product whose image fails to load still leaves Add clickable, and falls back to the placeholder",
     async ({ page }) => {
       const vendor = await getVendorBySlug("corner-sourdough");

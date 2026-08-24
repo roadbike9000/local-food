@@ -4,7 +4,7 @@ baseline_commit: 2d9cff4f756195cf18ad0f650390834ec4925a1e
 
 # Story 4.2: Product image displays on the storefront
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -25,31 +25,31 @@ so that I know what I'm actually buying.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Pass `imageUrl` through to `ProductCard` (AC #1, #4)
-  - [ ] `src/app/vendors/[slug]/page.tsx` — the `product={{...}}` object mapped for each `ProductCard` currently only includes `id`, `name`, `description`, `priceCents`, `stockQuantity` (`Product.imageUrl` is not selected into it at all, despite the Prisma query already fetching the full row via `include: { products: ... } }`). Add `imageUrl: p.imageUrl` to that mapped object.
-  - [ ] `src/components/ProductCard.tsx` — add `imageUrl: string | null` to `ProductCardProps["product"]`.
+- [x] Task 1: Pass `imageUrl` through to `ProductCard` (AC #1, #4)
+  - [x] `src/app/vendors/[slug]/page.tsx` — the `product={{...}}` object mapped for each `ProductCard` currently only includes `id`, `name`, `description`, `priceCents`, `stockQuantity` (`Product.imageUrl` is not selected into it at all, despite the Prisma query already fetching the full row via `include: { products: ... } }`). Add `imageUrl: p.imageUrl` to that mapped object.
+  - [x] `src/components/ProductCard.tsx` — add `imageUrl: string | null` to `ProductCardProps["product"]`.
 
-- [ ] Task 2: Render the image (or a placeholder) in `ProductCard` (AC #1, #2, #3)
-  - [ ] Use `next/image`'s `<Image>` component, not a plain `<img>` tag — `next.config.mjs`'s `images.remotePatterns` already whitelists `res.cloudinary.com` (set up during Story 4.1 specifically anticipating this story; don't add a second images config or a different pattern).
-  - [ ] Fixed `width`/`height` sized for this card's compact row layout (e.g. `64`/`64` or `80`/`80` — pick something that reads well next to the existing name/price text, doesn't need to match pixel-for-pixel, dev's call). `next/image` requires explicit dimensions unless using `fill` inside a sized wrapper — either approach is fine, stay consistent with `ProductCard`'s existing flex layout.
-  - [ ] `next/image` lazy-loads by default (`loading="lazy"`) — don't override this to `eager`; a slow/failed image must not hold up the rest of the card or page (AC #3).
-  - [ ] When `product.imageUrl` is `null`/`undefined`, render a neutral placeholder in the same slot (same dimensions as the real image, so the layout doesn't shift). No placeholder asset or icon library exists anywhere in this codebase today (no `/public` folder, no npm icon dependency) — build one inline (an SVG or a plain Tailwind-styled `div`, e.g. a muted background box), don't add a new dependency for this. Give it `data-testid="product-image-placeholder"` — no ARIA role naturally identifies "the image placeholder," matching this codebase's one existing narrow `data-testid` exception (`cart-total` in `src/app/cart/page.tsx`, added for the identical reason). The real `<Image>` needs no `data-testid`; its accessible role (`img`) plus `alt={product.name}` is enough to locate it.
-  - [ ] `product.imageUrl` being *set* doesn't guarantee the Cloudinary asset still loads (deleted upstream, transient network failure) — add an `onError` handler on the `<Image>` that swaps to the same placeholder rather than leaving Next's default broken-image rendering. This needs the component to track "did this specific image fail" in local state (`useState`), since `next/image`'s `onError` fires client-side after the initial render attempt.
-  - [ ] `next/image`'s `alt` prop is required (TypeScript enforces this) — use `product.name` for the real image (accessibility: a screen reader should hear the product's name, not a generic label); the placeholder can use `alt=""` since it's purely decorative and the product name is already shown as adjacent text.
-  - [ ] If using `fill` instead of fixed `width`/`height`, the wrapping element must have `position: relative` and an explicit size, and `<Image>` needs a `sizes` prop (Next warns/degrades performance without one) — only relevant if you choose the `fill` approach over fixed dimensions.
+- [x] Task 2: Render the image (or a placeholder) in `ProductCard` (AC #1, #2, #3)
+  - [x] Use `next/image`'s `<Image>` component, not a plain `<img>` tag — `next.config.mjs`'s `images.remotePatterns` already whitelists `res.cloudinary.com` (set up during Story 4.1 specifically anticipating this story; don't add a second images config or a different pattern).
+  - [x] Fixed `width`/`height` sized for this card's compact row layout (e.g. `64`/`64` or `80`/`80` — pick something that reads well next to the existing name/price text, doesn't need to match pixel-for-pixel, dev's call). `next/image` requires explicit dimensions unless using `fill` inside a sized wrapper — either approach is fine, stay consistent with `ProductCard`'s existing flex layout.
+  - [x] `next/image` lazy-loads by default (`loading="lazy"`) — don't override this to `eager`; a slow/failed image must not hold up the rest of the card or page (AC #3).
+  - [x] When `product.imageUrl` is `null`/`undefined`, render a neutral placeholder in the same slot (same dimensions as the real image, so the layout doesn't shift). No placeholder asset or icon library exists anywhere in this codebase today (no `/public` folder, no npm icon dependency) — build one inline (an SVG or a plain Tailwind-styled `div`, e.g. a muted background box), don't add a new dependency for this. Give it `data-testid="product-image-placeholder"` — no ARIA role naturally identifies "the image placeholder," matching this codebase's one existing narrow `data-testid` exception (`cart-total` in `src/app/cart/page.tsx`, added for the identical reason). The real `<Image>` needs no `data-testid`; its accessible role (`img`) plus `alt={product.name}` is enough to locate it.
+  - [x] `product.imageUrl` being *set* doesn't guarantee the Cloudinary asset still loads (deleted upstream, transient network failure) — add an `onError` handler on the `<Image>` that swaps to the same placeholder rather than leaving Next's default broken-image rendering. This needs the component to track "did this specific image fail" in local state (`useState`), since `next/image`'s `onError` fires client-side after the initial render attempt.
+  - [x] `next/image`'s `alt` prop is required (TypeScript enforces this) — use `product.name` for the real image (accessibility: a screen reader should hear the product's name, not a generic label); the placeholder can use `alt=""` since it's purely decorative and the product name is already shown as adjacent text.
+  - [x] If using `fill` instead of fixed `width`/`height`, the wrapping element must have `position: relative` and an explicit size, and `<Image>` needs a `sizes` prop (Next warns/degrades performance without one) — only relevant if you choose the `fill` approach over fixed dimensions.
 
-- [ ] Task 3: Confirm nothing else breaks (AC #3, plus regression safety)
-  - [ ] Verify the Add-to-cart button stays enabled/clickable regardless of image state (loading, loaded, or failed-and-placeholder-swapped) — it must never become unclickable or delayed by image loading.
-  - [ ] `tests/storefront-cart.spec.ts` and `tests/dashboard.spec.ts`'s existing out-of-stock test both locate a product's outer card via `productHeading.locator("../..")` — exactly two DOM levels up from the name `<h3>` to `ProductCard`'s outer flex container. Adding the image element must not change that depth relationship (add it as a sibling of the existing text-info `<div>` inside the same outer container, not as a new wrapping ancestor around the heading).
+- [x] Task 3: Confirm nothing else breaks (AC #3, plus regression safety)
+  - [x] Verify the Add-to-cart button stays enabled/clickable regardless of image state (loading, loaded, or failed-and-placeholder-swapped) — it must never become unclickable or delayed by image loading.
+  - [x] `tests/storefront-cart.spec.ts` and `tests/dashboard.spec.ts`'s existing out-of-stock test both locate a product's outer card via `productHeading.locator("../..")` — exactly two DOM levels up from the name `<h3>` to `ProductCard`'s outer flex container. Adding the image element must not change that depth relationship (add it as a sibling of the existing text-info `<div>` inside the same outer container, not as a new wrapping ancestor around the heading).
 
-- [ ] Task 4: Tests (AC #1-#4)
-  - [ ] Extend `tests/storefront-cart.spec.ts` (read it in full first, matches its existing vendor-storefront-visit pattern): a product created with a real `imageUrl` set renders an image element inside its card (read the actual rendered DOM from `next/image`'s output before writing the assertion — it renders a real `<img>` with a Next-optimizer-rewritten `src`, not the original Cloudinary URL verbatim, so assert on element presence/`alt` text or add a `data-testid`, not a literal `src` string match); a product with `imageUrl: null` shows the placeholder instead (assert the placeholder is present, and that no broken-image state is shown); a product with a deliberately-broken `imageUrl` (a syntactically valid but non-resolving Cloudinary-style URL) still leaves the Add button clickable and ends up showing the placeholder after the image fails to load.
-  - [ ] `tests/helpers/db.ts`'s `createTestProduct()` has no `imageUrl` override today (confirmed by reading it in full) — add one to its `overrides` type, undefined/omitted by default (matching every other optional field's pattern in that function).
-  - [ ] No mocking of the image load — matches this codebase's established "no mocking external services" convention (Story 4.1's own upload tests, Stripe/Clerk/Twilio elsewhere). The broken-image test's URL is a real, deliberately-non-resolving one, not a mocked response.
+- [x] Task 4: Tests (AC #1-#4)
+  - [x] Extend `tests/storefront-cart.spec.ts` (read it in full first, matches its existing vendor-storefront-visit pattern): a product created with a real `imageUrl` set renders an image element inside its card (read the actual rendered DOM from `next/image`'s output before writing the assertion — it renders a real `<img>` with a Next-optimizer-rewritten `src`, not the original Cloudinary URL verbatim, so assert on element presence/`alt` text or add a `data-testid`, not a literal `src` string match); a product with `imageUrl: null` shows the placeholder instead (assert the placeholder is present, and that no broken-image state is shown); a product with a deliberately-broken `imageUrl` (a syntactically valid but non-resolving Cloudinary-style URL) still leaves the Add button clickable and ends up showing the placeholder after the image fails to load.
+  - [x] `tests/helpers/db.ts`'s `createTestProduct()` has no `imageUrl` override today (confirmed by reading it in full) — add one to its `overrides` type, undefined/omitted by default (matching every other optional field's pattern in that function).
+  - [x] No mocking of the image load — matches this codebase's established "no mocking external services" convention (Story 4.1's own upload tests, Stripe/Clerk/Twilio elsewhere). The broken-image test's URL is a real, deliberately-non-resolving one, not a mocked response.
 
-- [ ] Task 5: Docs sync (housekeeping, matches established precedent)
-  - [ ] `docs/data-models.md` — Story 4.1 already confirmed `Product.imageUrl`'s row (`| imageUrl | String? | Cloudinary URL |`) has no stale "not yet populated"/"not yet rendered" language to remove. Re-check on this story's own inspection (the row may have been touched since); update only if it's actually stale, and say so either way in Completion Notes (don't skip the check just because 4.1 already found it clean once).
-  - [ ] `docs/api-contracts.md` — this story is pure rendering, no request/response shape changes to any endpoint. Confirm no relevant section needs a note (e.g. `GET /api/products`'s response shape doc, if any, already lists `imageUrl` — check, don't assume) and record the "no change needed" finding in Completion Notes rather than silently skipping the file.
+- [x] Task 5: Docs sync (housekeeping, matches established precedent)
+  - [x] `docs/data-models.md` — Story 4.1 already confirmed `Product.imageUrl`'s row (`| imageUrl | String? | Cloudinary URL |`) has no stale "not yet populated"/"not yet rendered" language to remove. Re-check on this story's own inspection (the row may have been touched since); update only if it's actually stale, and say so either way in Completion Notes (don't skip the check just because 4.1 already found it clean once).
+  - [x] `docs/api-contracts.md` — this story is pure rendering, no request/response shape changes to any endpoint. Confirm no relevant section needs a note (e.g. `GET /api/products`'s response shape doc, if any, already lists `imageUrl` — check, don't assume) and record the "no change needed" finding in Completion Notes rather than silently skipping the file.
 
 ## Dev Notes
 
@@ -97,8 +97,35 @@ so that I know what I'm actually buying.
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- **Caught and fixed a self-introduced DOM-depth regression during Task 2, before it ever reached a test run.** The first implementation attempt wrapped the image and the existing text-info `<div>` in a new intermediate wrapper `<div>`, adding a third ancestor level between the product-name `<h3>` and `ProductCard`'s outer container — exactly the regression Task 3's own bullet warned against. Caught on re-reading the JSX (also surfaced a second, unrelated bug in the same draft: an unbalanced `<div>` count that would have failed to compile). Rewrote `ProductCard.tsx` cleanly with the image, text-info `<div>`, and `<button>` as three direct siblings of the outer container — preserving the exact `heading -> text-info-div -> outer-div` two-level relationship `tests/storefront-cart.spec.ts`'s `heading.locator("../..")` depends on. Verified: full `storefront-cart.spec.ts` run (12/12, including every pre-existing test using that locator) passes clean.
+- Placeholder built inline as a small SVG in a `data-testid="product-image-placeholder"` `<div>` — no icon library or `/public` asset exists anywhere in this codebase (confirmed on inspection), matching Dev Notes' explicit instruction not to add one. The `data-testid` follows the one existing narrow precedent in this codebase (`cart-total`, `src/app/cart/page.tsx`) for an element with no natural ARIA role.
+- `onError` on `next/image` required local `useState` (`imageFailed`) to swap to the placeholder after a failed load — verified against a real, deliberately non-resolving Cloudinary-style URL (`.../story-4-2-does-not-exist.jpg`), not a mock. Confirmed the real network 404 in the dev server's own log output during the test run, not just the visible UI outcome.
+- `npx tsc --noEmit` — clean.
+- `npm run lint` — clean (no ESLint warnings or errors).
+- `npm run test:unit` — 90/90 passed, unaffected (this story adds no unit-testable logic).
+- `npx playwright test tests/storefront-cart.spec.ts` — 12/12 passed (9 pre-existing + 3 new), including the real broken-image case passing on first run.
+- Full `npx playwright test` — see Step 9 completion run below.
 
 ### Completion Notes List
 
+- `src/app/vendors/[slug]/page.tsx` now passes `imageUrl: p.imageUrl` through to `ProductCard` (previously omitted from the mapped object despite the Prisma query already fetching it).
+- `ProductCard.tsx` renders `next/image` when `product.imageUrl` is set and hasn't failed to load; falls back to an inline SVG placeholder (`data-testid="product-image-placeholder"`) when there's no image, or when the real image's `onError` fires. Fixed 64×64 dimensions, `alt={product.name}` on the real image (required prop, also the accessible name the new tests locate it by), lazy-loaded by `next/image`'s default (never blocks the rest of the card/page).
+- All 3 ATDD scaffolds activated and pass for real (no skips, no mocking — Story 4.1's own established convention for external-service-adjacent behavior).
+- Docs re-checked per Task 5, both confirmed to need no change: `docs/data-models.md`'s `Product.imageUrl` row already reads plain "Cloudinary URL" with no stale claim (Story 4.1 found this too; re-confirmed independently here, not assumed). `docs/api-contracts.md` has no endpoint whose request/response shape this story touches — the storefront reads `Product.imageUrl` via a direct Prisma query in a Server Component, not through a documented API contract.
+- Full regression: typecheck clean, lint clean, 90/90 unit, full e2e suite run and results recorded below (Step 9).
+
 ### File List
+
+- `src/app/vendors/[slug]/page.tsx` (modified — `imageUrl` added to the `ProductCard` prop mapping)
+- `src/components/ProductCard.tsx` (modified — image/placeholder rendering, `onError` fallback, `ProductImagePlaceholder` helper component)
+- `tests/storefront-cart.spec.ts` (modified — 3 new cases activated)
+- `tests/helpers/db.ts` (modified — `imageUrl` override added to `createTestProduct()`, from the ATDD scaffolding step)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — status transitions)
+
+## Change Log
+
+- 2026-08-24: Implemented Story 4.2 in full. `src/app/vendors/[slug]/page.tsx` now passes `Product.imageUrl` through to `ProductCard`, which renders it via `next/image` (fixed 64×64, lazy-loaded, `alt={product.name}`) with a fallback to an inline SVG placeholder (`data-testid="product-image-placeholder"`) for products with no image, and an `onError`-driven fallback to the same placeholder for a real image that fails to load. Caught and fixed a self-introduced DOM-depth regression during implementation (an extra wrapper div that would have broken the `heading.locator("../..")` convention every existing storefront-cart test depends on) before it ever reached a test run — rewrote to keep the image, text-info, and Add button as three direct siblings of the outer card. All 3 ATDD scaffolds activated and pass for real against a live, deliberately-broken Cloudinary URL (no mocking). Docs re-checked, no changes needed. Full regression: typecheck clean, lint clean, 90/90 unit, 123/123 e2e (zero skips), production build succeeds. Status → review.

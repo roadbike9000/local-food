@@ -81,6 +81,7 @@ export default async function StorefrontPage({
               description: p.description,
               priceCents: p.priceCents,
               stockQuantity: p.stockQuantity,
+              imageUrl: p.imageUrl,
             }}
           />
         ))}
