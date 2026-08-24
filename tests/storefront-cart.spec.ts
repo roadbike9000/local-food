@@ -480,3 +480,92 @@ test.describe("storefront and cart", () => {
     },
   );
 });
+
+/**
+ * Story 4.2 — product image on the storefront listing. Public route, no
+ * Clerk session needed, so no serial-mode/auth-fixture concerns like the
+ * authenticated dashboard/products-api describe blocks elsewhere.
+ */
+test.describe("product image on storefront (Story 4.2)", () => {
+  // Cloudinary's own long-standing public demo asset - stable across
+  // accounts/environments, real and loadable (not our own app's cloud, but
+  // these tests insert Product.imageUrl directly via Prisma, bypassing
+  // CreateProductSchema's host-scoping refine entirely - only the browser's
+  // ability to actually load the URL matters here).
+  const REAL_IMAGE_URL = "https://res.cloudinary.com/demo/image/upload/sample.jpg";
+  // Syntactically a real Cloudinary path, but not an asset that exists -
+  // Cloudinary 404s it, a genuine failed image load, not a mock.
+  const BROKEN_IMAGE_URL =
+    "https://res.cloudinary.com/demo/image/upload/story-4-2-does-not-exist.jpg";
+
+  test.skip(
+    "[P0] a product with imageUrl set renders its image on the storefront",
+    async ({ page }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, {
+        name: "Playwright Image Display Product",
+        imageUrl: REAL_IMAGE_URL,
+      });
+
+      try {
+        await page.goto("/vendors/corner-sourdough");
+        const card = page
+          .getByRole("heading", { name: product.name, exact: true })
+          .locator("../..");
+        await expect(card.getByRole("img", { name: product.name })).toBeVisible();
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test.skip(
+    "[P0] a product with no imageUrl shows a placeholder, not a broken image",
+    async ({ page }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, {
+        name: "Playwright No Image Product",
+      });
+
+      try {
+        await page.goto("/vendors/corner-sourdough");
+        const card = page
+          .getByRole("heading", { name: product.name, exact: true })
+          .locator("../..");
+        // No accessible image named after the product - only the
+        // placeholder should occupy that slot.
+        await expect(
+          card.getByRole("img", { name: product.name }),
+        ).toHaveCount(0);
+        await expect(card.getByTestId("product-image-placeholder")).toBeVisible();
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+
+  test.skip(
+    "[P0] a product whose image fails to load still leaves Add clickable, and falls back to the placeholder",
+    async ({ page }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = await createTestProduct(vendor.id, {
+        name: "Playwright Broken Image Product",
+        imageUrl: BROKEN_IMAGE_URL,
+      });
+
+      try {
+        await page.goto("/vendors/corner-sourdough");
+        const card = page
+          .getByRole("heading", { name: product.name, exact: true })
+          .locator("../..");
+
+        await expect(card.getByRole("button", { name: "Add" })).toBeEnabled();
+        await expect(card.getByTestId("product-image-placeholder")).toBeVisible({
+          timeout: 15_000,
+        });
+      } finally {
+        await deleteProduct(product.id);
+      }
+    },
+  );
+});

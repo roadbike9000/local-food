@@ -29,6 +29,7 @@ export async function createTestProduct(
     lowStockThreshold: number;
     stockIsPlaceholder: boolean;
     thresholdIsPlaceholder: boolean;
+    imageUrl: string;
   }> = {},
 ) {
   return prisma.product.create({
@@ -40,6 +41,7 @@ export async function createTestProduct(
       lowStockThreshold: overrides.lowStockThreshold ?? 5,
       stockIsPlaceholder: overrides.stockIsPlaceholder ?? false,
       thresholdIsPlaceholder: overrides.thresholdIsPlaceholder ?? false,
+      imageUrl: overrides.imageUrl,
     },
   });
 }
