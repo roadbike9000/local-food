@@ -221,12 +221,9 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
 });
 
 /**
- * ATDD scaffolds, Story 4.1 — POST /api/products/upload-image doesn't exist
- * yet (Task 1). Expected red-phase result until then: every request below
- * 404s against the missing route, so none of the status-code assertions
- * pass as written.
+ * Story 4.1 — POST /api/products/upload-image.
  */
-test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
+test.describe("POST /api/products/upload-image (Story 4.1)", () => {
   test.use({ storageState: existsSync(authFile) ? authFile : undefined });
   test.describe.configure({ mode: "serial" });
 
@@ -241,6 +238,11 @@ test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
     join(process.cwd(), "tests/fixtures/test-product-image.png"),
   ).toString("base64");
 
+  // Skipped: this Cloudinary account is disabled ("cloud_name is disabled",
+  // 401 from cloudinary.uploader.upload — confirmed via a direct probe
+  // outside the app, not an app-code bug). Same class of dependency-skip
+  // this codebase already uses for Stripe (payment.spec.ts). Un-skip once
+  // CLOUDINARY_* in .env point at a working account.
   test.skip(
     "[P0] uploads a real image as the signed-in vendor and returns a Cloudinary URL (200)",
     async ({ request }) => {
@@ -254,18 +256,7 @@ test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
     },
   );
 
-  test.skip(
-    "[P0] a fully unauthenticated request is rejected (401)",
-    async ({ request }) => {
-      const response = await request.post("/api/products/upload-image", {
-        data: { image: `data:image/png;base64,${testImageBase64}` },
-      });
-
-      expect(response.status()).toBe(401);
-    },
-  );
-
-  test.skip(
+  test(
     "[P0] a malformed (non-image) value is rejected (400)",
     async ({ request }) => {
       const response = await request.post("/api/products/upload-image", {
@@ -276,7 +267,7 @@ test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
     },
   );
 
-  test.skip(
+  test(
     "[P1] an oversized payload is rejected (400) with a size-specific error",
     async ({ request }) => {
       // ~4,000,000 base64 characters ≈ the 3MB-raw-file cap's encoded size
@@ -292,3 +283,18 @@ test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
     },
   );
 });
+
+// No storageState at all - a genuinely anonymous caller, distinct from
+// "signed in" above. Needs no fixture, so it always runs regardless of
+// E2E_VENDOR_* configuration (same pattern as
+// admin-vendors-api.spec.ts's equivalent case).
+test(
+  "[P0] POST /api/products/upload-image: a fully unauthenticated request is rejected (401)",
+  async ({ request }) => {
+    const response = await request.post("/api/products/upload-image", {
+      data: { image: "data:image/png;base64,AAAA" },
+    });
+
+    expect(response.status()).toBe(401);
+  },
+);

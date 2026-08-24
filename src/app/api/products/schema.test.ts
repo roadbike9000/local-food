@@ -60,9 +60,8 @@ describe("CreateProductSchema", () => {
     ).toBe(false);
   });
 
-  // ATDD scaffold, Story 4.1 (AC #4) — today's schema accepts any well-formed
-  // URL; this must fail until Task 2 narrows imageUrl to a Cloudinary host.
-  it.skip("rejects a well-formed imageUrl that isn't hosted on Cloudinary", () => {
+  // Story 4.1 (AC #4) — imageUrl must be hosted on Cloudinary.
+  it("rejects a well-formed imageUrl that isn't hosted on Cloudinary", () => {
     expect(
       CreateProductSchema.safeParse({
         ...validBody,

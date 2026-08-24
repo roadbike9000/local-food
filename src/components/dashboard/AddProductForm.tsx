@@ -6,17 +6,38 @@
  * product list on success.
  */
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 
 // Postgres INTEGER max - priceCents/stockQuantity/lowStockThreshold are all
 // Int columns; matches the server-side Zod bound on each.
 const INT4_MAX = 2_147_483_647;
+
+// Matches the server-side 3MB-raw-file cap (UploadImageSchema's ~4M-char
+// base64 cap) - see Dev Notes, Story 4.1.
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 export function AddProductForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file && file.size > MAX_IMAGE_BYTES) {
+      setError("Image is too large — max 3MB.");
+      event.target.value = "";
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,8 +55,36 @@ export function AddProductForm() {
     const priceCents = Math.round(Number(priceDollars) * 100);
     const stockQuantity = Number(formData.get("stockQuantity") ?? "");
     const lowStockThreshold = Number(formData.get("lowStockThreshold") ?? "");
+    const imageFile = formData.get("image");
+    const hasImage = imageFile instanceof File && imageFile.size > 0;
+
+    if (hasImage && imageFile.size > MAX_IMAGE_BYTES) {
+      setError("Image is too large — max 3MB.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
+      let imageUrl: string | undefined;
+
+      if (hasImage) {
+        const dataUrl = await readFileAsDataUrl(imageFile);
+        const uploadRes = await fetch("/api/products/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: dataUrl }),
+        });
+
+        if (!uploadRes.ok) {
+          const body = await uploadRes.json().catch(() => null);
+          setError(body?.error ?? "Could not upload image. Try again.");
+          return;
+        }
+
+        const uploadBody = await uploadRes.json();
+        imageUrl = uploadBody.imageUrl;
+      }
+
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -43,6 +92,7 @@ export function AddProductForm() {
           name,
           description: description || undefined,
           priceCents,
+          imageUrl,
           stockQuantity,
           lowStockThreshold,
         }),
@@ -168,6 +218,20 @@ export function AddProductForm() {
           min="0"
           max={INT4_MAX}
           required
+          className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="image" className="block text-sm text-stone-600">
+          Image (optional)
+        </label>
+        <input
+          id="image"
+          name="image"
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
           className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
         />
       </div>

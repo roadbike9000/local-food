@@ -11,7 +11,14 @@ export const CreateProductSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   priceCents: z.number().int().positive().max(INT4_MAX),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z
+    .string()
+    .url()
+    .refine(
+      (url) => url.startsWith("https://res.cloudinary.com/"),
+      "imageUrl must be a Cloudinary URL",
+    )
+    .optional(),
   // Required, no default - vendor must set both at creation (Story 1.2).
   stockQuantity: z.number().int().nonnegative().max(INT4_MAX),
   lowStockThreshold: z.number().int().nonnegative().max(INT4_MAX),

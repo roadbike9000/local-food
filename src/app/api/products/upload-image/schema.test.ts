@@ -11,26 +11,26 @@ const VALID_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
 describe("UploadImageSchema", () => {
-  it.skip("accepts a valid base64-encoded PNG data URL", () => {
+  it("accepts a valid base64-encoded PNG data URL", () => {
     const result = UploadImageSchema.safeParse({
       image: `data:image/png;base64,${VALID_PNG_BASE64}`,
     });
     expect(result.success).toBe(true);
   });
 
-  it.skip("rejects a plain remote URL (not a base64 data URL)", () => {
+  it("rejects a plain remote URL (not a base64 data URL)", () => {
     const result = UploadImageSchema.safeParse({
       image: "https://example.com/photo.png",
     });
     expect(result.success).toBe(false);
   });
 
-  it.skip("rejects a non-data-URL string", () => {
+  it("rejects a non-data-URL string", () => {
     const result = UploadImageSchema.safeParse({ image: "not an image" });
     expect(result.success).toBe(false);
   });
 
-  it.skip("rejects a data URL with a non-image MIME type", () => {
+  it("rejects a data URL with a non-image MIME type", () => {
     const result = UploadImageSchema.safeParse({
       image: "data:text/plain;base64,aGVsbG8=",
     });
@@ -39,7 +39,7 @@ describe("UploadImageSchema", () => {
 
   // ~3MB raw file / 3,000,000 bytes -> ~4,000,000 base64 characters (1.33x
   // inflation) - Dev Notes' documented Vercel body-size cap (Story 4.1).
-  it.skip("rejects a base64 payload over the ~4,000,000-character size cap", () => {
+  it("rejects a base64 payload over the ~4,000,000-character size cap", () => {
     const oversizedBase64 = "A".repeat(4_100_000);
     const result = UploadImageSchema.safeParse({
       image: `data:image/png;base64,${oversizedBase64}`,

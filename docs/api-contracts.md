@@ -54,12 +54,31 @@ Creates a product for the signed-in vendor.
   name: string,            // min length 1
   description?: string,
   priceCents: number,      // positive int
-  imageUrl?: string,       // must be a valid URL
+  imageUrl?: string,       // must be a Cloudinary URL (https://res.cloudinary.com/...)
 }
 ```
 - 401 if unauthenticated; 400 `{ error: "Invalid request" }` on schema mismatch.
 - Response: `201 { product: Product }`.
-- **Not currently called by any UI** — the dashboard "Add product" button has no handler yet.
+
+---
+
+### `POST /api/products/upload-image`
+Uploads a vendor-supplied product image to Cloudinary (Story 4.1). `AddProductForm` calls this first, then includes the returned `imageUrl` in the `POST /api/products` payload above — two sequential requests, not a combined one (see that story's Dev Notes for why).
+
+**Request body** (`UploadImageSchema`):
+```ts
+{
+  image: string,   // base64 data URL, e.g. "data:image/png;base64,...", max ~4,000,000 chars (~3MB raw file)
+}
+```
+
+**Auth:** vendor-scoped — `getCurrentVendor()` (`401` if none) then `assertVendorActive()` (`403` if deactivated), same shape as `POST /api/products`.
+
+**Behavior:**
+1. `req.json().catch(() => null)` then `safeParse` → `400 { error: <schema message> }` on failure — distinct messages for "not a base64 image" vs. "too large" (the schema's own `.refine()` message is passed through, not a generic "Invalid request", so the form can show the vendor what actually went wrong).
+2. Calls `uploadImage(image)` (`src/lib/cloudinary.ts`) — a full server-side upload; the browser never sees Cloudinary credentials. A Cloudinary-side failure (network, quota, invalid image data) is caught and mapped to `502 { error: "Could not upload image. Try again." }`, `Sentry.captureException`'d, never an unhandled `500`.
+
+**Response:** `200 { imageUrl: string }` — the Cloudinary `secure_url`, always starting with `https://res.cloudinary.com/`.
 
 ---
 
