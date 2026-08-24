@@ -1,12 +1,14 @@
 ---
-stepsCompleted: ['step-01-preflight-and-context']
-lastStep: 'step-01-preflight-and-context'
+stepsCompleted: ['step-01-preflight-and-context', 'step-02-generation-mode', 'step-03-test-strategy', 'step-04-generate-tests', 'step-05-validate-and-complete']
+lastStep: 'step-05-validate-and-complete'
 lastSaved: '2026-08-24'
 storyId: '4.2'
 storyKey: '4-2-product-image-displays-on-the-storefront'
 storyFile: '_bmad-output/implementation-artifacts/4-2-product-image-displays-on-the-storefront.md'
 atddChecklistPath: '_bmad-output/test-artifacts/atdd-checklist-4-2-product-image-displays-on-the-storefront.md'
-generatedTestFiles: []
+generatedTestFiles:
+  - 'tests/storefront-cart.spec.ts'
+  - 'tests/helpers/db.ts'
 inputDocuments:
   - '_bmad-output/planning-artifacts/epics.md'
   - '_bmad-output/implementation-artifacts/4-2-product-image-displays-on-the-storefront.md'
