@@ -192,11 +192,7 @@ test.describe("vendor dashboard (authenticated)", () => {
     }
   });
 
-  // Skipped: this Cloudinary account is disabled ("cloud_name is disabled",
-  // 401 - confirmed via a direct probe outside the app). Same class of
-  // dependency-skip this codebase already uses for Stripe (payment.spec.ts).
-  // Un-skip once CLOUDINARY_* in .env point at a working account.
-  test.skip(
+  test(
     "[P1] vendor uploads a product image and it's saved to the new product (Story 4.1)",
     async ({ page }) => {
       const vendor = await getVendorBySlug("corner-sourdough");

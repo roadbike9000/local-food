@@ -238,12 +238,7 @@ test.describe("POST /api/products/upload-image (Story 4.1)", () => {
     join(process.cwd(), "tests/fixtures/test-product-image.png"),
   ).toString("base64");
 
-  // Skipped: this Cloudinary account is disabled ("cloud_name is disabled",
-  // 401 from cloudinary.uploader.upload — confirmed via a direct probe
-  // outside the app, not an app-code bug). Same class of dependency-skip
-  // this codebase already uses for Stripe (payment.spec.ts). Un-skip once
-  // CLOUDINARY_* in .env point at a working account.
-  test.skip(
+  test(
     "[P0] uploads a real image as the signed-in vendor and returns a Cloudinary URL (200)",
     async ({ request }) => {
       const response = await request.post("/api/products/upload-image", {
