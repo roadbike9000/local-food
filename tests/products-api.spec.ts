@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "@playwright/test";
 import { getVendorBySlug, deleteProduct, prisma, createTestProduct } from "./helpers/db";
+import { MAX_BASE64_LENGTH } from "../src/app/api/products/upload-image/schema";
 
 /**
  * API-level coverage for PATCH /api/products/[id] — Story 1.2's new
@@ -221,12 +222,9 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
 });
 
 /**
- * ATDD scaffolds, Story 4.1 — POST /api/products/upload-image doesn't exist
- * yet (Task 1). Expected red-phase result until then: every request below
- * 404s against the missing route, so none of the status-code assertions
- * pass as written.
+ * Story 4.1 — POST /api/products/upload-image.
  */
-test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
+test.describe("POST /api/products/upload-image (Story 4.1)", () => {
   test.use({ storageState: existsSync(authFile) ? authFile : undefined });
   test.describe.configure({ mode: "serial" });
 
@@ -241,9 +239,19 @@ test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
     join(process.cwd(), "tests/fixtures/test-product-image.png"),
   ).toString("base64");
 
-  test.skip(
+  test(
     "[P0] uploads a real image as the signed-in vendor and returns a Cloudinary URL (200)",
     async ({ request }) => {
+      // CLOUDINARY_* is not provisioned in this repo's CI secrets today -
+      // skip gracefully rather than hard-failing, same convention
+      // payment.spec.ts uses for Stripe test keys (Story 4.1 review finding).
+      test.skip(
+        !process.env.CLOUDINARY_CLOUD_NAME ||
+          !process.env.CLOUDINARY_API_KEY ||
+          !process.env.CLOUDINARY_API_SECRET,
+        "Cloudinary not configured — CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET missing",
+      );
+
       const response = await request.post("/api/products/upload-image", {
         data: { image: `data:image/png;base64,${testImageBase64}` },
       });
@@ -254,34 +262,23 @@ test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
     },
   );
 
-  test.skip(
-    "[P0] a fully unauthenticated request is rejected (401)",
-    async ({ request }) => {
-      const response = await request.post("/api/products/upload-image", {
-        data: { image: `data:image/png;base64,${testImageBase64}` },
-      });
-
-      expect(response.status()).toBe(401);
-    },
-  );
-
-  test.skip(
-    "[P0] a malformed (non-image) value is rejected (400)",
+  test(
+    "[P0] a malformed (non-image) value is rejected (400) with a format-specific error, distinct from the size error",
     async ({ request }) => {
       const response = await request.post("/api/products/upload-image", {
         data: { image: "not an image" },
       });
 
       expect(response.status()).toBe(400);
+      const body = await response.json();
+      expect(body.error).not.toMatch(/too large/i);
     },
   );
 
-  test.skip(
+  test(
     "[P1] an oversized payload is rejected (400) with a size-specific error",
     async ({ request }) => {
-      // ~4,000,000 base64 characters ≈ the 3MB-raw-file cap's encoded size
-      // (Dev Notes, Story 4.1).
-      const oversized = "A".repeat(4_100_000);
+      const oversized = "A".repeat(MAX_BASE64_LENGTH + 1);
       const response = await request.post("/api/products/upload-image", {
         data: { image: `data:image/png;base64,${oversized}` },
       });
@@ -292,3 +289,18 @@ test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
     },
   );
 });
+
+// No storageState at all - a genuinely anonymous caller, distinct from
+// "signed in" above. Needs no fixture, so it always runs regardless of
+// E2E_VENDOR_* configuration (same pattern as
+// admin-vendors-api.spec.ts's equivalent case).
+test(
+  "[P0] POST /api/products/upload-image: a fully unauthenticated request is rejected (401)",
+  async ({ request }) => {
+    const response = await request.post("/api/products/upload-image", {
+      data: { image: "data:image/png;base64,AAAA" },
+    });
+
+    expect(response.status()).toBe(401);
+  },
+);

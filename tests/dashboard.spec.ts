@@ -192,12 +192,19 @@ test.describe("vendor dashboard (authenticated)", () => {
     }
   });
 
-  // ATDD scaffolds, Story 4.1 — AddProductForm has no image input yet
-  // (Task 3), so `form.getByLabel("Image")` doesn't resolve to anything
-  // until then.
-  test.skip(
+  test(
     "[P1] vendor uploads a product image and it's saved to the new product (Story 4.1)",
     async ({ page }) => {
+      // CLOUDINARY_* is not provisioned in this repo's CI secrets today -
+      // skip gracefully rather than hard-failing, same convention
+      // payment.spec.ts uses for Stripe test keys (Story 4.1 review finding).
+      test.skip(
+        !process.env.CLOUDINARY_CLOUD_NAME ||
+          !process.env.CLOUDINARY_API_KEY ||
+          !process.env.CLOUDINARY_API_SECRET,
+        "Cloudinary not configured — CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET missing",
+      );
+
       const vendor = await getVendorBySlug("corner-sourdough");
       const productName = `Playwright Image Product ${Date.now()}`;
 
@@ -235,7 +242,7 @@ test.describe("vendor dashboard (authenticated)", () => {
     },
   );
 
-  test.skip(
+  test(
     "[P1] selecting an oversized image shows an inline error and creates no product (Story 4.1)",
     async ({ page }) => {
       await page.goto("/dashboard/products");
