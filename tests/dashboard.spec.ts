@@ -192,6 +192,73 @@ test.describe("vendor dashboard (authenticated)", () => {
     }
   });
 
+  // ATDD scaffolds, Story 4.1 — AddProductForm has no image input yet
+  // (Task 3), so `form.getByLabel("Image")` doesn't resolve to anything
+  // until then.
+  test.skip(
+    "[P1] vendor uploads a product image and it's saved to the new product (Story 4.1)",
+    async ({ page }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const productName = `Playwright Image Product ${Date.now()}`;
+
+      try {
+        await page.goto("/dashboard/products");
+        await page.getByRole("button", { name: "Add product" }).click();
+
+        const form = page.getByRole("form", { name: "Add product" });
+        await form.getByLabel("Name").fill(productName);
+        await form.getByLabel("Price (USD)").fill("4.50");
+        await form.getByLabel("Stock Quantity", { exact: true }).fill("25");
+        await form.getByLabel("Low-Stock Threshold").fill("5");
+        await form
+          .getByLabel("Image")
+          .setInputFiles("tests/fixtures/test-product-image.png");
+
+        await Promise.all([
+          page.waitForResponse("**/api/products"),
+          page.getByRole("button", { name: "Save product" }).click(),
+        ]);
+
+        await expect(
+          page.getByRole("cell", { name: productName, exact: true }),
+        ).toBeVisible({ timeout: 15_000 });
+
+        // Story 4.1 owns the data getting saved correctly, not visual
+        // rendering (Story 4.2's scope) - verify via the DB, not the DOM.
+        const created = await prisma.product.findFirst({
+          where: { vendorId: vendor.id, name: productName },
+        });
+        expect(created?.imageUrl).toMatch(/^https:\/\/res\.cloudinary\.com\//);
+      } finally {
+        await deleteProductByName(vendor.id, productName);
+      }
+    },
+  );
+
+  test.skip(
+    "[P1] selecting an oversized image shows an inline error and creates no product (Story 4.1)",
+    async ({ page }) => {
+      await page.goto("/dashboard/products");
+      await page.getByRole("button", { name: "Add product" }).click();
+
+      const form = page.getByRole("form", { name: "Add product" });
+      await form.getByLabel("Name").fill("Oversized Image Reject Test");
+      await form.getByLabel("Price (USD)").fill("4.50");
+      await form.getByLabel("Stock Quantity", { exact: true }).fill("25");
+      await form.getByLabel("Low-Stock Threshold").fill("5");
+
+      // A buffer over the 3MB client-side cap (Dev Notes, Story 4.1) -
+      // built in-memory, no fixture file needed for this size-only case.
+      await form.getByLabel("Image").setInputFiles({
+        name: "oversized.png",
+        mimeType: "image/png",
+        buffer: Buffer.alloc(3 * 1024 * 1024 + 1),
+      });
+
+      await expect(page.getByText(/too large/i)).toBeVisible();
+    },
+  );
+
   test("vendor can add a new pickup slot", async ({ page }) => {
     const vendor = await getVendorBySlug("corner-sourdough");
     const location = `Playwright Dock ${Date.now()}`;

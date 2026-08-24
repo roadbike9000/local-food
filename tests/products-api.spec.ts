@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "@playwright/test";
 import { getVendorBySlug, deleteProduct, prisma, createTestProduct } from "./helpers/db";
@@ -216,6 +216,79 @@ test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {
       } finally {
         await deleteProduct(product.id);
       }
+    },
+  );
+});
+
+/**
+ * ATDD scaffolds, Story 4.1 — POST /api/products/upload-image doesn't exist
+ * yet (Task 1). Expected red-phase result until then: every request below
+ * 404s against the missing route, so none of the status-code assertions
+ * pass as written.
+ */
+test.describe("POST /api/products/upload-image (ATDD, Story 4.1)", () => {
+  test.use({ storageState: existsSync(authFile) ? authFile : undefined });
+  test.describe.configure({ mode: "serial" });
+
+  test.beforeEach(async () => {
+    test.skip(
+      !existsSync(authFile),
+      "No vendor session — E2E_VENDOR_EMAIL/CLERK_SECRET_KEY not configured",
+    );
+  });
+
+  const testImageBase64 = readFileSync(
+    join(process.cwd(), "tests/fixtures/test-product-image.png"),
+  ).toString("base64");
+
+  test.skip(
+    "[P0] uploads a real image as the signed-in vendor and returns a Cloudinary URL (200)",
+    async ({ request }) => {
+      const response = await request.post("/api/products/upload-image", {
+        data: { image: `data:image/png;base64,${testImageBase64}` },
+      });
+
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(body.imageUrl).toMatch(/^https:\/\/res\.cloudinary\.com\//);
+    },
+  );
+
+  test.skip(
+    "[P0] a fully unauthenticated request is rejected (401)",
+    async ({ request }) => {
+      const response = await request.post("/api/products/upload-image", {
+        data: { image: `data:image/png;base64,${testImageBase64}` },
+      });
+
+      expect(response.status()).toBe(401);
+    },
+  );
+
+  test.skip(
+    "[P0] a malformed (non-image) value is rejected (400)",
+    async ({ request }) => {
+      const response = await request.post("/api/products/upload-image", {
+        data: { image: "not an image" },
+      });
+
+      expect(response.status()).toBe(400);
+    },
+  );
+
+  test.skip(
+    "[P1] an oversized payload is rejected (400) with a size-specific error",
+    async ({ request }) => {
+      // ~4,000,000 base64 characters ≈ the 3MB-raw-file cap's encoded size
+      // (Dev Notes, Story 4.1).
+      const oversized = "A".repeat(4_100_000);
+      const response = await request.post("/api/products/upload-image", {
+        data: { image: `data:image/png;base64,${oversized}` },
+      });
+
+      expect(response.status()).toBe(400);
+      const body = await response.json();
+      expect(body.error).toMatch(/too large/i);
     },
   );
 });

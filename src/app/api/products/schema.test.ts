@@ -59,6 +59,17 @@ describe("CreateProductSchema", () => {
       CreateProductSchema.safeParse({ ...validBody, imageUrl: "not-a-url" }).success,
     ).toBe(false);
   });
+
+  // ATDD scaffold, Story 4.1 (AC #4) — today's schema accepts any well-formed
+  // URL; this must fail until Task 2 narrows imageUrl to a Cloudinary host.
+  it.skip("rejects a well-formed imageUrl that isn't hosted on Cloudinary", () => {
+    expect(
+      CreateProductSchema.safeParse({
+        ...validBody,
+        imageUrl: "https://evil.example.com/x.png",
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("stockQuantity (Story 1.2, AC #1)", () => {

@@ -85,6 +85,14 @@ so that customers can see what they're buying before they order.
 - **Real Cloudinary calls, no mock** — this codebase never mocks external services (Stripe, Clerk, Twilio all use real dev-mode calls with graceful `test.skip()` when unconfigured). Confirm `CLOUDINARY_*` env vars are present in this dev environment before assuming the new Playwright tests will run for real rather than skip; document whichever is true in the Dev Agent Record, matching how `payment.spec.ts` documents its own Stripe-key dependency.
 - Uses the existing vendor Playwright auth fixture (`playwright/.auth/vendor.json` via `@clerk/testing`) — no new auth infrastructure needed, this is a vendor-scoped route like every other one already covered by that fixture.
 
+### ATDD Artifacts
+
+- Checklist: `_bmad-output/test-artifacts/atdd-checklist-4-1-vendor-uploads-a-product-image.md`
+- Unit tests: `src/app/api/products/schema.test.ts` (extended, 1 case), `src/app/api/products/upload-image/schema.test.ts` (new, 5 cases)
+- E2E tests: `tests/products-api.spec.ts` (extended, 4 cases — new `POST /api/products/upload-image` describe block), `tests/dashboard.spec.ts` (extended, 2 cases)
+- Fixture built ahead of schedule: `tests/fixtures/test-product-image.png` — a real, valid 68-byte 1x1 PNG, not a synthetic string, so the happy-path upload test exercises a real Cloudinary call once activated (matches this repo's no-mocking-external-services convention).
+- Activate task-by-task per the checklist's "Next Steps" section — Task 1 (route+schema) first, Task 2 (host restriction) second, Task 3 (form wiring) third. Task 1's schema file doesn't exist yet, so `npx tsc --noEmit` currently reports exactly one expected error (`Cannot find module './schema'`) — resolves on its own once Task 1 lands.
+
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 4.1] — story definition and ACs (corrected in this story per AC #7 — see Dev Notes).
