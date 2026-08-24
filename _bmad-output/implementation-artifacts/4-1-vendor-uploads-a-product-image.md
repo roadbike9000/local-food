@@ -4,7 +4,7 @@ baseline_commit: 58c86cdbae6977fc3b6e7c505d8af88879eb6969
 
 # Story 4.1: Vendor uploads a product image
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
