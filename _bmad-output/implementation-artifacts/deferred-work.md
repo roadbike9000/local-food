@@ -1,5 +1,19 @@
 # Deferred Work
 
+## Deferred from: scenario review with Jeff (2026-08-24)
+
+Source: `scenarios from Jeff/Local Food Scnearios from Jeff.rtf` (4 scenarios), reviewed via `bmad-review-edge-case-hunter` against actual code. Two of the four scenarios (vendor delete+re-add with exact name, ASCII punctuation in vendor/product names) were confirmed already handled correctly by existing code (`resolveVendorSlug()`, `slugify()`) and produced no new work item beyond this entry and a small adjacent finding below. The other two became Epic 4 (Vendor Product Images) and Epic 5 (Pickup Slot & Order Integrity) in `epics.md`.
+
+- source_spec: scenario review, scenario 2 (ASCII punctuation in names)
+  summary: `slugify()` only lowercases and strips `[^a-z0-9]` — an accented/non-ASCII vendor or product name (e.g. "Café Rosé") silently loses the accented letters entirely (→ "caf-ros") rather than transliterating them (→ "cafe-rose"). Jeff's scenario was scoped to "nothing exotic, just common ASCII," so this is outside what was asked for, but a food-vendor marketplace plausibly has real accented business names.
+  evidence: `src/lib/utils.ts:4-10` — `input.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")`. No Unicode normalization/transliteration step exists. Not reproduced against a live form (no test added), confirmed by reading the implementation directly.
+  status: open — needs a human decision (transliterate via a library, reject non-ASCII names with a friendly error, or accept silent character-dropping as-is) before it's worth a story.
+
+- source_spec: scenario review, scenario 4 (date/time/timezone)
+  summary: No vendor-storefront timezone concept exists anywhere in this codebase. `AddSlotForm.tsx` parses a vendor's `datetime-local` input via `new Date()`, which resolves in whatever timezone the vendor's browser happens to be in at that moment — nothing about that timezone is ever stored. If a vendor's device clock/timezone is wrong, or someone creates a slot on a vendor's behalf from a different timezone than the vendor's actual location, the stored UTC instant is silently wrong with no way to later distinguish "wrong" from "intentional." This is the deeper question behind Jeff's original "cross-timezone cart rule" and "leap year" concerns — those concerns can't become concrete stories until this is decided, since no timezone-dependent rule exists yet to be buggy.
+  evidence: `grep` confirms no `date-fns`/`luxon`/`dayjs` anywhere in `package.json` — all raw JS `Date`. `prisma/schema.prisma`'s `Vendor` and `PickupSlot` models have no timezone field. `src/components/dashboard/AddSlotForm.tsx:32` — `new Date(startsAtLocal)` on a `datetime-local` input value.
+  status: open — needs a human decision from Jeff: does a vendor's storefront need its own explicit timezone (a `Vendor.timezone` field, all slot times/cutoffs computed relative to it), or is a single-timezone assumption acceptable for the foreseeable future? Referenced from `epics.md`'s Epic 5 as the reason Story 5.3 isn't written yet.
+
 ## Deferred from: 2-3-admin-deactivates-a-vendor (2026-08-22)
 
 - source_spec: `_bmad-output/implementation-artifacts/2-3-admin-deactivates-a-vendor.md`

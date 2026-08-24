@@ -30,6 +30,10 @@ FR13: Vendor is notified via a dashboard banner of any Product still at the plac
 
 *(FR5 is retired — "admin adds products" was confirmed to mean the existing vendor self-service `AddProductForm`, already implemented, no new work. Not listed as a build FR.)*
 
+FR14: Vendor can upload a photo for a product; customers see it on the storefront (listing and detail).
+FR15: Customer selects a pickup slot during checkout; the resulting Order is linked to that slot.
+FR16: A vendor cannot create a pickup slot whose start time has already passed.
+
 ### NonFunctional Requirements
 
 NFR1: Stock Quantity changes (decrement, threshold check) must be consistent under concurrent orders — no overselling the last unit (FR-8, FR-11).
@@ -46,6 +50,9 @@ NFR4: No new external dependency is introduced — Admin auth reuses Clerk, stoc
 - New route tree `src/app/admin/**` (`vendors/`, `inventory/`), separate from vendor's `src/app/dashboard/**`; every new admin route must be added to `middleware.ts`'s `isProtectedRoute` matcher (AD-6).
 - Existing routes requiring modification: `src/app/api/checkout/route.ts` (stock sufficiency check, `assertVendorActive()`), `src/app/api/webhooks/*` (call `decrementStock()` on payment confirmation), `src/app/dashboard/products/page.tsx` (drop direct `isAvailable` read, add FR-13 banner, route stock edits through `setStock()`), storefront listing/detail pages (availability display).
 - Multi-item order stock decrements run inside one DB transaction — all lines succeed or none do; a post-payment shortfall is flagged for manual admin review, not auto-resolved (AD-3, Deferred: auto-refund out of scope).
+- `Product.imageUrl` already exists in the schema (Cloudinary URL) and is already accepted by `CreateProductSchema`, but has zero UI wiring anywhere (no upload, no display) — Epic 4 wires it end-to-end. No schema migration needed for the single-image scope decided for this epic (see Epic 4 below).
+- `Order.pickupSlotId` already exists in the schema (nullable) but is never set — `POST /api/checkout` has no reference to `PickupSlot` at all today. Epic 5 wires checkout to capture and validate a slot selection; no schema migration needed for Story 5.1.
+- Epic 4 and Epic 5 are both standalone — no dependency on Epics 1-3 or on each other.
 
 ### UX Design Requirements
 
@@ -65,6 +72,9 @@ FR3: Epic 2 — admin adds vendor
 FR4: Epic 2 — admin deactivates vendor
 FR9: Epic 3 — admin inventory dashboard
 FR10: Epic 3 — low-stock SMS alert
+FR14: Epic 4 — vendor product image upload + storefront display
+FR15: Epic 5 — checkout captures pickup-slot selection, Order links to it
+FR16: Epic 5 — pickup slot creation rejects a past start time
 
 ## Epic List
 
@@ -79,6 +89,15 @@ Admin can onboard and deactivate vendors on the platform without touching the da
 ### Epic 3: Admin Inventory Oversight
 Admin can see stock levels across all vendors on demand and gets an SMS alert before something sells out. Builds on Epic 1 (needs `stockQuantity` to exist) and Epic 2 (needs Admin identity/gating) — both prior epics.
 **FRs covered:** FR9, FR10
+
+### Epic 4: Vendor Product Images
+Vendors can upload a photo for each product so customers see what they're actually buying, not just a name and price. Standalone — no dependency on Epics 1-3.
+**FRs covered:** FR14
+
+### Epic 5: Pickup Slot & Order Integrity
+Customer orders are linked to the pickup slot they were placed against, and a vendor can't create a slot that's already in the past. Standalone — no dependency on Epics 1-3, though Story 5.1 touches the same `/api/checkout` route Epic 1 built on.
+**FRs covered:** FR15, FR16
+**Scope note:** these two epics are the direct result of a scenario review with Jeff (2026-08-24) — see `scenarios from Jeff/Local Food Scnearios from Jeff.rtf`. Two of that review's four scenarios (vendor delete+re-add, ASCII punctuation in names) turned out to already be correctly handled by existing code and did **not** produce a new epic; see `deferred-work.md`'s new entry for the one small adjacent gap they did surface (accented/non-ASCII names). Jeff's date/timezone scenario surfaced a real, concrete prerequisite gap (orders were never linked to pickup slots at all — closed by Story 5.1) and a mechanical validation gap (Story 5.2), but the deeper question behind it — does this app need an explicit vendor-storefront timezone concept — is still open and deliberately **not** resolved here. See `deferred-work.md`'s open decision entry.
 
 ## Epic 1: Accurate Stock & Cart
 
@@ -272,3 +291,78 @@ So that I can act before it sells out.
 **And** a post-payment shortfall result from Story 1.4's `decrementStock()` (money captured, stock insufficient under a race) also triggers this same SMS mechanism to the admin's phone — closing the loop Epic 1 intentionally left open since Admin didn't exist yet at that point
 
 *(FR10, FR8's shortfall consequence, AD-3, NFR3.)*
+
+## Epic 4: Vendor Product Images
+
+Vendors can upload a photo for each product so customers see what they're actually buying, not just a name and price. Standalone — no dependency on Epics 1-3.
+
+### Story 4.1: Vendor uploads a product image
+
+As a vendor,
+I want to upload a photo for a product,
+So that customers can see what they're buying before they order.
+
+**Acceptance Criteria:**
+
+**Given** the vendor's product creation form (`AddProductForm`) — no product-edit form exists in this codebase today (`PATCH /api/products/[id]` only ever handles Stock Quantity/Low-Stock Threshold, Story 1.2's deliberate scope); adding an image to an *existing* product is out of scope here
+**When** they select an image file and submit
+**Then** the file uploads to Cloudinary via a signed upload (server issues the signature; Cloudinary credentials never reach the browser) and the resulting URL is saved to `Product.imageUrl`
+**And** the server rejects a submitted `imageUrl` that doesn't resolve to the app's own Cloudinary account host — `CreateProductSchema`'s current `z.string().url()` accepts any well-formed URL from any host, this narrows it (NFR2)
+**And** an upload failure (network error, oversized file, wrong file type) shows an inline error and does not save a broken `imageUrl`
+**And** a product with no image continues to work exactly as it does today — this field stays optional, every pre-existing product is unaffected
+
+*(FR14, NFR2. Decision: single image per product, matching the current schema — multiple images per product would need a new `ProductImage[]` relation and is explicitly out of scope for this epic; revisit as its own epic if wanted later.)*
+
+### Story 4.2: Product image displays on the storefront
+
+As a customer,
+I want to see a product's photo when I'm browsing,
+So that I know what I'm actually buying.
+
+**Acceptance Criteria:**
+
+**Given** a product with `imageUrl` set
+**When** it's shown on the storefront (listing or detail page)
+**Then** the image renders alongside the existing name/price/description
+**And** a product with no `imageUrl` (the common case for every pre-existing product) shows a neutral placeholder, never a broken-image icon
+**And** image rendering never blocks the rest of the page — a slow-loading or failed image doesn't prevent the Add-to-cart button from being usable
+
+*(FR14.)*
+
+## Epic 5: Pickup Slot & Order Integrity
+
+Customer orders are linked to the pickup slot they were placed against, and a vendor can't create a slot that's already in the past. Standalone — no dependency on Epics 1-3, though Story 5.1 touches the same `/api/checkout` route Epic 1 built on.
+
+### Story 5.1: Customer selects a pickup slot at checkout; order links to it
+
+As a customer,
+I want to choose which pickup slot my order is for,
+So that I know when and where to pick it up.
+
+**Acceptance Criteria:**
+
+**Given** a vendor with one or more upcoming pickup slots
+**When** a customer reaches checkout
+**Then** they're shown that vendor's available slots and must pick one before completing checkout — no order can be created without a `pickupSlotId`
+**And** the selected slot's id is validated server-side (belongs to the correct vendor, still exists) before the order is created — never trusted from the client alone (NFR2)
+**And** the resulting `Order.pickupSlotId` is set to the selected slot — this is currently always `null` for every real order today; closing that gap is this story's core deliverable
+**And** a vendor with zero upcoming slots shows a clear "no pickup times available" state at checkout instead of a broken or empty picker
+
+*(FR15, NFR2. Scope note: no pickup-slot selection UI exists anywhere in the current cart/checkout flow — this is new customer-facing UI, not just a backend wiring change.)*
+
+### Story 5.2: Pickup slot creation rejects a start time already in the past
+
+As the platform,
+I want to reject a pickup slot whose start time has already elapsed,
+So that customers are never offered a pickup window that's already over.
+
+**Acceptance Criteria:**
+
+**Given** the vendor's add-slot form (`AddSlotForm.tsx`) or a direct API call
+**When** a slot is submitted with `startsAt` earlier than the current server time
+**Then** `CreateSlotSchema` rejects it with a friendly 400 error, not a silently-created invalid slot
+**And** the existing `endsAt > startsAt` check (already enforced) is unaffected by this change
+
+*(FR16.)*
+
+**Not yet a story:** the vendor-storefront-timezone question this epic's scenario review raised (no timezone concept exists anywhere in this codebase today — see `deferred-work.md`'s open decision entry) needs a product decision from Jeff before it can be scoped as a Story 5.3. Doesn't block 5.1/5.2.

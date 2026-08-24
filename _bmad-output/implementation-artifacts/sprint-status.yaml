@@ -1,5 +1,5 @@
 # generated: 2026-08-17
-# last_updated: 2026-08-23 (E2E admin creds provisioned)
+# last_updated: 2026-08-24 (Story 4.1 created)
 # project: local-food
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-08-17
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 project: local-food
 project_key: NOKEY
 tracking_system: file-system
@@ -67,6 +67,14 @@ development_status:
   3-1-admin-inventory-dashboard: done
   3-2-low-stock-sms-alert-to-admin: done
   epic-3-retrospective: done
+
+  epic-4: in-progress
+  4-1-vendor-uploads-a-product-image: ready-for-dev
+  4-2-product-image-displays-on-the-storefront: backlog
+
+  epic-5: backlog
+  5-1-customer-selects-a-pickup-slot-at-checkout: backlog
+  5-2-pickup-slot-creation-rejects-a-past-start-time: backlog
 
 action_items:
   - epic: 1
@@ -152,5 +160,5 @@ action_items:
   - epic: 3
     action: "Since epics.md's three-epic roadmap is now fully delivered, decide whether to groom a new epic or treat this roadmap as complete"
     owner: "Jeff"
-    status: in-progress
-    note: "Jeff: roadmap not complete - more scenarios to review, may become new epics. Not yet scoped into epics.md."
+    status: done
+    note: "2026-08-24: Jeff's 4 scenarios (scenarios from Jeff/Local Food Scnearios from Jeff.rtf) reviewed against actual code, expanded via bmad-review-edge-case-hunter. Drafted and Jeff-approved into epics.md: Epic 4 (Vendor Product Images, FR14) and Epic 5 (Pickup Slot & Order Integrity, FR15/FR16) - 4 new stories total. Two scenarios (vendor delete+re-add, ASCII punctuation) confirmed already handled by existing code, no new epic; one small adjacent gap (accented-name handling) and one open decision (vendor-storefront timezone concept) logged as new deferred-work.md entries, both still awaiting a separate Jeff decision but not blocking roadmap continuation. Roadmap decision made: not complete, grooming continues with Epics 4-5."
