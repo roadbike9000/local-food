@@ -116,6 +116,28 @@ test.describe("vendor dashboard (authenticated)", () => {
     expect(locations).not.toContain("Farmers Market, Stall 7");
   });
 
+  test(
+    "[P1] POST /api/pickup-slots rejects a past startsAt (400), no slot created — Story 5.2, AC #1",
+    async ({ page }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const location = `Playwright Past Slot ${Date.now()}`;
+      const startsAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const endsAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+      await page.goto("/dashboard"); // warm-up, page.request shares this context's cookies
+      const response = await page.request.post("/api/pickup-slots", {
+        data: { startsAt, endsAt, location },
+      });
+
+      expect(response.status()).toBe(400);
+
+      const created = await prisma.pickupSlot.findFirst({
+        where: { vendorId: vendor.id, location },
+      });
+      expect(created).toBeNull();
+    },
+  );
+
   test("vendor sees their own orders tab", async ({ page }) => {
     await page.goto("/dashboard/orders");
     await expect(page.getByRole("heading", { name: "Orders" })).toBeVisible();
