@@ -165,7 +165,7 @@ Creates a pickup slot for the signed-in vendor.
 ```
 - 401 if unauthenticated; 400 on schema/refinement failure.
 - Response: `201 { slot: PickupSlot }`.
-- **Not currently called by any UI** — the dashboard "Add slot" button has no handler yet.
+- Called by the dashboard's "Add slot" button (`AddSlotForm.tsx`).
 
 ---
 

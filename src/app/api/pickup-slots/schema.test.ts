@@ -37,6 +37,11 @@ describe("CreateSlotSchema", () => {
       endsAt: validBody.startsAt,
     });
     expect(result.success).toBe(false);
+    // AC #2: this must fail on the endsAt/startsAt ordering check, not the
+    // past-startsAt check (startsAt here is still a valid future time).
+    const messages = !result.success && result.error.issues.map((i) => i.message);
+    expect(messages).toContain("endsAt must be after startsAt");
+    expect(messages).not.toContain("startsAt must not be in the past");
   });
 
   it("rejects endsAt equal to startsAt", () => {
@@ -67,5 +72,11 @@ describe("CreateSlotSchema", () => {
     const past = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const result = CreateSlotSchema.safeParse({ startsAt: past, endsAt: validBody.endsAt });
     expect(result.success).toBe(false);
+    // AC #2: this must fail on the past-startsAt check, not the
+    // endsAt/startsAt ordering check (endsAt here is still genuinely after
+    // startsAt).
+    const messages = !result.success && result.error.issues.map((i) => i.message);
+    expect(messages).toContain("startsAt must not be in the past");
+    expect(messages).not.toContain("endsAt must be after startsAt");
   });
 });

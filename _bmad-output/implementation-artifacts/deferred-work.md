@@ -1,5 +1,37 @@
 # Deferred Work
 
+## Deferred from: code review of story-5-2-pickup-slot-creation-rejects-a-past-start-time (2026-08-25)
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: The new `startsAt`-past refine's failure message is unreachable — `route.ts:47` collapses every `safeParse` failure (including cases where multiple refines fire simultaneously on a malformed date) to a generic `400 { error: "Invalid request" }`.
+  evidence: Pre-existing pattern already true of the original `endsAt > startsAt` refine before this story; this diff follows established precedent (the story's own Task 1 explicitly reasoned about and accepted this) rather than introducing the gap.
+  status: open — no action needed unless per-field error messaging becomes a real product requirement for this route.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: `AddSlotForm.tsx`'s `datetime-local` inputs have no native `min` attribute, so the date picker itself still offers past times before any JS validation runs.
+  evidence: Not required by either AC; the sibling `endsAt <= startsAt` guard is also JS-based (not native), so this matches this form's existing convention. A nice-to-have, not a defect.
+  status: open — worth revisiting if this form gets a broader UX pass.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: No grace window exists between "now" evaluated client-side and "now" re-evaluated server-side a request-round-trip later — a `startsAt` a few hundred milliseconds out at submit time could tip past the boundary by the time the server parses it.
+  evidence: Inherent to any hard "reject already-past" boundary check and consistent with the spec's explicit strict-`>` choice (Dev Notes: "a slot starting at literally the current instant is rejected, consistent with treating 'now' as already past"). Not a defect introduced by this story.
+  status: open — would need a product decision (a small server-side tolerance window) if this ever causes real vendor-facing false rejections.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: `CreateSlotSchema` is no longer a pure function — its result now depends on wall-clock time at call time, not just its input.
+  evidence: Fine for its only current caller (the create route). A future reuse of this exact schema (e.g. an edit-slot endpoint, or re-validating an already-stored row) would incorrectly reject any slot that has since started, since nothing marks this schema as create-only.
+  status: open — flag for whichever future story adds a second consumer of `CreateSlotSchema`.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: `z.string().datetime()` (Zod v3 default) rejects non-`Z` ISO offsets (e.g. `+00:00`), and `docs/api-contracts.md`'s `startsAt`/`endsAt` comments say only "ISO datetime" with no note of the UTC-only constraint.
+  evidence: Pre-existing gap — the field's type/validator is unchanged by this story, and the app itself is unaffected since `AddSlotForm.tsx` always sends `.toISOString()` (always `Z`-suffixed). Only a direct API caller sending a valid offset-form ISO 8601 timestamp would hit this, with an unexplained generic `400`.
+  status: open — worth a one-line docs fix (or `{ offset: true }` on the schema) whenever this route's direct-API-caller surface is revisited.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: `tests/dashboard.spec.ts`'s `toLocal()` test helper (`d.toISOString().slice(0, 16)`) feeds a UTC wall-clock string into a `datetime-local` input, which the browser interprets as local time — a UTC/local-time mismatch baked into the fixture.
+  evidence: Pre-existing pattern from before this story (already used by `"vendor can add a new pickup slot"`, untouched by this diff). The 24h fixture buffer absorbs any offset within roughly ±14h, so it hasn't caused a visible failure.
+  status: open — worth fixing (build the `datetime-local` string from local `Date` components instead of `toISOString()`) if this repo's CI or dev environment ever runs in a timezone the buffer doesn't cover.
+
 ## Deferred from: code review of 4-2-product-image-displays-on-the-storefront (2026-08-24)
 
 - source_spec: `_bmad-output/implementation-artifacts/4-2-product-image-displays-on-the-storefront.md`

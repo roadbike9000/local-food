@@ -75,7 +75,7 @@ development_status:
 
   epic-5: in-progress
   5-1-customer-selects-a-pickup-slot-at-checkout: done
-  5-2-pickup-slot-creation-rejects-a-past-start-time: review
+  5-2-pickup-slot-creation-rejects-a-past-start-time: done
 
 action_items:
   - epic: 1

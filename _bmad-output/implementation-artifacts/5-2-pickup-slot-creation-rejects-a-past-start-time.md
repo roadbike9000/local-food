@@ -4,7 +4,7 @@ baseline_commit: 4369bd7408188fc423e5f254a0ec53a7fc2399d7
 
 # Story 5.2: Pickup slot creation rejects a start time already in the past
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -40,6 +40,25 @@ so that customers are never offered a pickup window that's already over.
   - [x] Confirm (no new test needed, just verify while in the file) that an existing case still independently proves `endsAt > startsAt` is unaffected — after Task 2's fix, the existing `"rejects endsAt before startsAt"` test uses two relative-future dates with `endsAt` before `startsAt`, isolating exactly that condition per AC #2.
   - [x] New Playwright test, extend `tests/dashboard.spec.ts`'s `"vendor dashboard (authenticated)"` describe block (already serial-mode, already authenticated — matches this route's existing `GET /api/pickup-slots` direct-API-test pattern at line ~110): `[P1]` `POST /api/pickup-slots` with a past `startsAt` (and a valid `endsAt` after it) returns `400`, and no `PickupSlot` row is created for it (verify via `prisma.pickupSlot.findMany` scoped by vendor + a unique `location`, or absence of a new row — dev's call on the exact query, no existing helper does this lookup). Use `page.goto("/dashboard")` then `page.request.post(...)` — same auth-cookie-sharing pattern the existing `GET /api/pickup-slots` test in the same file already uses, confirmed by reading it.
   - [ ] Do not add a new e2e UI-level test for this — both of `tests/dashboard.spec.ts`'s existing `AddSlotForm` tests (`"vendor can add a new pickup slot"`, `"add-slot form shows a validation error when the end time is before the start time"`) already use `new Date(Date.now() + 24 * 60 * 60 * 1000)`-based times, confirmed unaffected by this change — re-run them after Task 1 lands to confirm, don't skip that check, but no new UI test is needed unless Task 3 is also done (in which case a UI test for that client-side path would be the dev's own addition, matching Task 3's own discretionary scope).
+
+### Review Findings
+
+- [x] [Review][Patch] Task 3's client-side guard makes the vendor's device clock authoritative for a legitimate future `startsAt` — contradicts the spec's own NFR2 rationale. `AddSlotForm.tsx:45` checks `startsAt <= new Date()` using the *browser's* clock, reintroducing device-clock dependence on the reject side that AC #1/NFR2 specifically designed against. **Decided (2026-08-25, Jeff): remove Task 3's client-side guard entirely** — rely solely on the server's `400` as the single source of truth. Task 3 was explicitly discretionary and not required by either AC. **Applied:** removed the `if (startsAt <= new Date()) { ... }` block from `handleSubmit` (`AddSlotForm.tsx`); this also resolves the untested-guard finding, since the guard being removed needs no test.
+
+- [x] [Review][Patch] `docs/api-contracts.md` still said this endpoint is "Not currently called by any UI" three lines below the line this diff edited [docs/api-contracts.md:168]. `AddSlotForm.tsx` has POSTed to this route since before this story, and `tests/dashboard.spec.ts:291` exercises exactly that button. **Applied:** replaced the stale bullet with "Called by the dashboard's 'Add slot' button (`AddSlotForm.tsx`)."
+
+- [x] [Review][Patch] Unit tests only asserted `result.success === false`, never *which* refine fired or its message [src/app/api/pickup-slots/schema.test.ts:31-40,66-70]. AC #2 requires both checks to "apply independently" with "neither's failure message" changing. **Applied:** both `"rejects endsAt before startsAt"` and `"rejects a startsAt already in the past"` now also assert on `result.error.issues[].message`, confirming each fails on its own refine and not the other's.
+
+- [x] [Review][Patch] New Playwright test had no `try`/`finally` cleanup, unlike every fixture-creating sibling test in the file [tests/dashboard.spec.ts:119-139]. **Applied:** wrapped the test body in `try { ... } finally { deletePickupSlotByLocation(vendor.id, location); }`, matching `"vendor can add a new pickup slot"`'s pattern.
+
+**Verification after patches:** `npx tsc --noEmit` clean; `npm run lint` clean; `npx vitest run` 92/92; `npx playwright test tests/dashboard.spec.ts` 22/22; `npm run build` succeeds.
+
+- [x] [Review][Defer] Refine failure message is unreachable — `route.ts:47` collapses every `safeParse` failure (including malformed dates producing multiple simultaneous refine issues) to a generic `400 { error: "Invalid request" }` [src/app/api/pickup-slots/route.ts:47]. Pre-existing pattern already true of the original `endsAt > startsAt` refine before this story; this diff follows established precedent rather than introducing the gap. — deferred, pre-existing
+- [x] [Review][Defer] `datetime-local` inputs have no native `min` attribute, so the picker still offers past times before any JS runs [src/components/dashboard/AddSlotForm.tsx:119-125]. A nice-to-have, not required by either AC; the sibling `endsAt`/`startsAt` guard is already JS-based, not native, so this matches existing form convention. — deferred, pre-existing
+- [x] [Review][Defer] No grace window between client-side "now" and server-side "now" for a `startsAt` a few hundred milliseconds out — inherent to any hard "reject already-past" boundary and consistent with the spec's explicit strict-`>` choice, not a defect introduced here. [src/app/api/pickup-slots/schema.ts:22] — deferred, pre-existing
+- [x] [Review][Defer] `CreateSlotSchema` is no longer a pure function (result now depends on wall-clock time at call time) [src/app/api/pickup-slots/schema.ts:18]. Fine for its only current caller (the create route); a future reuse (e.g. an edit-slot schema, or re-validating a stored row) would need to know this schema is create-only. No current misuse — nothing to fix now. — deferred, pre-existing
+- [x] [Review][Defer] `z.string().datetime()` rejects non-`Z` ISO offsets (Zod v3 default) and `docs/api-contracts.md`'s "ISO datetime" comment doesn't note the UTC-only constraint [docs/api-contracts.md:160]. Pre-existing gap (field type unchanged by this story); the app itself is unaffected since `AddSlotForm.tsx` always sends `.toISOString()`. — deferred, pre-existing
+- [x] [Review][Defer] `tests/dashboard.spec.ts`'s `toLocal()` helper (`d.toISOString().slice(0, 16)`) feeds a UTC wall-clock string into a `datetime-local` input the browser reads as local time [tests/dashboard.spec.ts:301,332]. Pre-existing pattern from before this story (already used by `"vendor can add a new pickup slot"`); the 24h fixture buffer absorbs it. — deferred, pre-existing
 
 ## Dev Notes
 
