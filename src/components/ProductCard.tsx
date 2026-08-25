@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useCart } from "./CartProvider";
 import { formatPrice } from "@/lib/utils";
 import { isInStock } from "@/lib/availability";
 
+// A small thumbnail for a compact row layout - no pixel-exact requirement,
+// just large enough to be recognizable next to the name/price text.
 const IMAGE_SIZE = 64;
 
 type ProductCardProps = {
@@ -30,7 +32,6 @@ function ProductImagePlaceholder() {
   return (
     <div
       data-testid="product-image-placeholder"
-      role="presentation"
       style={{ width: IMAGE_SIZE, height: IMAGE_SIZE }}
       className="flex flex-shrink-0 items-center justify-center rounded-md bg-stone-100 text-stone-400"
     >
@@ -57,13 +58,26 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
   const inStock = isInStock(product);
   const outOfStockId = `out-of-stock-${product.id}`;
   const [imageFailed, setImageFailed] = useState(false);
+  // Resets a stale failure if this same card instance is ever reused for a
+  // different (or corrected) imageUrl - currently masked by page.tsx's
+  // key={p.id} giving each product its own instance, but cheap to guard
+  // against any future live-update pattern reusing the instance instead of
+  // remounting it (Story 4.2 review finding).
+  useEffect(() => {
+    setImageFailed(false);
+  }, [product.imageUrl]);
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4">
+    <div className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white p-4">
       {product.imageUrl && !imageFailed ? (
         <Image
           src={product.imageUrl}
-          alt={product.name}
+          // Decorative relative to the adjacent, already-visible product
+          // name heading - a non-empty alt would have a screen reader
+          // announce the same text twice per card (Story 4.2 review
+          // finding).
+          alt=""
+          data-testid="product-image"
           width={IMAGE_SIZE}
           height={IMAGE_SIZE}
           className="flex-shrink-0 rounded-md object-cover"

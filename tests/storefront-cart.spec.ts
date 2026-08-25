@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test, expect } from "@playwright/test";
 import {
   getVendorBySlug,
@@ -7,6 +9,7 @@ import {
   deleteVendorBySlug,
   prisma,
 } from "./helpers/db";
+import { uploadImage } from "../src/lib/cloudinary";
 
 // Matches src/lib/utils.ts's formatPrice() exactly, same reasoning as the
 // P0 test below: avoids a toFixed()-based reimplementation that would
@@ -487,24 +490,45 @@ test.describe("storefront and cart", () => {
  * authenticated dashboard/products-api describe blocks elsewhere.
  */
 test.describe("product image on storefront (Story 4.2)", () => {
-  // Cloudinary's own long-standing public demo asset - stable across
-  // accounts/environments, real and loadable (not our own app's cloud, but
-  // these tests insert Product.imageUrl directly via Prisma, bypassing
-  // CreateProductSchema's host-scoping refine entirely - only the browser's
-  // ability to actually load the URL matters here).
-  const REAL_IMAGE_URL = "https://res.cloudinary.com/demo/image/upload/sample.jpg";
-  // Syntactically a real Cloudinary path, but not an asset that exists -
-  // Cloudinary 404s it, a genuine failed image load, not a mock.
-  const BROKEN_IMAGE_URL =
-    "https://res.cloudinary.com/demo/image/upload/story-4-2-does-not-exist.jpg";
+  // page.tsx re-validates imageUrl against this app's own Cloudinary cloud
+  // before ever passing it to ProductCard (Story 4.2 review finding) - a
+  // "demo" cloud URL would get silently coerced to null and never reach
+  // next/image at all. Upload a real fixture via the same uploadImage()
+  // helper the app itself uses (Story 4.1), not a hardcoded/other-cloud URL,
+  // so this test exercises the real host-scoping path end to end.
+  const hasCloudinaryCreds =
+    !!process.env.CLOUDINARY_CLOUD_NAME &&
+    !!process.env.CLOUDINARY_API_KEY &&
+    !!process.env.CLOUDINARY_API_SECRET;
+  let realImageUrl: string | undefined;
+
+  test.beforeAll(async () => {
+    if (!hasCloudinaryCreds) return;
+    const base64 = readFileSync(
+      join(process.cwd(), "tests/fixtures/test-product-image.png"),
+    ).toString("base64");
+    realImageUrl = await uploadImage(`data:image/png;base64,${base64}`);
+  });
+
+  // Same cloud as realImageUrl (so it passes page.tsx's host check), but the
+  // asset doesn't exist - Cloudinary's real CDN 404s it, a genuine failed
+  // image load post-render, distinct from the "wrong cloud, coerced to null
+  // before ProductCard ever sees it" case. No auth needed for this one - a
+  // 404 response from Cloudinary's public CDN doesn't require API credentials.
+  const BROKEN_IMAGE_URL = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload/story-4-2-does-not-exist.jpg`;
 
   test(
     "[P0] a product with imageUrl set renders its image on the storefront",
     async ({ page }) => {
+      test.skip(
+        !realImageUrl,
+        "Cloudinary not configured — CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET missing",
+      );
+
       const vendor = await getVendorBySlug("corner-sourdough");
       const product = await createTestProduct(vendor.id, {
         name: "Playwright Image Display Product",
-        imageUrl: REAL_IMAGE_URL,
+        imageUrl: realImageUrl,
       });
 
       try {
@@ -512,7 +536,10 @@ test.describe("product image on storefront (Story 4.2)", () => {
         const card = page
           .getByRole("heading", { name: product.name, exact: true })
           .locator("../..");
-        await expect(card.getByRole("img", { name: product.name })).toBeVisible();
+        await expect(card.getByTestId("product-image")).toBeVisible();
+        await expect(
+          card.getByTestId("product-image-placeholder"),
+        ).toHaveCount(0);
       } finally {
         await deleteProduct(product.id);
       }
@@ -532,11 +559,7 @@ test.describe("product image on storefront (Story 4.2)", () => {
         const card = page
           .getByRole("heading", { name: product.name, exact: true })
           .locator("../..");
-        // No accessible image named after the product - only the
-        // placeholder should occupy that slot.
-        await expect(
-          card.getByRole("img", { name: product.name }),
-        ).toHaveCount(0);
+        await expect(card.getByTestId("product-image")).toHaveCount(0);
         await expect(card.getByTestId("product-image-placeholder")).toBeVisible();
       } finally {
         await deleteProduct(product.id);
