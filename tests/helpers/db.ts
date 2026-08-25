@@ -14,8 +14,10 @@ export async function getVendorBySlug(slug: string) {
     where: { slug },
     // pickupSlots added for Story 5.1 - checkout-api.spec.ts's existing
     // tests and the new pickup-slot tests both need a real seeded slot id
-    // without a second query.
-    include: { products: true, pickupSlots: true },
+    // without a second query. orderBy (review finding) makes pickupSlots[0]
+    // deterministic - harmless today since each seeded vendor has exactly
+    // one slot, but latent otherwise.
+    include: { products: true, pickupSlots: { orderBy: { startsAt: "asc" } } },
   });
   if (!vendor) {
     throw new Error(`Seed data missing: vendor "${slug}" not found. Run npm run db:seed.`);

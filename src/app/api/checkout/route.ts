@@ -45,14 +45,16 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  // Selected pickup slot must belong to this vendor and still exist (AC #2,
-  // NFR2) - checked before the product/stock work so a bad slot fails fast,
-  // same reasoning as the vendor-active check above. "Still exists" means
-  // the row exists and belongs to this vendor, not that it hasn't started
-  // yet - PickupSlot has no soft-delete and this story doesn't add a
-  // startsAt re-check at checkout time (see story Dev Notes).
+  // Selected pickup slot must belong to this vendor, still exist, and still
+  // be upcoming (AC #2, NFR2) - checked before the product/stock work so a
+  // bad slot fails fast, same reasoning as the vendor-active check above.
+  // The startsAt check was added after code review widened the original
+  // scope call: without it, any client could POST any pickupSlotId
+  // belonging to the vendor - including one from weeks/months ago - since
+  // the picker's "upcoming" filter (GET /api/vendors/[vendorId]/pickup-slots)
+  // is advisory-only and never itself re-checked server-side at order time.
   const pickupSlot = await prisma.pickupSlot.findFirst({
-    where: { id: pickupSlotId, vendorId },
+    where: { id: pickupSlotId, vendorId, startsAt: { gte: new Date() } },
   });
   if (!pickupSlot) {
     return NextResponse.json(

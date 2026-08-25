@@ -4,7 +4,7 @@ baseline_commit: 105242c32b8238356bf4438d7ce11327766d3be8
 
 # Story 5.1: Customer selects a pickup slot at checkout; order links to it
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -55,6 +55,28 @@ so that I know when and where to pick it up.
 - [x] Task 5: Docs sync (housekeeping, matches established precedent)
   - [x] `docs/api-contracts.md` — add a new section for `GET /api/vendors/[vendorId]/pickup-slots` (first public read route — note that explicitly, matching the doc's existing per-endpoint format), and update `POST /api/checkout`'s documented request body to include the new required `pickupSlotId` field.
   - [x] `docs/data-models.md` — check `Order.pickupSlotId`'s row for any "always null" / "not yet set" language (Task 3's Dev Notes source reference below flags it as a likely candidate) and update if stale; record the finding either way in Completion Notes, don't assume.
+
+### Review Findings
+
+3-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance Auditor — all three on Opus, per Jeff's request) against `git diff 105242c32b8238356bf4438d7ce11327766d3be8..story-5-1-customer-selects-a-pickup-slot-at-checkout`. 22 raised findings consolidated after dedup/verification: 11 patch (1 resolved from decision-needed), 2 defer, 9 dismissed as noise/pre-existing/inaccurate.
+
+- [x] [Review][Patch] No `startsAt` re-check at checkout — resolved via Jeff's decision (2026-08-25): reframing accepted, exposure is wider than originally scoped (any client can POST any `pickupSlotId` belonging to the vendor, including a long-past one, since nothing server-side re-checks recency). Add `startsAt: { gte: new Date() }` to `pickupSlot.findFirst`'s `where` clause [src/app/api/checkout/route.ts:56-58].
+
+- [x] [Review][Patch] Single-slot case shows no pickup-time confirmation to the customer [src/app/cart/page.tsx:175-201] — `slots.length === 1` matches neither the zero-slot nor the 2+-slot render branch. The slot is auto-selected (AC #5) and silently posted to checkout, but the customer is never shown when/where to pick up — violating AC #1's "shows them at checkout" for the majority real-world case (every seeded vendor has exactly one slot).
+- [x] [Review][Patch] "No pickup times available." flashes before the fetch resolves [src/app/cart/page.tsx:33-47,175-177] — `slots` initializes to `[]` with no loading state, so the zero-slot message paints on every mount/`vendorId` change before data arrives, for vendors that do have slots.
+- [x] [Review][Patch] Pickup-slots fetch has no error handling [src/app/cart/page.tsx:39-47] — no `res.ok` check, no `.catch()`; a failed/malformed response leaves Checkout permanently disabled with a misleading "no pickup times" message instead of a real error, and a non-array `data.slots` would throw on the next `slots.length` read.
+- [x] [Review][Patch] New route missing `export const dynamic = "force-dynamic"` [src/app/api/vendors/[vendorId]/pickup-slots/route.ts] — same class of Next.js route-caching bug already found and fixed twice in this codebase (`src/app/vendors/[slug]/page.tsx`, `src/app/admin/inventory/page.tsx`, both explicitly citing "a dynamic route segment with no explicit dynamic export is cache-eligible under Next"). A cached response would silently serve stale/expired slots — production-only, invisible in `next dev`.
+- [x] [Review][Patch] Multi-slot Playwright test under-verifies the picker [tests/storefront-cart.spec.ts:606-634] — never asserts both radio options render or that neither is pre-selected before interaction; `slotB` is created but never referenced (dead variable).
+- [x] [Review][Patch] `getVendorBySlug()`'s new `pickupSlots` include has no `orderBy` [tests/helpers/db.ts:14-18] — `pickupSlots[0]` is DB-order-dependent; harmless today (one seeded slot per vendor) but latent the moment a vendor gets a second, with no failure signal.
+- [x] [Review][Patch] `sprint-status.yaml`'s `last_updated` field broke its established bare-date format [_bmad-output/implementation-artifacts/sprint-status.yaml] — every prior update (verified via `git log`) was a bare `YYYY-MM-DD`; this one appended free text, breaking anything that parses it as a date.
+- [x] [Review][Patch] New route returns the full `PickupSlot` row instead of just the fields the client uses [src/app/api/vendors/[vendorId]/pickup-slots/route.ts:23-26] — ships `capacity`, `vendorId`, `createdAt` unnecessarily; add a `select`.
+- [x] [Review][Patch] Client can serialize `pickupSlotId: null` if the disabled-button guard is ever bypassed [src/app/cart/page.tsx:62] — server correctly rejects it, but with the generic "Invalid request" rather than the slot-specific message.
+- [x] [Review][Patch] 4 of the 5 fixed-up `checkout-api.spec.ts` tests read `vendor.pickupSlots[0]` with no existence guard [tests/checkout-api.spec.ts] — would fail with an opaque TypeError instead of a clear message if seed data is ever missing a slot; the file already has this exact guard pattern for products (`if (!product) throw new Error("Seed data missing...")`), just not extended to slots.
+
+- [x] [Review][Defer] `PickupSlot.capacity` remains unenforced [prisma/schema.prisma] — deferred, pre-existing; explicitly out of scope per this story's own Dev Notes ("that's a different story's job if it's ever wanted"), now more consequential since orders bind to slots for the first time.
+- [x] [Review][Defer] `Order.pickupSlot` relation has no explicit `onDelete`, defaults to `SetNull` [prisma/schema.prisma] — deferred, pre-existing schema shape; fully latent, no slot-delete route exists today to trigger it (also covers the related unhandled-`P2003` race if a slot were deleted mid-checkout).
+
+Dismissed as noise, pre-existing-and-unrelated, or factually inaccurate (9): the AC #3 test's Stripe-absence `test.skip()` (matches every other test in the file, not new); the deactivated-vendor test's `"placeholder"` string depending on check ordering (deliberate, documented in both the test comment and Task 2); the new route's synchronous `{ params }` destructuring (matches 100% of existing dynamic routes in this codebase, e.g. `admin/vendors/[id]/deactivate`); `createTestPickupSlot`'s Date-mutation being called an "aliasing bug" (each call correctly computes distinct start/end internally; the real symptom — identical timestamps *across* calls with no override — matches `prisma/seed.ts`'s own already-accepted pattern, not a new defect); the "no new trust boundary" doc-wording nuance (`vendorId` is not treated as secret anywhere else in this codebase either — already client-supplied to `POST /api/checkout` with no secrecy assumption); the multi-slot test's redundant `deletePickupSlotByLocation` calls before `deleteVendorBySlug` (harmless — `PickupSlot.vendorId` is `onDelete: Cascade` — and matches this suite's existing cleanup-ordering pattern); no `take` limit on the new route's `findMany` (speculative — no vendor in this app has more than a couple of slots, no evidence of a realistic many-slots scenario); the new route not filtering by `vendor.isActive` (checkout is this codebase's actual enforcement layer for vendor-active status, not each individual read — matches the established layered-validation pattern); and a pre-existing test's `Date.now() % 10000` phone-collision risk (predates this diff, out of this story's scope).
 
 ## Dev Notes
 
@@ -127,20 +149,22 @@ Claude Sonnet 5 (claude-sonnet-5)
 
 ### File List
 
-- `src/app/api/vendors/[vendorId]/pickup-slots/route.ts` (new)
+- `src/app/api/vendors/[vendorId]/pickup-slots/route.ts` (new; patched — `dynamic = "force-dynamic"`, `select` scoped to client-used fields)
 - `src/app/api/checkout/schema.ts` (modified — `pickupSlotId` required)
-- `src/app/api/checkout/route.ts` (modified — pickup-slot validation + `Order.create` now sets `pickupSlotId`)
+- `src/app/api/checkout/route.ts` (modified — pickup-slot validation + `Order.create` now sets `pickupSlotId`; patched — `startsAt: { gte: new Date() }` added to the slot lookup)
 - `src/app/api/checkout/schema.test.ts` (modified — `validBody` gained `pickupSlotId`, 1 new test)
-- `src/app/cart/page.tsx` (modified — pickup-slot fetch/auto-select/picker UI, `Checkout` gating)
-- `tests/checkout-api.spec.ts` (modified — 5 pre-existing tests given a real/placeholder `pickupSlotId`, 3 new tests)
-- `tests/storefront-cart.spec.ts` (modified — 2 new tests, new imports)
-- `tests/helpers/db.ts` (modified — `getVendorBySlug()` now includes `pickupSlots`, new `createTestPickupSlot()`)
+- `src/app/cart/page.tsx` (modified — pickup-slot fetch/auto-select/picker UI, `Checkout` gating; patched — single-slot confirmation text, loading state, fetch error handling, null-slot guard in `handleCheckout`)
+- `tests/checkout-api.spec.ts` (modified — 5 pre-existing tests given a real/placeholder `pickupSlotId`, 3 new tests; patched — existence guards added for `vendor.pickupSlots[0]` in 4 tests)
+- `tests/storefront-cart.spec.ts` (modified — 2 new tests, new imports; patched — multi-slot test now asserts both radios render and neither is pre-selected)
+- `tests/helpers/db.ts` (modified — `getVendorBySlug()` now includes `pickupSlots`, new `createTestPickupSlot()`; patched — `orderBy: { startsAt: "asc" }` added to the `pickupSlots` include)
 - `docs/api-contracts.md` (modified — new endpoint section, `POST /api/checkout` contract updated)
 - `docs/data-models.md` (modified — `Order.pickupSlotId` row reworded)
 - `_bmad-output/project-context.md` (modified — new Actual State Log entry for the seed-data staleness discovery)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (modified — 2 findings deferred from code review)
 - `_bmad-output/test-artifacts/atdd-checklist-5-1-customer-selects-a-pickup-slot-at-checkout.md` (from the prior ATDD pass, referenced not modified this session)
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — status transitions)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — status transitions; patched — `last_updated` field reverted to bare-date format)
 
 ## Change Log
 
 - 2026-08-25: Implemented Story 5.1 in full. New public `GET /api/vendors/[vendorId]/pickup-slots` route; `CheckoutSchema`/`POST /api/checkout` now require and validate `pickupSlotId` server-side and set it on order creation; `/cart` gained a pickup-slot picker with auto-select for a single slot and a blocked-checkout "no pickup times available" state for zero. Fixed all 5 pre-existing `checkout-api.spec.ts` tests broken by the now-required schema field, in the same pass. Discovered and worked around (not a code bug) a dev-DB seed-data staleness trap — logged in `project-context.md`'s Actual State Log. Docs (`api-contracts.md`, `data-models.md`) re-checked and updated per Task 5. Full regression: typecheck clean, lint clean, 91/91 unit, 128/128 e2e, zero regressions, `payment.spec.ts`/`sms.spec.ts` confirmed unmodified and still green. Status → review.
+- 2026-08-25 (code review): 3-layer adversarial review on Opus (Blind Hunter, Edge Case Hunter, Acceptance Auditor) against the full diff from the story's baseline commit. 22 raised findings consolidated to 1 decision-needed (resolved by Jeff: widen the `startsAt` scope call and add the server-side re-check), 10 further patch findings, 2 deferred, 9 dismissed. **Fixed (11 patches):** the single-slot case now shows a pickup-time confirmation instead of nothing; a genuine loading state replaces the "no pickup times" flash that painted before every fetch resolved; the slot fetch now handles `res.ok`/network failures instead of leaving a silently-wrong disabled state; `handleCheckout` guards against a null `selectedSlotId` reaching the network; the new route gained `dynamic = "force-dynamic"` (same caching-bug class already fixed twice elsewhere in this codebase) and a `select` scoped to the 4 fields the client uses; `POST /api/checkout`'s slot lookup now also requires `startsAt: { gte: new Date() }`, closing a wider-than-scoped gap where any slot ever belonging to the vendor — including long-past ones — was accepted; the multi-slot Playwright test now asserts both options render and neither is pre-selected, using the previously-dead `slotB`; `getVendorBySlug()`'s `pickupSlots` include gained an `orderBy`; `sprint-status.yaml`'s `last_updated` field reverted to its established bare-date format; 4 `checkout-api.spec.ts` tests gained the same seed-data existence guard the file already uses for products. **Deferred (2, logged in `deferred-work.md`):** `PickupSlot.capacity` remains unenforced; `Order.pickupSlot`'s implicit `SetNull` `onDelete` is latent with no slot-delete route to trigger it. Full regression re-run clean after all patches: typecheck, lint, 91/91 unit, 128/128 e2e (fresh re-seed), production build succeeds. Status → done.

@@ -626,10 +626,22 @@ test.describe("pickup slot selection at checkout (Story 5.1)", () => {
           .fill("+15005550093");
 
         const checkoutButton = page.getByRole("button", { name: /checkout/i });
+        const radioA = page.getByRole("radio", { name: new RegExp(slotA.location!) });
+        const radioB = page.getByRole("radio", { name: new RegExp(slotB.location!) });
+
+        // Review finding: the original assertions only proved *a* radio
+        // gates Checkout, not that both options actually render or that
+        // neither is pre-selected - an implementation showing only one
+        // option would have passed.
+        await expect(radioA).toBeVisible();
+        await expect(radioB).toBeVisible();
+        await expect(radioA).not.toBeChecked();
+        await expect(radioB).not.toBeChecked();
         await expect(checkoutButton).toBeDisabled();
 
-        await page.getByRole("radio", { name: new RegExp(slotA.location!) }).check();
+        await radioA.check();
         await expect(checkoutButton).toBeEnabled();
+        await expect(radioB).not.toBeChecked();
       } finally {
         await deleteProduct(product.id);
         await deletePickupSlotByLocation(vendor.id, "Market A");
