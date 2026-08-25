@@ -9,6 +9,12 @@ import {
   prisma,
 } from "./helpers/db";
 
+// Story 5.1: seeded vendors' own pickupSlots[0] (via getVendorBySlug's
+// pickupSlots include) is reused directly below rather than
+// createTestPickupSlot() - both seeded vendors already have exactly one
+// upcoming slot each (prisma/seed.ts), so no extra fixture/cleanup is
+// needed for these three tests.
+
 // API-level coverage for /api/checkout's pricing/availability rules (faster
 // and more direct than the E2E redirect test in payment.spec.ts, which only
 // exercises the happy path). Requires seeded data (npm run db:seed).
@@ -201,6 +207,108 @@ test.describe("checkout API", () => {
       } finally {
         await deleteProduct(product.id);
         await deleteVendorBySlug(vendor.slug);
+      }
+    },
+  );
+
+  test(
+    "rejects a pickupSlotId belonging to a different vendor (400) — Story 5.1, AC #2",
+    async ({ request }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const otherVendor = await getVendorBySlug("green-valley-produce");
+      const product = vendor.products.find((p) => p.stockQuantity >= 1);
+      if (!product) throw new Error("Seed data missing a product with stock");
+      const otherVendorSlot = otherVendor.pickupSlots[0];
+      if (!otherVendorSlot) {
+        throw new Error("Seed data missing green-valley-produce's pickup slot");
+      }
+
+      const response = await request.post("/api/checkout", {
+        data: {
+          vendorId: vendor.id,
+          pickupSlotId: otherVendorSlot.id,
+          customerName: "Playwright Wrong-Vendor Slot Check",
+          customerPhone: "+15005550095",
+          items: [{ productId: product.id, quantity: 1 }],
+        },
+      });
+
+      expect(response.status()).toBe(400);
+      // Distinct message from the existing "One or more items are
+      // unavailable" (missing product) / "don't have enough stock"
+      // messages - proves the slot check ran, not just any 400.
+      const body = await response.json();
+      expect(body.error).toMatch(/no longer available/i);
+
+      const order = await prisma.order.findFirst({
+        where: { vendorId: vendor.id, customerPhone: "+15005550095" },
+      });
+      expect(order).toBeNull();
+    },
+  );
+
+  test(
+    "rejects a non-existent pickupSlotId (400) — Story 5.1, AC #2",
+    async ({ request }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = vendor.products.find((p) => p.stockQuantity >= 1);
+      if (!product) throw new Error("Seed data missing a product with stock");
+
+      const response = await request.post("/api/checkout", {
+        data: {
+          vendorId: vendor.id,
+          pickupSlotId: "nonexistent-slot-id",
+          customerName: "Playwright Missing Slot Check",
+          customerPhone: "+15005550094",
+          items: [{ productId: product.id, quantity: 1 }],
+        },
+      });
+
+      expect(response.status()).toBe(400);
+      const body = await response.json();
+      expect(body.error).toMatch(/no longer available/i);
+
+      const order = await prisma.order.findFirst({
+        where: { vendorId: vendor.id, customerPhone: "+15005550094" },
+      });
+      expect(order).toBeNull();
+    },
+  );
+
+  test(
+    "a valid pickupSlotId for the cart's own vendor succeeds and sets Order.pickupSlotId — Story 5.1, AC #3",
+    async ({ request }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = vendor.products.find((p) => p.stockQuantity >= 1);
+      if (!product) throw new Error("Seed data missing a product with stock");
+      const slot = vendor.pickupSlots[0];
+      if (!slot) throw new Error("Seed data missing corner-sourdough's pickup slot");
+      const customerPhone = `+1500555${Date.now() % 10000}`.padEnd(12, "0");
+
+      const response = await request.post("/api/checkout", {
+        data: {
+          vendorId: vendor.id,
+          pickupSlotId: slot.id,
+          customerName: "Playwright Valid Slot Check",
+          customerPhone,
+          items: [{ productId: product.id, quantity: 1 }],
+        },
+      });
+
+      // Same Stripe-config skip reasoning as the other tests in this file -
+      // only skip on a genuine 500, a 400 must fail the test.
+      test.skip(response.status() === 500, "Stripe test keys not configured; skipping");
+      expect(response.status()).toBe(200);
+
+      const order = await prisma.order.findFirst({
+        where: { vendorId: vendor.id, customerPhone },
+        orderBy: { createdAt: "desc" },
+      });
+      try {
+        expect(order).not.toBeNull();
+        expect(order!.pickupSlotId).toBe(slot.id);
+      } finally {
+        if (order) await deleteOrder(order.id);
       }
     },
   );

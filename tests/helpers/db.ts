@@ -12,7 +12,10 @@ export const prisma = new PrismaClient();
 export async function getVendorBySlug(slug: string) {
   const vendor = await prisma.vendor.findUnique({
     where: { slug },
-    include: { products: true },
+    // pickupSlots added for Story 5.1 - checkout-api.spec.ts's existing
+    // tests and the new pickup-slot tests both need a real seeded slot id
+    // without a second query.
+    include: { products: true, pickupSlots: true },
   });
   if (!vendor) {
     throw new Error(`Seed data missing: vendor "${slug}" not found. Run npm run db:seed.`);
@@ -103,6 +106,34 @@ export async function deletePickupSlotByLocation(
   location: string,
 ) {
   await prisma.pickupSlot.deleteMany({ where: { vendorId, location } });
+}
+
+// Story 5.1: throwaway pickup-slot fixtures for the multi-slot/zero-slot
+// checkout UI tests - no existing helper creates a standalone slot.
+// startsAt/endsAt default to "tomorrow", matching prisma/seed.ts's own
+// pattern, so slots are always "upcoming" per the route's
+// startsAt: { gte: new Date() } filter regardless of when the suite runs.
+export async function createTestPickupSlot(
+  vendorId: string,
+  overrides: Partial<{
+    startsAt: Date;
+    endsAt: Date;
+    capacity: number;
+    location: string | null;
+  }> = {},
+) {
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const defaultStart = new Date(tomorrow.setHours(17, 0, 0, 0));
+  const defaultEnd = new Date(tomorrow.setHours(19, 0, 0, 0));
+  return prisma.pickupSlot.create({
+    data: {
+      vendorId,
+      startsAt: overrides.startsAt ?? defaultStart,
+      endsAt: overrides.endsAt ?? defaultEnd,
+      capacity: overrides.capacity ?? 20,
+      location: overrides.location ?? "Test Market (Playwright)",
+    },
+  });
 }
 
 // Story 2.2: test cleanup for admin-created Vendor rows. Scoped by slug

@@ -7,6 +7,8 @@ import {
   deleteProduct,
   createTestVendor,
   deleteVendorBySlug,
+  createTestPickupSlot,
+  deletePickupSlotByLocation,
   prisma,
 } from "./helpers/db";
 import { uploadImage } from "../src/lib/cloudinary";
@@ -588,6 +590,76 @@ test.describe("product image on storefront (Story 4.2)", () => {
         });
       } finally {
         await deleteProduct(product.id);
+      }
+    },
+  );
+});
+
+/**
+ * Story 5.1 — pickup slot selection at checkout. Own throwaway vendor per
+ * test (never corner-sourdough/green-valley-produce - both seeded vendors
+ * have exactly one slot each, which is the fixture AC #5's auto-select
+ * needs to stay untested-by-omission here; see payment.spec.ts/sms.spec.ts
+ * instead). Public route, no Clerk session needed.
+ */
+test.describe("pickup slot selection at checkout (Story 5.1)", () => {
+  test(
+    "[P1] 2+ upcoming slots: Checkout stays disabled until one is picked, then enables",
+    async ({ page }) => {
+      const vendor = await createTestVendor();
+      const product = await createTestProduct(vendor.id);
+      const slotA = await createTestPickupSlot(vendor.id, { location: "Market A" });
+      const slotB = await createTestPickupSlot(vendor.id, { location: "Market B" });
+
+      try {
+        await page.goto(`/vendors/${vendor.slug}`);
+        await page.getByRole("button", { name: "Add" }).click();
+        // Client-side Link navigation, not page.goto("/cart") - the cart
+        // lives in an in-memory React context (CartProvider), a full page
+        // load would silently drop the item just added (same reasoning as
+        // "can add a product to the cart" above).
+        await page.getByRole("link", { name: /cart/i }).click();
+        await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+        await page.getByPlaceholder("Your name").fill("Playwright Slot Picker");
+        await page
+          .getByPlaceholder("Mobile number (for pickup texts)")
+          .fill("+15005550093");
+
+        const checkoutButton = page.getByRole("button", { name: /checkout/i });
+        await expect(checkoutButton).toBeDisabled();
+
+        await page.getByRole("radio", { name: new RegExp(slotA.location!) }).check();
+        await expect(checkoutButton).toBeEnabled();
+      } finally {
+        await deleteProduct(product.id);
+        await deletePickupSlotByLocation(vendor.id, "Market A");
+        await deletePickupSlotByLocation(vendor.id, "Market B");
+        await deleteVendorBySlug(vendor.slug);
+      }
+    },
+  );
+
+  test(
+    "[P1] zero upcoming slots: shows 'no pickup times available' and Checkout never enables",
+    async ({ page }) => {
+      const vendor = await createTestVendor();
+      const product = await createTestProduct(vendor.id);
+
+      try {
+        await page.goto(`/vendors/${vendor.slug}`);
+        await page.getByRole("button", { name: "Add" }).click();
+        await page.getByRole("link", { name: /cart/i }).click();
+        await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+        await page.getByPlaceholder("Your name").fill("Playwright No Slots");
+        await page
+          .getByPlaceholder("Mobile number (for pickup texts)")
+          .fill("+15005550092");
+
+        await expect(page.getByText(/no pickup times available/i)).toBeVisible();
+        await expect(page.getByRole("button", { name: /checkout/i })).toBeDisabled();
+      } finally {
+        await deleteProduct(product.id);
+        await deleteVendorBySlug(vendor.slug);
       }
     },
   );

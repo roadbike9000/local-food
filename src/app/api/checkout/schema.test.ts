@@ -3,6 +3,7 @@ import { CheckoutSchema } from "./schema";
 
 const validBody = {
   vendorId: "vendor_1",
+  pickupSlotId: "slot_1",
   customerName: "Jane Doe",
   customerPhone: "+15005550006",
   items: [{ productId: "prod_1", quantity: 2 }],
@@ -40,5 +41,12 @@ describe("CheckoutSchema", () => {
   it("rejects a missing vendorId", () => {
     const { vendorId: _vendorId, ...withoutVendorId } = validBody;
     expect(CheckoutSchema.safeParse(withoutVendorId).success).toBe(false);
+  });
+
+  // Story 5.1, AC #1: no order can be created without a pickupSlotId. Mirrors
+  // the "rejects a missing vendorId" pattern above.
+  it("rejects a missing pickupSlotId", () => {
+    const { pickupSlotId: _pickupSlotId, ...withoutSlot } = validBody;
+    expect(CheckoutSchema.safeParse(withoutSlot).success).toBe(false);
   });
 });
