@@ -11,4 +11,10 @@ export const CreateSlotSchema = z
   })
   .refine((d) => new Date(d.endsAt) > new Date(d.startsAt), {
     message: "endsAt must be after startsAt",
+  })
+  // FR16: a slot can't be created already in the past. Server time (new
+  // Date() here, evaluated in the route handler) is authoritative, not
+  // the vendor's device clock/timezone (NFR2).
+  .refine((d) => new Date(d.startsAt) > new Date(), {
+    message: "startsAt must not be in the past",
   });

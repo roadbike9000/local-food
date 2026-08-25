@@ -42,6 +42,11 @@ export function AddSlotForm() {
       setSubmitting(false);
       return;
     }
+    if (startsAt <= new Date()) {
+      setError("Start time must not be in the past.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/pickup-slots", {

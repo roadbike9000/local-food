@@ -157,7 +157,7 @@ Creates a pickup slot for the signed-in vendor.
 **Request body** (`CreateSlotSchema`):
 ```ts
 {
-  startsAt: string,   // ISO datetime
+  startsAt: string,   // ISO datetime, refined: must be after the current server time (Story 5.2, FR16)
   endsAt: string,      // ISO datetime, refined: must be after startsAt
   capacity?: number,   // positive int, default 20
   location?: string,
