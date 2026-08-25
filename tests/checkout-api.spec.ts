@@ -35,6 +35,7 @@ test.describe("checkout API", () => {
     const response = await request.post("/api/checkout", {
       data: {
         vendorId: vendor.id,
+        pickupSlotId: vendor.pickupSlots[0].id,
         customerName: "Playwright Total Check",
         customerPhone,
         items: [{ productId: product.id, quantity }],
@@ -81,6 +82,7 @@ test.describe("checkout API", () => {
         const response = await request.post("/api/checkout", {
           data: {
             vendorId: vendor.id,
+            pickupSlotId: vendor.pickupSlots[0].id,
             customerName: "Playwright Stock Write Check",
             customerPhone: "+15005550097",
             items: [{ productId: product.id, quantity: 3 }],
@@ -121,6 +123,7 @@ test.describe("checkout API", () => {
         const response = await request.post("/api/checkout", {
           data: {
             vendorId: vendor.id,
+            pickupSlotId: vendor.pickupSlots[0].id,
             customerName: "Playwright Availability Check",
             customerPhone: "+15005550099",
             items: [{ productId: outOfStock.id, quantity: 1 }],
@@ -159,6 +162,7 @@ test.describe("checkout API", () => {
         const response = await request.post("/api/checkout", {
           data: {
             vendorId: vendor.id,
+            pickupSlotId: vendor.pickupSlots[0].id,
             customerName: "Playwright Sufficiency Check",
             customerPhone: "+15005550098",
             items: [{ productId: lowStock.id, quantity: 2 }],
@@ -187,6 +191,10 @@ test.describe("checkout API", () => {
         const response = await request.post("/api/checkout", {
           data: {
             vendorId: vendor.id,
+            // Vendor-active check runs before the pickup-slot check, so this
+            // never reaches slot validation — any non-empty string satisfies
+            // Zod. createTestVendor() creates no pickup slots by default.
+            pickupSlotId: "placeholder",
             customerName: "Playwright Deactivated Vendor Check",
             customerPhone: "+15005550096",
             items: [{ productId: product.id, quantity: 1 }],

@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const { vendorId, customerName, customerPhone, items } = parsed.data;
+  const { vendorId, pickupSlotId, customerName, customerPhone, items } = parsed.data;
 
   // Vendor-active check first (Story 2.3, AD-4) - fail fast before
   // bothering to query products for a bad/deactivated vendor. This route
@@ -43,6 +43,22 @@ export async function POST(req: Request) {
       );
     }
     throw err;
+  }
+
+  // Selected pickup slot must belong to this vendor and still exist (AC #2,
+  // NFR2) - checked before the product/stock work so a bad slot fails fast,
+  // same reasoning as the vendor-active check above. "Still exists" means
+  // the row exists and belongs to this vendor, not that it hasn't started
+  // yet - PickupSlot has no soft-delete and this story doesn't add a
+  // startsAt re-check at checkout time (see story Dev Notes).
+  const pickupSlot = await prisma.pickupSlot.findFirst({
+    where: { id: pickupSlotId, vendorId },
+  });
+  if (!pickupSlot) {
+    return NextResponse.json(
+      { error: "Selected pickup time is no longer available" },
+      { status: 400 },
+    );
   }
 
   // A cart can list the same product across multiple lines; aggregate the
@@ -105,6 +121,7 @@ export async function POST(req: Request) {
   const order = await prisma.order.create({
     data: {
       vendorId,
+      pickupSlotId,
       customerName,
       customerPhone,
       totalCents,
