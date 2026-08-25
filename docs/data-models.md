@@ -88,7 +88,7 @@ One customer purchase.
 |---|---|---|
 | id | String (cuid) | PK |
 | vendorId | String | FK → Vendor, `onDelete: Restrict` (Story 2.3 — was `Cascade`, same reasoning as `Product.vendorId`: order history must survive even an accidental hard-delete), indexed |
-| pickupSlotId | String? | FK → PickupSlot, optional |
+| pickupSlotId | String? | FK → PickupSlot. Nullable at the DB level (no migration to backfill pre-Story-5.1 orders), but `POST /api/checkout` has required and set it on every order created since Story 5.1 — no longer always-null in practice, just for any order placed before that story shipped |
 | customerName | String | |
 | customerPhone | String | used as the Twilio SMS destination |
 | status | OrderStatus | default `PENDING`, indexed |

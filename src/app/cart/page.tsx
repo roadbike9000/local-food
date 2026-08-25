@@ -1,8 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCart } from "@/components/CartProvider";
-import { formatPrice } from "@/lib/utils";
+import { formatPickupWindow, formatPrice } from "@/lib/utils";
+
+// Local shape, not a Prisma model type - keeps this "use client" file from
+// needing to reason about the full Prisma PickupSlot (startsAt/endsAt come
+// back as ISO strings over fetch(), not Date objects, so a Prisma-typed
+// field would be misleading anyway). Mirrors CartProvider's own CartItem
+// pattern of a hand-defined client-side shape.
+type PickupSlotOption = {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  location: string | null;
+};
 
 // The cart + checkout page. Collects customer contact info, then calls our
 // /api/checkout route which creates a Stripe Checkout session and redirects.
@@ -12,9 +24,59 @@ export default function CartPage() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slots, setSlots] = useState<PickupSlotOption[]>([]);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  // Distinguishes "haven't fetched yet" from "fetched, genuinely zero slots"
+  // (review finding) - without this, the zero-slot message paints on every
+  // mount before the fetch resolves, even for vendors that do have slots.
+  const [slotsLoaded, setSlotsLoaded] = useState(false);
+  const [slotsError, setSlotsError] = useState(false);
+
+  // Slot selection is checkout-flow-local state (Story 5.1 Dev Notes) - kept
+  // here, not in CartContext, since it doesn't need to survive navigation
+  // the way cart contents do.
+  useEffect(() => {
+    setSlots([]);
+    setSelectedSlotId(null);
+    setSlotsLoaded(false);
+    setSlotsError(false);
+    if (!vendorId) return;
+
+    let cancelled = false;
+    fetch(`/api/vendors/${vendorId}/pickup-slots`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load pickup times");
+        return res.json();
+      })
+      .then((data: { slots: PickupSlotOption[] }) => {
+        if (cancelled) return;
+        setSlots(data.slots);
+        setSlotsLoaded(true);
+        // AC #5: auto-select when there's exactly one upcoming slot - no
+        // pointless click to "choose" the only option.
+        if (data.slots.length === 1) setSelectedSlotId(data.slots[0].id);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSlotsError(true);
+        setSlotsLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vendorId]);
 
   async function handleCheckout() {
     setError(null);
+    // Defense-in-depth (review finding) - the Checkout button's disabled
+    // state is the primary guard, but selectedSlotId is string | null, so
+    // this keeps a bypassed/future call site from ever reaching the network
+    // with a null slot and getting back a generic "Invalid request".
+    if (!selectedSlotId) {
+      setError("Select a pickup time to continue.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/checkout", {
@@ -22,6 +84,7 @@ export default function CartPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           vendorId,
+          pickupSlotId: selectedSlotId,
           customerName: name,
           customerPhone: phone,
           items: items.map((i) => ({
@@ -132,10 +195,57 @@ export default function CartPage() {
           onChange={(e) => setPhone(e.target.value)}
           className="w-full rounded-md border border-stone-300 px-3 py-2"
         />
+
+        {!slotsLoaded && (
+          <p className="text-sm text-stone-600">Loading pickup times…</p>
+        )}
+
+        {slotsLoaded && slotsError && (
+          <p className="text-sm text-red-600">
+            Could not load pickup times. Try refreshing the page.
+          </p>
+        )}
+
+        {slotsLoaded && !slotsError && slots.length === 0 && (
+          <p className="text-sm text-stone-600">No pickup times available.</p>
+        )}
+
+        {slotsLoaded && !slotsError && slots.length === 1 && (
+          <p className="text-sm text-stone-700">
+            <span className="font-medium">Pickup: </span>
+            {formatPickupWindow(new Date(slots[0].startsAt), new Date(slots[0].endsAt))}
+            {slots[0].location ? ` · ${slots[0].location}` : ""}
+          </p>
+        )}
+
+        {slotsLoaded && !slotsError && slots.length >= 2 && (
+          <fieldset className="space-y-1">
+            <legend className="text-sm font-medium text-stone-700">
+              Pickup time
+            </legend>
+            {slots.map((slot) => (
+              <label
+                key={slot.id}
+                className="flex items-center gap-2 text-sm text-stone-700"
+              >
+                <input
+                  type="radio"
+                  name="pickupSlot"
+                  value={slot.id}
+                  checked={selectedSlotId === slot.id}
+                  onChange={() => setSelectedSlotId(slot.id)}
+                />
+                {formatPickupWindow(new Date(slot.startsAt), new Date(slot.endsAt))}
+                {slot.location ? ` · ${slot.location}` : ""}
+              </label>
+            ))}
+          </fieldset>
+        )}
+
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           onClick={handleCheckout}
-          disabled={loading || !name || !phone}
+          disabled={loading || !name || !phone || !selectedSlotId}
           className="w-full rounded-md bg-brand px-4 py-2.5 font-medium text-white hover:bg-brand-dark disabled:opacity-50"
         >
           {loading ? "Redirecting…" : "Checkout"}

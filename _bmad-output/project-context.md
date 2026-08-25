@@ -99,6 +99,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 Real gaps found in this codebase after the fact, not caught by any story's own review — logged here so a future search finds them before rediscovering them:
 
 - Epic 2 retro tech debt (fixed 2026-08-22): `getCurrentVendor()` resolves by `clerkUserId` alone with no `deletedAt` filter, so a deactivated vendor's own dashboard could still `POST /api/products` and `POST /api/pickup-slots`. Fixed with the same `assertVendorActive()`/`VendorDeactivatedError` guard checkout and the storefront already use. **No e2e test proves this end-to-end** — doing so would require a signed-in session for a *deactivated* vendor, and this codebase's only vendor Clerk identity is the seeded, always-active Corner Sourdough fixture (test convention explicitly forbids deactivating it, since concurrent tests under `fullyParallel` depend on it staying orderable). Same class of gap as the admin e2e credential gap — a dedicated throwaway vendor Clerk identity would resolve it, external/Jeff-owned, not attempted here.
+- Story 5.1 discovery (2026-08-25, not a code bug — a dev-environment data-staleness trap): `prisma/seed.ts` computes each seeded vendor's one `PickupSlot` as "tomorrow relative to whenever `npm run db:seed` last ran," not relative to the current date. A dev DB seeded on one day and left untouched drifts past that slot's `startsAt`, so `GET /api/vendors/[vendorId]/pickup-slots` (Story 5.1) — and the storefront's pre-existing "Next pickup" banner, which had the same latent exposure since Epic 1 but only as a passive display, never a functional gate — both correctly stop returning it as "upcoming." Surfaced during this story's own manual verification: `corner-sourdough`'s slot had drifted 1 day stale, `GET /api/vendors/[vendorId]/pickup-slots` correctly returned `{ slots: [] }`, and `payment.spec.ts`/`sms.spec.ts` would have started failing (Checkout stuck disabled — AC #5's auto-select never fires with zero slots) had the suite run against the stale DB. Fixed for this session by re-seeding (`npm run db:seed`); no code change made or warranted — the route's `startsAt: { gte: new Date() }` filter is doing exactly what Task 1 asked. Flagging because Story 5.1 is the first story where this drift can break a real user flow (checkout), not just a cosmetic banner — worth a `npm run db:seed` reminder in onboarding/CI-setup docs if this trips someone else up, not attempted here.
 
 ---
 
@@ -118,4 +119,4 @@ Real gaps found in this codebase after the fact, not caught by any story's own r
 - Review quarterly for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-08-22
+Last Updated: 2026-08-25

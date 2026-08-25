@@ -5,6 +5,7 @@ import { z } from "zod";
 // fixed set of named exports (HTTP verbs, config, etc.) from a route file.
 export const CheckoutSchema = z.object({
   vendorId: z.string().min(1),
+  pickupSlotId: z.string().min(1),
   customerName: z.string().min(1),
   customerPhone: z.string().min(5),
   items: z

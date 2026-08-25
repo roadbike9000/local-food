@@ -74,7 +74,7 @@ development_status:
   epic-4-retrospective: done
 
   epic-5: in-progress
-  5-1-customer-selects-a-pickup-slot-at-checkout: ready-for-dev
+  5-1-customer-selects-a-pickup-slot-at-checkout: done
   5-2-pickup-slot-creation-rejects-a-past-start-time: backlog
 
 action_items:

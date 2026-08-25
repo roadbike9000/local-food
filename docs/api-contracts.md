@@ -6,7 +6,7 @@ All routes live under `src/app/api/` (Next.js App Router route handlers). None u
 
 - **Vendor-scoped routes** (`products`, `pickup-slots`) call `getCurrentVendor()` (`src/lib/vendor.ts`), which reads the Clerk session and looks up the `Vendor` row by `clerkUserId`. No vendor row → `401 Unauthorized`. There is no separate authorization check beyond "does a Vendor row exist for this Clerk user" — a signed-in vendor can only ever see/write their own data because every query filters `where: { vendorId: vendor.id }`.
 - **Admin-scoped routes/pages** (`/admin/*`, Story 2.1) call `getCurrentAdmin()` (`src/lib/admin.ts`), which reads the Clerk session and looks up the `Admin` row by `clerkUserId` — the same shape as `getCurrentVendor()`, a distinct identity/table. `src/app/admin/page.tsx` calls `notFound()` when no admin resolves; a future mutating admin route should return `401 Unauthorized` instead, mirroring the vendor-scoped routes' pattern.
-- **Public routes** (`checkout`) take no auth — anyone can place an order against any `vendorId`, which is the intended storefront behavior.
+- **Public routes** (`checkout`, `vendors/[vendorId]/pickup-slots`) take no auth — anyone can place an order against any `vendorId`, or list a vendor's upcoming pickup slots, which is the intended storefront behavior. `vendors/[vendorId]/pickup-slots` (Story 5.1) is the first unauthenticated `GET` route in this codebase — every other public route is a write (`checkout`); the data it returns (slot times/locations) is already shown publicly on the storefront's "Next pickup" banner, so no new trust boundary is opened.
 - **Webhook route** (`webhooks/stripe`) authenticates the *caller* (Stripe) via HMAC signature (`stripe-signature` header + `STRIPE_WEBHOOK_SECRET`), not via Clerk.
 - `middleware.ts` additionally hard-blocks unauthenticated access to `/dashboard(.*)` and `/admin(.*)` at the edge, before any page/route code runs.
 
@@ -19,6 +19,7 @@ Creates a `PENDING` order and a Stripe Checkout session.
 ```ts
 {
   vendorId: string,       // min length 1
+  pickupSlotId: string,   // min length 1 — required (Story 5.1); no order can be created without one
   customerName: string,   // min length 1
   customerPhone: string,  // min length 5
   items: Array<{ productId: string; quantity: number /* positive int */ }>  // min 1 item
@@ -28,14 +29,30 @@ Creates a `PENDING` order and a Stripe Checkout session.
 **Behavior:**
 1. `req.json().catch(() => null)` then `safeParse` — malformed JSON or schema mismatch → `400 { error: "Invalid request" }`.
 2. **Vendor lookup and active check (Story 2.3, AD-4), before the product query.** `prisma.vendor.findUnique({ where: { id: vendorId } })` — missing → `400 { error: "One or more items are unavailable" }` (the same message a missing/wrong-vendor product also produces, kept consistent). Found → `assertVendorActive(vendor)` in a `try/catch`; a deactivated vendor (`VendorDeactivatedError`) → `400 { error: "This vendor is no longer accepting orders" }`. Fails fast, before the product query below runs at all.
-3. Quantities are aggregated per `productId` first (a cart can list the same product on multiple lines), then the distinct products are re-fetched from the DB, filtered by `vendorId`. If the count doesn't match the number of distinct requested products (one is deleted or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
-4. Stock sufficiency check: `stockQuantity >= totalRequestedQuantity` per product (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean; totaled across duplicate lines for the same product). Any short product rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created. **This check is a point-in-time read with no reservation or transaction** — it does not itself prevent two concurrent checkouts from both passing for the same last unit. Stock itself is never written here; the actual decrement happens later, in `POST /api/webhooks/stripe`, only once Stripe confirms payment (Story 1.4) — see that route's contract below.
-5. Computes `totalCents` from DB prices — the client-sent price (there is none in this schema) can never influence the charge.
-6. Creates `Order` (status `PENDING`) with nested `OrderItem` creates.
-7. Creates a Stripe Checkout session (`mode: "payment"`), `metadata: { orderId }` so the webhook can find it back, `success_url` → `/checkout/success`, `cancel_url` → `/cart`.
-8. Updates the `Order` with `stripeSessionId`.
+3. **Pickup slot lookup (Story 5.1, AC #2, NFR2), before the product query.** `prisma.pickupSlot.findFirst({ where: { id: pickupSlotId, vendorId } })` — not found (wrong vendor or since-deleted) → `400 { error: "Selected pickup time is no longer available" }`, a distinct message from the product-unavailable case below. "Still exists" means the row exists and belongs to this vendor, not that it hasn't started yet — no `startsAt` re-check at checkout time.
+4. Quantities are aggregated per `productId` first (a cart can list the same product on multiple lines), then the distinct products are re-fetched from the DB, filtered by `vendorId`. If the count doesn't match the number of distinct requested products (one is deleted or belongs to a different vendor), → `400 { error: "One or more items are unavailable" }`.
+5. Stock sufficiency check: `stockQuantity >= totalRequestedQuantity` per product (architecture AD-2 — availability is computed from `stockQuantity`, not a stored boolean; totaled across duplicate lines for the same product). Any short product rejects the whole order → `400 { error: "One or more items don't have enough stock" }`, before anything is created. **This check is a point-in-time read with no reservation or transaction** — it does not itself prevent two concurrent checkouts from both passing for the same last unit. Stock itself is never written here; the actual decrement happens later, in `POST /api/webhooks/stripe`, only once Stripe confirms payment (Story 1.4) — see that route's contract below.
+6. Computes `totalCents` from DB prices — the client-sent price (there is none in this schema) can never influence the charge.
+7. Creates `Order` (status `PENDING`, `pickupSlotId` set to the validated slot — Story 5.1, AC #3) with nested `OrderItem` creates.
+8. Creates a Stripe Checkout session (`mode: "payment"`), `metadata: { orderId }` so the webhook can find it back, `success_url` → `/checkout/success`, `cancel_url` → `/cart`.
+9. Updates the `Order` with `stripeSessionId`.
 
 **Response:** `200 { url: string }` — the Stripe-hosted checkout URL to redirect the browser to.
+
+---
+
+### `GET /api/vendors/[vendorId]/pickup-slots`
+Lists a vendor's upcoming pickup slots, soonest first (Story 5.1). Public — the first unauthenticated `GET` route in this codebase. Feeds the pickup-slot picker at checkout (`/cart`); distinct from the vendor-scoped `GET /api/pickup-slots` below, which requires a signed-in vendor session and returns all of that vendor's slots (past and future) for dashboard management.
+
+**Request body:** none.
+
+**Auth:** none.
+
+**Behavior:**
+1. `prisma.pickupSlot.findMany({ where: { vendorId: params.vendorId, startsAt: { gte: new Date() } }, orderBy: { startsAt: "asc" } })` — only upcoming slots.
+2. No vendor-existence check — an unknown `vendorId` returns the same empty-array shape as a real vendor with zero upcoming slots. `POST /api/checkout` re-validates the selected slot's vendor ownership regardless of what this route returns, so this isn't a new trust boundary.
+
+**Response:** `200 { slots: PickupSlot[] }`, even for zero slots (not a `404` — "no pickup times available" is a valid, expected state).
 
 ---
 

@@ -179,3 +179,13 @@ Source: `scenarios from Jeff/Local Food Scnearios from Jeff.rtf` (4 scenarios), 
   summary: `CartProvider`'s `updateQuantity(productId, quantity)` has no guard against non-finite (`NaN`) input on its public context API.
   evidence: `src/components/CartProvider.tsx:99-107`. Currently unreachable — the only two call sites in the codebase (`src/app/cart/page.tsx`'s two stepper buttons) both pass `i.quantity ± 1`, always an already-clamped integer. Defense-in-depth on an unreachable path.
   **RESOLVED 2026-08-21:** Added a leading `if (!Number.isFinite(delta)) return;` guard to `updateQuantity()` in `src/components/CartProvider.tsx`, same defence-in-depth shape as `decrementStock()`'s quantity guard above. Without it, a non-finite delta would propagate through `clampQuantity()`'s `Math.min`/`Math.max` into a `NaN` quantity with no guard anywhere on this public context API. No test added — unreachable via any current call site, and this component has no existing unit-test harness (only e2e, which can't drive a non-finite delta through real UI interaction). Full regression clean: typecheck, lint, 63/63 unit, 12/12 storefront-cart e2e.
+
+## Deferred from: code review of story-5-1-customer-selects-a-pickup-slot-at-checkout (2026-08-25)
+
+- source_spec: `_bmad-output/implementation-artifacts/5-1-customer-selects-a-pickup-slot-at-checkout.md`
+  summary: `PickupSlot.capacity` remains unenforced anywhere in the codebase.
+  evidence: Pre-existing gap, explicitly out of scope per this story's own Dev Notes ("that's a different story's job if it's ever wanted"). Now more consequential than before — `POST /api/checkout` binds every order to a `pickupSlotId` for the first time (Story 5.1), so a capacity-20 slot can now silently accept unlimited orders where previously no order was linked to a slot at all. Not fixed here per the story's own deliberate scope call, but the "different story" this needs now has a concrete trigger.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-1-customer-selects-a-pickup-slot-at-checkout.md`
+  summary: `Order.pickupSlot` relation has no explicit `onDelete`, defaults to Prisma's `SetNull` on this optional FK.
+  evidence: `prisma/schema.prisma` — `pickupSlot PickupSlot? @relation(fields: [pickupSlotId], references: [id])` with no `onDelete` clause. Fully latent today: no route exists anywhere in this codebase to delete a `PickupSlot`, so the silent-blank-on-delete behavior can't currently trigger, and a delete raced against `POST /api/checkout`'s `findFirst` (unhandled Prisma `P2003`) is equally unreachable. Revisit if/when a pickup-slot-deletion route is ever added — at that point deleting a slot with existing paid orders would silently blank their pickup time unless this is addressed first.

@@ -30,11 +30,14 @@ test.describe("checkout API", () => {
     // decrement lands and a prior test run has consumed it).
     const product = vendor.products.find((p) => p.stockQuantity >= quantity);
     if (!product) throw new Error("Seed data missing a product with enough stock");
+    const slot = vendor.pickupSlots[0];
+    if (!slot) throw new Error("Seed data missing corner-sourdough's pickup slot");
     const customerPhone = `+1500555${Date.now() % 10000}`.padEnd(12, "0");
 
     const response = await request.post("/api/checkout", {
       data: {
         vendorId: vendor.id,
+        pickupSlotId: slot.id,
         customerName: "Playwright Total Check",
         customerPhone,
         items: [{ productId: product.id, quantity }],
@@ -75,12 +78,15 @@ test.describe("checkout API", () => {
       // does hold (verified by code inspection at review time), this test
       // makes the claim true rather than just correcting the wording.
       const vendor = await getVendorBySlug("corner-sourdough");
+      const slot = vendor.pickupSlots[0];
+      if (!slot) throw new Error("Seed data missing corner-sourdough's pickup slot");
       const product = await createTestProduct(vendor.id, { stockQuantity: 10 });
 
       try {
         const response = await request.post("/api/checkout", {
           data: {
             vendorId: vendor.id,
+            pickupSlotId: slot.id,
             customerName: "Playwright Stock Write Check",
             customerPhone: "+15005550097",
             items: [{ productId: product.id, quantity: 3 }],
@@ -112,6 +118,8 @@ test.describe("checkout API", () => {
     "rejects a cart requesting more than the available stock (400)",
     async ({ request }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
+      const slot = vendor.pickupSlots[0];
+      if (!slot) throw new Error("Seed data missing corner-sourdough's pickup slot");
       const outOfStock = await createTestProduct(vendor.id, {
         name: "Insufficient Stock Test Product",
         stockQuantity: 0,
@@ -121,6 +129,7 @@ test.describe("checkout API", () => {
         const response = await request.post("/api/checkout", {
           data: {
             vendorId: vendor.id,
+            pickupSlotId: slot.id,
             customerName: "Playwright Availability Check",
             customerPhone: "+15005550099",
             items: [{ productId: outOfStock.id, quantity: 1 }],
@@ -150,6 +159,8 @@ test.describe("checkout API", () => {
       // also satisfy. This is the one case that actually proves the
       // per-quantity comparison (review round 2 finding).
       const vendor = await getVendorBySlug("corner-sourdough");
+      const slot = vendor.pickupSlots[0];
+      if (!slot) throw new Error("Seed data missing corner-sourdough's pickup slot");
       const lowStock = await createTestProduct(vendor.id, {
         name: "Low Stock Test Product",
         stockQuantity: 1,
@@ -159,6 +170,7 @@ test.describe("checkout API", () => {
         const response = await request.post("/api/checkout", {
           data: {
             vendorId: vendor.id,
+            pickupSlotId: slot.id,
             customerName: "Playwright Sufficiency Check",
             customerPhone: "+15005550098",
             items: [{ productId: lowStock.id, quantity: 2 }],
@@ -187,6 +199,10 @@ test.describe("checkout API", () => {
         const response = await request.post("/api/checkout", {
           data: {
             vendorId: vendor.id,
+            // Vendor-active check runs before the pickup-slot check, so this
+            // never reaches slot validation — any non-empty string satisfies
+            // Zod. createTestVendor() creates no pickup slots by default.
+            pickupSlotId: "placeholder",
             customerName: "Playwright Deactivated Vendor Check",
             customerPhone: "+15005550096",
             items: [{ productId: product.id, quantity: 1 }],
