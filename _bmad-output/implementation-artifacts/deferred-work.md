@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of 4-2-product-image-displays-on-the-storefront (2026-08-24)
+
+- source_spec: `_bmad-output/implementation-artifacts/4-2-product-image-displays-on-the-storefront.md`
+  summary: `ProductCard.tsx`'s new image-rendering logic has no fast/deterministic (unit or component-level) test coverage — all 3 new tests are Playwright e2e cases that hit a live third-party CDN (Cloudinary), including a 15-second-timeout "broken image" case. A CI failure here is currently indistinguishable between "the code broke" and "Cloudinary hiccupped" without manual triage.
+  evidence: Code review (round 1, Blind Hunter). Confirmed no component-testing framework or convention exists anywhere in this codebase — `vitest.config.mts` scopes Vitest to `src/**/*.test.ts` pure-function/schema tests only (no React Testing Library, no jsdom component-rendering setup), and Playwright's own `testDir` covers only full-browser e2e. Building a component-testing harness for one component is infrastructure work beyond this story's scope — accepted as-is; worth reconsidering if `next/image`-adjacent rendering logic keeps growing in future stories.
+  status: open — no action needed unless component-level test coverage becomes a recurring pain point across future stories.
+
 ## Deferred from: code review of 4-1-vendor-uploads-a-product-image (2026-08-24)
 
 - source_spec: `_bmad-output/implementation-artifacts/4-1-vendor-uploads-a-product-image.md`

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ProductCard } from "@/components/ProductCard";
 import { formatPickupWindow } from "@/lib/utils";
 import { assertVendorActive, VendorDeactivatedError } from "@/lib/vendor";
+import { CLOUDINARY_URL_PREFIX } from "@/app/api/products/schema";
 
 // A vendor's storefront. The [slug] folder name makes this a dynamic route:
 // /vendors/corner-sourdough -> params.slug === "corner-sourdough"
@@ -81,6 +82,16 @@ export default async function StorefrontPage({
               description: p.description,
               priceCents: p.priceCents,
               stockQuantity: p.stockQuantity,
+              // Re-validated here, not trusted from the DB as-is — imageUrl
+              // has no DB-level constraint (Zod-only, at CreateProductSchema),
+              // and next/image throws a hard render error for a host outside
+              // next.config.mjs's remotePatterns, which would crash this
+              // whole page rather than degrade one card (Story 4.2 review
+              // finding). Anything that doesn't match this app's own
+              // Cloudinary cloud is treated the same as no image.
+              imageUrl: p.imageUrl?.startsWith(CLOUDINARY_URL_PREFIX)
+                ? p.imageUrl
+                : null,
             }}
           />
         ))}
