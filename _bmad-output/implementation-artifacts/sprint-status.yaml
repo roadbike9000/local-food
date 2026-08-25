@@ -1,5 +1,5 @@
 # generated: 2026-08-17
-# last_updated: 2026-08-24 (Story 4.1 created)
+# last_updated: 2026-08-24 (Epic 4 retrospective complete)
 # project: local-food
 # project_key: NOKEY
 # tracking_system: file-system
@@ -68,9 +68,10 @@ development_status:
   3-2-low-stock-sms-alert-to-admin: done
   epic-3-retrospective: done
 
-  epic-4: in-progress
+  epic-4: done
   4-1-vendor-uploads-a-product-image: done
   4-2-product-image-displays-on-the-storefront: done
+  epic-4-retrospective: done
 
   epic-5: backlog
   5-1-customer-selects-a-pickup-slot-at-checkout: backlog
@@ -162,3 +163,19 @@ action_items:
     owner: "Jeff"
     status: done
     note: "2026-08-24: Jeff's 4 scenarios (scenarios from Jeff/Local Food Scnearios from Jeff.rtf) reviewed against actual code, expanded via bmad-review-edge-case-hunter. Drafted and Jeff-approved into epics.md: Epic 4 (Vendor Product Images, FR14) and Epic 5 (Pickup Slot & Order Integrity, FR15/FR16) - 4 new stories total. Two scenarios (vendor delete+re-add, ASCII punctuation) confirmed already handled by existing code, no new epic; one small adjacent gap (accented-name handling) and one open decision (vendor-storefront timezone concept) logged as new deferred-work.md entries, both still awaiting a separate Jeff decision but not blocking roadmap continuation. Roadmap decision made: not complete, grooming continues with Epics 4-5."
+  - epic: 4
+    action: "Provision CLOUDINARY_* secrets in CI (.github/workflows/ci.yml), or explicitly accept the gap the way the admin-credential gap was eventually named and tracked - 2 of Epic 4's e2e tests have never run in CI"
+    owner: "Jeff"
+    status: open
+  - epic: 4
+    action: "When patching a code-review finding, re-run the full regression suite (not just the touched test file) before considering the patch done - Story 4.1's regex-stack-overflow bug would have shipped past a narrower check"
+    owner: "Dev"
+    status: open
+  - epic: 4
+    action: "Before importing any constant from a route's schema.ts (or similar server-side module) into a \"use client\" component, check whether it reads process.env - a non-NEXT_PUBLIC_-prefixed value silently becomes undefined in the browser bundle with no build error"
+    owner: "Dev"
+    status: open
+  - epic: 4
+    action: "Consider whether create-story should cite doc section headings instead of raw line numbers for any file not being edited in the same commit as the story - line references have now drifted stale twice across two epics (misattribution in 3.1, wrong-field citation in 4.1)"
+    owner: "Jeff"
+    status: open
