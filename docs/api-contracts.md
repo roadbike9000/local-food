@@ -99,6 +99,27 @@ Uploads a vendor-supplied product image to Cloudinary (Story 4.1). `AddProductFo
 
 ---
 
+### `DELETE /api/products/upload-image`
+Deletes a Cloudinary asset by its `secure_url` — compensating cleanup when `POST /api/products` fails *after* `POST /api/products/upload-image` already succeeded, so the upload doesn't sit orphaned in Cloudinary storage forever (Story 4.1, review-deferred item, resolved 2026-08-26). `AddProductForm` fires this best-effort (fire-and-forget) on a failed product-creation response when an image had already been uploaded.
+
+**Request body** (`DeleteImageSchema`):
+```ts
+{
+  imageUrl: string,   // a Cloudinary secure_url, e.g. "https://res.cloudinary.com/.../local-food/abc123.jpg"
+}
+```
+
+**Auth:** vendor-scoped — same `getCurrentVendor()`/`assertVendorActive()` shape as the other routes in this file.
+
+**Behavior:**
+1. `400 { error: "Invalid request" }` if the body doesn't parse.
+2. **Safety check, not an ownership check:** this endpoint has no record of which vendor uploaded which image before a `Product` row exists to attach it to — refuses (`400 { error: "Image is in use" }`) if any `Product.imageUrl` still references the URL, so it can only ever delete a genuine orphan, never a live product's image (regardless of which vendor is asking).
+3. Calls `deleteImage(imageUrl)` (`src/lib/cloudinary.ts`), which derives the Cloudinary `public_id` from the URL itself (no separate storage needed) and calls `cloudinary.uploader.destroy()`. A Cloudinary-side failure is caught, `Sentry.captureException`'d, and swallowed — this is best-effort cleanup, not something that should block the caller's own (already-failing) request.
+
+**Response:** `200 {}` on success (including the swallowed-failure case above).
+
+---
+
 ### `POST /api/admin/vendors`
 Admin-only vendor onboarding (Story 2.2). Creates a `Vendor` unbound from any Clerk user.
 

@@ -365,4 +365,4 @@ So that customers are never offered a pickup window that's already over.
 
 *(FR16.)*
 
-**Not yet a story:** the vendor-storefront-timezone question this epic's scenario review raised (no timezone concept exists anywhere in this codebase today — see `deferred-work.md`'s open decision entry) needs a product decision from Jeff before it can be scoped as a Story 5.3. Doesn't block 5.1/5.2.
+**Not yet a story:** the vendor-storefront-timezone question this epic's scenario review raised is now decided (2026-08-26, Jeff: add `Vendor.timezone`, compute all slot/cutoff times relative to it — see `deferred-work.md`) but not yet scoped or implemented. A future Story 5.3 should cover: the `Vendor.timezone` schema migration, threading it through `AddSlotForm.tsx`'s `datetime-local` handling, and any checkout/storefront "upcoming" logic that currently assumes a single implicit timezone. Doesn't block 5.1/5.2, which already shipped.

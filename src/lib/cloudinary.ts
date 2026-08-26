@@ -21,4 +21,26 @@ export async function uploadImage(
   return result.secure_url;
 }
 
+// A Cloudinary secure_url looks like
+// https://res.cloudinary.com/<cloud>/image/upload/v<version>/<folder>/<name>.<ext>
+// — the public_id destroy() needs is "<folder>/<name>" (no version, no
+// extension). Derived from the URL rather than stored separately, since
+// uploadImage() only ever returns the URL to its callers.
+export function extractPublicId(secureUrl: string): string | null {
+  const match = secureUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z0-9]+$/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Deletes a Cloudinary asset by its secure_url. Used to clean up an
+ * orphaned upload — one that was uploaded but never got attached to a
+ * Product row (e.g. POST /api/products failed after the image upload
+ * already succeeded).
+ */
+export async function deleteImage(secureUrl: string): Promise<void> {
+  const publicId = extractPublicId(secureUrl);
+  if (!publicId) return;
+  await cloudinary.uploader.destroy(publicId);
+}
+
 export { cloudinary };
