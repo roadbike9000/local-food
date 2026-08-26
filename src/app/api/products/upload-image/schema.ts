@@ -58,3 +58,7 @@ export const UploadImageSchema = z.object({
       "Image is too large — max 3MB",
     ),
 });
+
+export const DeleteImageSchema = z.object({
+  imageUrl: z.string().url(),
+});

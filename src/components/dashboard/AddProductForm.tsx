@@ -113,6 +113,17 @@ export function AddProductForm() {
       });
 
       if (!res.ok) {
+        if (imageUrl) {
+          // Best-effort cleanup of the now-orphaned Cloudinary upload — the
+          // image succeeded but the product it was for didn't get created.
+          // Fire-and-forget: never let this secondary call affect the
+          // user-facing error below.
+          fetch("/api/products/upload-image", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageUrl }),
+          }).catch(() => {});
+        }
         if (res.status === 401) {
           setError("Your session expired. Sign in again.");
           return;
