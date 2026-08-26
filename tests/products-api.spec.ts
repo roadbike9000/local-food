@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "@playwright/test";
+import { signInAndSave } from "../playwright/support/clerk-auth";
 import { getVendorBySlug, deleteProduct, prisma, createTestProduct } from "./helpers/db";
 import { MAX_BASE64_LENGTH } from "../src/app/api/products/upload-image/schema";
 import { deleteImage, extractPublicId, cloudinary } from "../src/lib/cloudinary";
@@ -19,27 +20,73 @@ import { deleteImage, extractPublicId, cloudinary } from "../src/lib/cloudinary"
 const authFile = join(process.cwd(), "playwright/.auth/vendor.json");
 
 // Single outer serial block wrapping both authenticated describe blocks
-// below. Each block used to configure its own `mode: "serial"`
-// independently - that only serializes tests *within* a block, not
-// *between* the two blocks, so Playwright's scheduler could still start
-// each block's first test on a different worker at the same moment. Both
-// share one Clerk session (storageState), and @clerk/testing's dev-browser
-// sign-in doesn't cleanly support that (clerk/javascript#7891, the same
-// issue dashboard.spec.ts's own single-block serial mode works around) -
-// reproduced live in CI (2 workers): "PATCH .../[id]" and "POST
-// .../upload-image" each 401'd on their first request, consistently,
-// because both blocks' first tests started in the same instant on
-// different workers. Nesting under one outer serial block forces every
-// test in this file - across both inner blocks - to run one at a time.
+// below - merges what used to be two independently-serial blocks sharing
+// one Clerk session, so every test in this file runs one at a time. Real
+// root cause, and full diagnosis history, below.
+//
+// Clerk's session token (the __session JWT, minted by global-setup.ts once
+// before the whole suite runs) has a 60-second TTL. This file makes only
+// raw request.*() calls - no page navigation - and Playwright's `request`
+// fixture reads a *static* snapshot of playwright/.auth/vendor.json at
+// context-creation time; it does not share live cookie state with a `page`
+// fixture, so a page.goto("/") + clerk.loaded() warm-up (tried, confirmed
+// ineffective) can't refresh it. Once 60s of suite wall-clock time pass
+// since global-setup ran - trivial once this file (12th of 15
+// alphabetically) is reached in a full run - every request here 401s,
+// permanently. dashboard.spec.ts never hits this because it drives
+// everything through `page` (real navigation), the one context Clerk's
+// client-side SDK actually keeps fresh.
+//
+// Fix: re-mint the session file whenever it's more than SESSION_MAX_AGE_MS
+// old, checked before every test - not just once at global-setup, and not
+// just once at this block's start either (this block's own serial runtime,
+// with real Cloudinary round-trips in a few tests, can itself exceed the
+// 60s TTL by its last few tests). Re-minting mid-run originally failed with
+// "Clerk: Failed to sign in: You're already signed in" - clerk-auth.ts's
+// signInAndSave() now signs out first (harmless no-op if nothing to sign
+// out of, e.g. global-setup's very first mint) before signing back in,
+// which resolved it.
+//
+// The single-serial-block merge above is still worth keeping (removes
+// ordering ambiguity between the two inner blocks) but does not by itself
+// fix session expiry - a cross-worker concurrent-sign-in race
+// (clerk/javascript#7891) was the original, wrong, suspected cause;
+// reproducing the identical failure at a literal --workers=1 (zero
+// concurrency possible) ruled that out.
+const SESSION_MAX_AGE_MS = 45_000; // 15s margin under Clerk's 60s TTL
+
 test.describe("authenticated product API (Story 1.2, Story 4.1)", () => {
   test.use({ storageState: existsSync(authFile) ? authFile : undefined });
   test.describe.configure({ mode: "serial" });
+
+  let lastMintedAt = 0;
+
+  async function ensureFreshSession(): Promise<void> {
+    if (Date.now() - lastMintedAt < SESSION_MAX_AGE_MS) return;
+    if (!process.env.CLERK_SECRET_KEY || !process.env.E2E_VENDOR_EMAIL) return;
+    try {
+      await signInAndSave(
+        process.env.BASE_URL ?? "http://localhost:3000",
+        process.env.E2E_VENDOR_EMAIL,
+        authFile,
+      );
+      lastMintedAt = Date.now();
+    } catch (err) {
+      // Mirrors global-setup.ts's own error-swallowing: a transient sign-in
+      // failure here must not hard-fail the file - the per-test
+      // test.skip(!existsSync(authFile), ...) guard below already handles
+      // "no session available" gracefully, and falling back to whatever
+      // session is already on disk is strictly no worse than not trying.
+      console.warn("[products-api.spec.ts] session re-mint failed:", err);
+    }
+  }
 
   test.beforeEach(async () => {
     test.skip(
       !existsSync(authFile),
       "No vendor session — E2E_VENDOR_EMAIL/CLERK_SECRET_KEY not configured",
     );
+    await ensureFreshSession();
   });
 
   test.describe("PATCH /api/products/[id] (ATDD, Story 1.2)", () => {

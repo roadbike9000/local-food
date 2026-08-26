@@ -21,29 +21,17 @@
  * `test.skip(!existsSync(authFile), ...)` guards in the relevant spec files
  * already handle a missing file gracefully. Nothing runs at all if
  * CLERK_SECRET_KEY itself is unset, since both identities need it.
+ *
+ * The actual sign-in mechanics live in ./clerk-auth.ts's signInAndSave(),
+ * shared with tests/products-api.spec.ts, which re-mints the vendor session
+ * on its own schedule - see that file's own comment for why a single mint
+ * here isn't enough for it (Clerk's session token has a 60s TTL, and this
+ * file's own tests can outlast that for a suite reaching them late).
  */
-import { chromium, type FullConfig } from "@playwright/test";
-import { clerkSetup, clerk } from "@clerk/testing/playwright";
-import { mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-
-async function signInAndSave(
-  baseURL: string,
-  email: string,
-  outPath: string,
-): Promise<void> {
-  const browser = await chromium.launch();
-  try {
-    const page = await browser.newPage();
-    await page.goto(baseURL);
-    await clerk.signIn({ page, emailAddress: email });
-
-    mkdirSync(dirname(outPath), { recursive: true });
-    await page.context().storageState({ path: outPath });
-  } finally {
-    await browser.close();
-  }
-}
+import { type FullConfig } from "@playwright/test";
+import { clerkSetup } from "@clerk/testing/playwright";
+import { join } from "node:path";
+import { signInAndSave } from "./clerk-auth";
 
 export default async function globalSetup(config: FullConfig) {
   const secretKey = process.env.CLERK_SECRET_KEY;
