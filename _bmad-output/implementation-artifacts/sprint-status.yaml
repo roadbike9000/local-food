@@ -166,7 +166,8 @@ action_items:
   - epic: 4
     action: "Provision CLOUDINARY_* secrets in CI (.github/workflows/ci.yml), or explicitly accept the gap the way the admin-credential gap was eventually named and tracked - 2 of Epic 4's e2e tests have never run in CI"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-26: CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET added as GitHub Actions repo secrets and wired into ci.yml's e2e step, same pattern as the other provider secrets. The two previously-always-skipped Cloudinary tests (products-api.spec.ts's real-upload test and the DELETE genuine-orphan test) now run for real in CI."
   - epic: 4
     action: "When patching a code-review finding, re-run the full regression suite (not just the touched test file) before considering the patch done - Story 4.1's regex-stack-overflow bug would have shipped past a narrower check"
     owner: "Dev"
