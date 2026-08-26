@@ -46,6 +46,14 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          # Story 4.1. Without these, the two live-Cloudinary e2e tests
+          # (products-api.spec.ts's real-upload test, and the DELETE
+          # genuine-orphan test) skip themselves rather than fail - so CI
+          # stayed green either way, but only exercises the real upload/
+          # delete path against Cloudinary once these are configured.
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
           # Test-only vendor identity for playwright/support/global-setup.ts's
           # Backend-API sign-in. Without these, authenticated dashboard/
           # products-api tests skip themselves (existsSync(authFile) guard)
