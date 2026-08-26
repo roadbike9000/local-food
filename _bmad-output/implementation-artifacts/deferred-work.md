@@ -1,5 +1,37 @@
 # Deferred Work
 
+## Deferred from: code review of story-5-2-pickup-slot-creation-rejects-a-past-start-time (2026-08-25)
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: The new `startsAt`-past refine's failure message is unreachable — `route.ts:47` collapses every `safeParse` failure (including cases where multiple refines fire simultaneously on a malformed date) to a generic `400 { error: "Invalid request" }`.
+  evidence: Pre-existing pattern already true of the original `endsAt > startsAt` refine before this story; this diff follows established precedent (the story's own Task 1 explicitly reasoned about and accepted this) rather than introducing the gap.
+  status: open — no action needed unless per-field error messaging becomes a real product requirement for this route.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: `AddSlotForm.tsx`'s `datetime-local` inputs have no native `min` attribute, so the date picker itself still offers past times before any JS validation runs.
+  evidence: Not required by either AC; the sibling `endsAt <= startsAt` guard is also JS-based (not native), so this matches this form's existing convention. A nice-to-have, not a defect.
+  **RESOLVED 2026-08-25:** Added `min={toDatetimeLocalValue(new Date())}` to the `startsAt` input in `AddSlotForm.tsx`, using a new local-wall-clock formatter (not `toISOString()`, which would introduce the UTC/local mismatch fixed below). `endsAt` was left without a `min` — syncing it to the live `startsAt` value would need controlled-input state this uncontrolled form doesn't have, and the existing JS `endsAt <= startsAt` guard already covers that case. Full regression clean: typecheck, lint, 92/92 unit, 22/22 dashboard e2e, build succeeds.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: No grace window exists between "now" evaluated client-side and "now" re-evaluated server-side a request-round-trip later — a `startsAt` a few hundred milliseconds out at submit time could tip past the boundary by the time the server parses it.
+  evidence: Inherent to any hard "reject already-past" boundary check and consistent with the spec's explicit strict-`>` choice (Dev Notes: "a slot starting at literally the current instant is rejected, consistent with treating 'now' as already past"). Not a defect introduced by this story.
+  status: open — would need a product decision (a small server-side tolerance window) if this ever causes real vendor-facing false rejections.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: `CreateSlotSchema` is no longer a pure function — its result now depends on wall-clock time at call time, not just its input.
+  evidence: Fine for its only current caller (the create route). A future reuse of this exact schema (e.g. an edit-slot endpoint, or re-validating an already-stored row) would incorrectly reject any slot that has since started, since nothing marks this schema as create-only.
+  **RESOLVED 2026-08-25:** Added a doc comment directly above `CreateSlotSchema`'s declaration stating it's create-only and why (the past-`startsAt` refine depends on wall-clock time at call time) — no code behavior change, just marks the trap for whichever future story reuses this schema.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: `z.string().datetime()` (Zod v3 default) rejects non-`Z` ISO offsets (e.g. `+00:00`), and `docs/api-contracts.md`'s `startsAt`/`endsAt` comments say only "ISO datetime" with no note of the UTC-only constraint.
+  evidence: Pre-existing gap — the field's type/validator is unchanged by this story, and the app itself is unaffected since `AddSlotForm.tsx` always sends `.toISOString()` (always `Z`-suffixed). Only a direct API caller sending a valid offset-form ISO 8601 timestamp would hit this, with an unexplained generic `400`.
+  **RESOLVED 2026-08-25:** Added `{ offset: true }` to both `startsAt`/`endsAt`'s `z.string().datetime()` validators in `CreateSlotSchema`, so any spec-valid ISO 8601 UTC offset is now accepted, not just `"Z"`. `docs/api-contracts.md` updated to say so explicitly. Full regression clean.
+
+- source_spec: `_bmad-output/implementation-artifacts/5-2-pickup-slot-creation-rejects-a-past-start-time.md`
+  summary: `tests/dashboard.spec.ts`'s `toLocal()` test helper (`d.toISOString().slice(0, 16)`) feeds a UTC wall-clock string into a `datetime-local` input, which the browser interprets as local time — a UTC/local-time mismatch baked into the fixture.
+  evidence: Pre-existing pattern from before this story (already used by `"vendor can add a new pickup slot"`, untouched by this diff). The 24h fixture buffer absorbs any offset within roughly ±14h, so it hasn't caused a visible failure.
+  **RESOLVED 2026-08-25:** Both `toLocal()` definitions in `tests/dashboard.spec.ts` (the "vendor can add a new pickup slot" and "add-slot form shows a validation error..." tests) now build the `datetime-local` string from local `Date` components (`getFullYear`/`getMonth`/`getDate`/`getHours`/`getMinutes`), matching `AddSlotForm.tsx`'s own new `toDatetimeLocalValue()` helper — no longer timezone-dependent on the ±14h buffer. Verified: 22/22 `tests/dashboard.spec.ts` still pass.
+
 ## Deferred from: code review of 4-2-product-image-displays-on-the-storefront (2026-08-24)
 
 - source_spec: `_bmad-output/implementation-artifacts/4-2-product-image-displays-on-the-storefront.md`

@@ -124,17 +124,25 @@ test.describe("vendor dashboard (authenticated)", () => {
       const startsAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const endsAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-      await page.goto("/dashboard"); // warm-up, page.request shares this context's cookies
-      const response = await page.request.post("/api/pickup-slots", {
-        data: { startsAt, endsAt, location },
-      });
+      try {
+        await page.goto("/dashboard"); // warm-up, page.request shares this context's cookies
+        const response = await page.request.post("/api/pickup-slots", {
+          data: { startsAt, endsAt, location },
+        });
 
-      expect(response.status()).toBe(400);
+        expect(response.status()).toBe(400);
 
-      const created = await prisma.pickupSlot.findFirst({
-        where: { vendorId: vendor.id, location },
-      });
-      expect(created).toBeNull();
+        const created = await prisma.pickupSlot.findFirst({
+          where: { vendorId: vendor.id, location },
+        });
+        expect(created).toBeNull();
+      } finally {
+        // No row is expected, but clean up defensively in case a regression
+        // creates one — same pattern as the sibling "vendor can add a new
+        // pickup slot" test, so a failure here doesn't leak a stray row into
+        // this serial-mode describe block.
+        await deletePickupSlotByLocation(vendor.id, location);
+      }
     },
   );
 
@@ -298,7 +306,13 @@ test.describe("vendor dashboard (authenticated)", () => {
 
       const starts = new Date(Date.now() + 24 * 60 * 60 * 1000);
       const ends = new Date(starts.getTime() + 60 * 60 * 1000);
-      const toLocal = (d: Date) => d.toISOString().slice(0, 16);
+      // Local wall-clock components, not toISOString() (which is UTC and
+    // would silently shift in any non-UTC timezone) — matches
+    // AddSlotForm.tsx's own toDatetimeLocalValue().
+    const toLocal = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
       await page.locator("#startsAt").fill(toLocal(starts));
       await page.locator("#endsAt").fill(toLocal(ends));
@@ -329,7 +343,13 @@ test.describe("vendor dashboard (authenticated)", () => {
     // blocks before the JS handler ever runs).
     const starts = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const ends = new Date(starts.getTime() - 60 * 60 * 1000); // 1h before starts
-    const toLocal = (d: Date) => d.toISOString().slice(0, 16);
+    // Local wall-clock components, not toISOString() (which is UTC and
+    // would silently shift in any non-UTC timezone) — matches
+    // AddSlotForm.tsx's own toDatetimeLocalValue().
+    const toLocal = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
     await page.locator("#startsAt").fill(toLocal(starts));
     await page.locator("#endsAt").fill(toLocal(ends));

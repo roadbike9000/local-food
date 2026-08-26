@@ -4,7 +4,7 @@ baseline_commit: 4369bd7408188fc423e5f254a0ec53a7fc2399d7
 
 # Story 5.2: Pickup slot creation rejects a start time already in the past
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -23,23 +23,42 @@ so that customers are never offered a pickup window that's already over.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Reject a past `startsAt` at the schema layer (AC #1, #2)
-  - [ ] `src/app/api/pickup-slots/schema.ts` — add a second `.refine()` to `CreateSlotSchema`: `new Date(d.startsAt) > new Date()`, message `"startsAt must not be in the past"`. Zod allows chaining multiple `.refine()` calls on the same schema (confirmed: `ZodEffects` exposes its own `.refine()`) — this is additive, it does **not** replace or restructure the existing `endsAt > startsAt` refine, which stays exactly as-is.
-  - [ ] Strict `>`, not `>=` — matches the existing `endsAt > startsAt` refine's own strict-inequality convention (a slot starting at literally the current instant is rejected, consistent with treating "now" as already past).
-  - [ ] No `route.ts` change needed for AC #1's "rejected with a `400`" — confirmed by reading `src/app/api/pickup-slots/route.ts` in full: `CreateSlotSchema.safeParse(...)` failing *for any reason* (including the existing `endsAt > startsAt` refine today) already returns the generic `400 { error: "Invalid request" }`. The new past-`startsAt` refine gets identical treatment automatically — this is the established precedent for this route, not a gap to close.
+- [x] Task 1: Reject a past `startsAt` at the schema layer (AC #1, #2)
+  - [x] `src/app/api/pickup-slots/schema.ts` — add a second `.refine()` to `CreateSlotSchema`: `new Date(d.startsAt) > new Date()`, message `"startsAt must not be in the past"`. Zod allows chaining multiple `.refine()` calls on the same schema (confirmed: `ZodEffects` exposes its own `.refine()`) — this is additive, it does **not** replace or restructure the existing `endsAt > startsAt` refine, which stays exactly as-is.
+  - [x] Strict `>`, not `>=` — matches the existing `endsAt > startsAt` refine's own strict-inequality convention (a slot starting at literally the current instant is rejected, consistent with treating "now" as already past).
+  - [x] No `route.ts` change needed for AC #1's "rejected with a `400`" — confirmed by reading `src/app/api/pickup-slots/route.ts` in full: `CreateSlotSchema.safeParse(...)` failing *for any reason* (including the existing `endsAt > startsAt` refine today) already returns the generic `400 { error: "Invalid request" }`. The new past-`startsAt` refine gets identical treatment automatically — this is the established precedent for this route, not a gap to close.
 
-- [ ] Task 2: Fix `schema.test.ts`'s hardcoded literal dates — **read this in full before starting, this is the task most likely to be under-scoped**
-  - [ ] `src/app/api/checkout/schema.test.ts` was a false lead — the file that actually needs fixing is `src/app/api/pickup-slots/schema.test.ts`. Its `validBody` hardcodes `startsAt: "2026-08-10T17:00:00.000Z"` / `endsAt: "2026-08-10T19:00:00.000Z"` — both now **in the past** relative to today. The moment Task 1 lands, the file's two "accepts..." tests (`"accepts a valid body and defaults capacity to 20"`, `"accepts an explicit capacity and location"`) start failing at the new past-`startsAt` refine, even though neither test is about that refine at all. This is the exact same hardcoded-past-literal decay class of bug Story 5.1 hit in `prisma/seed.ts`'s dev-DB drift (see `project-context.md`'s Actual State Log) — same root cause, different file.
-  - [ ] Fix: replace `validBody`'s hardcoded literals with dates computed relative to `Date.now()` (e.g. `startsAt` = now + 24h, `endsAt` = `startsAt` + 2h) — same pattern `tests/dashboard.spec.ts`'s two pickup-slot e2e tests already use (`new Date(Date.now() + 24 * 60 * 60 * 1000)`), confirmed by reading that file: those two e2e tests are **already relative-dated and need no change**, only this Vitest file has the hardcoded-literal problem.
-  - [ ] The file's other two tests that build their own literal dates inline (`"rejects endsAt before startsAt"`, `"rejects endsAt equal to startsAt"`) also use now-past literals — these still correctly return `success: false` either way (now failing for an *additional*, unintended reason alongside the one they're meant to test), so they won't break, but fix their literals to relative-future dates too while touching this file, so each test isolates exactly the one condition its name claims.
+- [x] Task 2: Fix `schema.test.ts`'s hardcoded literal dates — **read this in full before starting, this is the task most likely to be under-scoped**
+  - [x] `src/app/api/checkout/schema.test.ts` was a false lead — the file that actually needs fixing is `src/app/api/pickup-slots/schema.test.ts`. Its `validBody` hardcodes `startsAt: "2026-08-10T17:00:00.000Z"` / `endsAt: "2026-08-10T19:00:00.000Z"` — both now **in the past** relative to today. The moment Task 1 lands, the file's two "accepts..." tests (`"accepts a valid body and defaults capacity to 20"`, `"accepts an explicit capacity and location"`) start failing at the new past-`startsAt` refine, even though neither test is about that refine at all. This is the exact same hardcoded-past-literal decay class of bug Story 5.1 hit in `prisma/seed.ts`'s dev-DB drift (see `project-context.md`'s Actual State Log) — same root cause, different file.
+  - [x] Fix: replace `validBody`'s hardcoded literals with dates computed relative to `Date.now()` (e.g. `startsAt` = now + 24h, `endsAt` = `startsAt` + 2h) — same pattern `tests/dashboard.spec.ts`'s two pickup-slot e2e tests already use (`new Date(Date.now() + 24 * 60 * 60 * 1000)`), confirmed by reading that file: those two e2e tests are **already relative-dated and need no change**, only this Vitest file has the hardcoded-literal problem.
+  - [x] The file's other two tests that build their own literal dates inline (`"rejects endsAt before startsAt"`, `"rejects endsAt equal to startsAt"`) also use now-past literals — these still correctly return `success: false` either way (now failing for an *additional*, unintended reason alongside the one they're meant to test), so they won't break, but fix their literals to relative-future dates too while touching this file, so each test isolates exactly the one condition its name claims.
 
-- [ ] Task 3 (dev's discretion, not required by the AC): client-side pre-check in `AddSlotForm.tsx` mirroring its existing `endsAt <= startsAt` guard (same file, `handleSubmit`) for a friendlier inline message before the network round-trip. Not required — AC #1's "rejected... with a `400`" is fully satisfied by Task 1's schema-level fix alone, and every current e2e test already uses a relative-future `startsAt` so none would exercise this new client path either way. If added, match the existing guard's exact shape (`if (startsAt <= new Date()) { setError(...); setSubmitting(false); return; }`) and message style ("X must be Y.").
+- [x] Task 3 (dev's discretion, not required by the AC): client-side pre-check in `AddSlotForm.tsx` mirroring its existing `endsAt <= startsAt` guard (same file, `handleSubmit`) for a friendlier inline message before the network round-trip. Not required — AC #1's "rejected... with a `400`" is fully satisfied by Task 1's schema-level fix alone, and every current e2e test already uses a relative-future `startsAt` so none would exercise this new client path either way. If added, match the existing guard's exact shape (`if (startsAt <= new Date()) { setError(...); setSubmitting(false); return; }`) and message style ("X must be Y.").
 
-- [ ] Task 4: Tests (AC #1, #2)
-  - [ ] New Vitest case in `src/app/api/pickup-slots/schema.test.ts`: `"rejects a startsAt already in the past"` — mirrors the file's existing `"rejects endsAt before startsAt"` test's shape, using a literal or relative past date for `startsAt` and a valid (relative-future) `endsAt`.
-  - [ ] Confirm (no new test needed, just verify while in the file) that an existing case still independently proves `endsAt > startsAt` is unaffected — after Task 2's fix, the existing `"rejects endsAt before startsAt"` test uses two relative-future dates with `endsAt` before `startsAt`, isolating exactly that condition per AC #2.
-  - [ ] New Playwright test, extend `tests/dashboard.spec.ts`'s `"vendor dashboard (authenticated)"` describe block (already serial-mode, already authenticated — matches this route's existing `GET /api/pickup-slots` direct-API-test pattern at line ~110): `[P1]` `POST /api/pickup-slots` with a past `startsAt` (and a valid `endsAt` after it) returns `400`, and no `PickupSlot` row is created for it (verify via `prisma.pickupSlot.findMany` scoped by vendor + a unique `location`, or absence of a new row — dev's call on the exact query, no existing helper does this lookup). Use `page.goto("/dashboard")` then `page.request.post(...)` — same auth-cookie-sharing pattern the existing `GET /api/pickup-slots` test in the same file already uses, confirmed by reading it.
+- [x] Task 4: Tests (AC #1, #2)
+  - [x] New Vitest case in `src/app/api/pickup-slots/schema.test.ts`: `"rejects a startsAt already in the past"` — mirrors the file's existing `"rejects endsAt before startsAt"` test's shape, using a literal or relative past date for `startsAt` and a valid (relative-future) `endsAt`.
+  - [x] Confirm (no new test needed, just verify while in the file) that an existing case still independently proves `endsAt > startsAt` is unaffected — after Task 2's fix, the existing `"rejects endsAt before startsAt"` test uses two relative-future dates with `endsAt` before `startsAt`, isolating exactly that condition per AC #2.
+  - [x] New Playwright test, extend `tests/dashboard.spec.ts`'s `"vendor dashboard (authenticated)"` describe block (already serial-mode, already authenticated — matches this route's existing `GET /api/pickup-slots` direct-API-test pattern at line ~110): `[P1]` `POST /api/pickup-slots` with a past `startsAt` (and a valid `endsAt` after it) returns `400`, and no `PickupSlot` row is created for it (verify via `prisma.pickupSlot.findMany` scoped by vendor + a unique `location`, or absence of a new row — dev's call on the exact query, no existing helper does this lookup). Use `page.goto("/dashboard")` then `page.request.post(...)` — same auth-cookie-sharing pattern the existing `GET /api/pickup-slots` test in the same file already uses, confirmed by reading it.
   - [ ] Do not add a new e2e UI-level test for this — both of `tests/dashboard.spec.ts`'s existing `AddSlotForm` tests (`"vendor can add a new pickup slot"`, `"add-slot form shows a validation error when the end time is before the start time"`) already use `new Date(Date.now() + 24 * 60 * 60 * 1000)`-based times, confirmed unaffected by this change — re-run them after Task 1 lands to confirm, don't skip that check, but no new UI test is needed unless Task 3 is also done (in which case a UI test for that client-side path would be the dev's own addition, matching Task 3's own discretionary scope).
+
+### Review Findings
+
+- [x] [Review][Patch] Task 3's client-side guard makes the vendor's device clock authoritative for a legitimate future `startsAt` — contradicts the spec's own NFR2 rationale. `AddSlotForm.tsx:45` checks `startsAt <= new Date()` using the *browser's* clock, reintroducing device-clock dependence on the reject side that AC #1/NFR2 specifically designed against. **Decided (2026-08-25, Jeff): remove Task 3's client-side guard entirely** — rely solely on the server's `400` as the single source of truth. Task 3 was explicitly discretionary and not required by either AC. **Applied:** removed the `if (startsAt <= new Date()) { ... }` block from `handleSubmit` (`AddSlotForm.tsx`); this also resolves the untested-guard finding, since the guard being removed needs no test.
+
+- [x] [Review][Patch] `docs/api-contracts.md` still said this endpoint is "Not currently called by any UI" three lines below the line this diff edited [docs/api-contracts.md:168]. `AddSlotForm.tsx` has POSTed to this route since before this story, and `tests/dashboard.spec.ts:291` exercises exactly that button. **Applied:** replaced the stale bullet with "Called by the dashboard's 'Add slot' button (`AddSlotForm.tsx`)."
+
+- [x] [Review][Patch] Unit tests only asserted `result.success === false`, never *which* refine fired or its message [src/app/api/pickup-slots/schema.test.ts:31-40,66-70]. AC #2 requires both checks to "apply independently" with "neither's failure message" changing. **Applied:** both `"rejects endsAt before startsAt"` and `"rejects a startsAt already in the past"` now also assert on `result.error.issues[].message`, confirming each fails on its own refine and not the other's.
+
+- [x] [Review][Patch] New Playwright test had no `try`/`finally` cleanup, unlike every fixture-creating sibling test in the file [tests/dashboard.spec.ts:119-139]. **Applied:** wrapped the test body in `try { ... } finally { deletePickupSlotByLocation(vendor.id, location); }`, matching `"vendor can add a new pickup slot"`'s pattern.
+
+**Verification after patches:** `npx tsc --noEmit` clean; `npm run lint` clean; `npx vitest run` 92/92; `npx playwright test tests/dashboard.spec.ts` 22/22; `npm run build` succeeds.
+
+- [x] [Review][Defer] Refine failure message is unreachable — `route.ts:47` collapses every `safeParse` failure (including malformed dates producing multiple simultaneous refine issues) to a generic `400 { error: "Invalid request" }` [src/app/api/pickup-slots/route.ts:47]. Pre-existing pattern already true of the original `endsAt > startsAt` refine before this story; this diff follows established precedent rather than introducing the gap. — deferred, pre-existing
+- [x] [Review][Defer] `datetime-local` inputs have no native `min` attribute, so the picker still offers past times before any JS runs [src/components/dashboard/AddSlotForm.tsx:119-125]. A nice-to-have, not required by either AC; the sibling `endsAt`/`startsAt` guard is already JS-based, not native, so this matches existing form convention. — deferred, pre-existing
+- [x] [Review][Defer] No grace window between client-side "now" and server-side "now" for a `startsAt` a few hundred milliseconds out — inherent to any hard "reject already-past" boundary and consistent with the spec's explicit strict-`>` choice, not a defect introduced here. [src/app/api/pickup-slots/schema.ts:22] — deferred, pre-existing
+- [x] [Review][Defer] `CreateSlotSchema` is no longer a pure function (result now depends on wall-clock time at call time) [src/app/api/pickup-slots/schema.ts:18]. Fine for its only current caller (the create route); a future reuse (e.g. an edit-slot schema, or re-validating a stored row) would need to know this schema is create-only. No current misuse — nothing to fix now. — deferred, pre-existing
+- [x] [Review][Defer] `z.string().datetime()` rejects non-`Z` ISO offsets (Zod v3 default) and `docs/api-contracts.md`'s "ISO datetime" comment doesn't note the UTC-only constraint [docs/api-contracts.md:160]. Pre-existing gap (field type unchanged by this story); the app itself is unaffected since `AddSlotForm.tsx` always sends `.toISOString()`. — deferred, pre-existing
+- [x] [Review][Defer] `tests/dashboard.spec.ts`'s `toLocal()` helper (`d.toISOString().slice(0, 16)`) feeds a UTC wall-clock string into a `datetime-local` input the browser reads as local time [tests/dashboard.spec.ts:301,332]. Pre-existing pattern from before this story (already used by `"vendor can add a new pickup slot"`); the 24h fixture buffer absorbs it. — deferred, pre-existing
 
 ## Dev Notes
 
@@ -79,8 +98,36 @@ so that customers are never offered a pickup window that's already over.
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- Task 3 (discretionary client-side pre-check) was chosen — added to `AddSlotForm.tsx`, mirroring the existing `endsAt <= startsAt` guard exactly (same shape, same placement, same message style).
+- Doc drift found and fixed, not part of any listed task: `docs/api-contracts.md`'s `POST /api/pickup-slots` request-body comment documented only the `endsAt > startsAt` refine, silently stale the moment Task 1 landed. Fixed per `project-context.md`'s own doc-accuracy rule.
+- `npx tsc --noEmit` — clean throughout.
+- `npm run lint` — clean.
+- `npx vitest run` — 92/92 passed (91 pre-existing + 1 new).
+- Full `npx playwright test` (fresh re-seed, fresh dev server) — 129/129 passed, zero skips. The 3 tests that were serial-mode-aborted during ATDD's red-phase verification now run to completion normally, confirmed.
+- Production build — clean.
 
 ### Completion Notes List
 
+- `CreateSlotSchema` (`src/app/api/pickup-slots/schema.ts`) gained a second `.refine()` rejecting `startsAt <= new Date()` (server time) — additive, the existing `endsAt > startsAt` refine is untouched. No `route.ts` change needed — confirmed the route already collapses every schema-refinement failure to the same generic `400 { error: "Invalid request" }`.
+- Fixed `src/app/api/pickup-slots/schema.test.ts`'s hardcoded-past-literal `validBody` (applied during the ATDD pass, verified still correct here) — now computed relative to `Date.now()`.
+- Task 3 (discretionary) implemented: `AddSlotForm.tsx` now also rejects a past `startsAt` client-side before the network call, matching its existing `endsAt <= startsAt` guard's shape.
+- `docs/api-contracts.md` updated (not a listed task, but stale as a direct result of this change — fixed per the project's doc-accuracy rule).
+- No timezone concept added — this story's check is timezone-agnostic (two absolute instants compared server-side), per Dev Notes' explicit scope boundary.
+- Full regression: typecheck clean, lint clean, 92/92 unit, 129/129 e2e (zero skips), production build succeeds.
+
 ### File List
+
+- `src/app/api/pickup-slots/schema.ts` (modified — past-`startsAt` refine added)
+- `src/app/api/pickup-slots/schema.test.ts` (modified — `validBody`/inline-date fixes and 1 new test, from the ATDD pass)
+- `src/components/dashboard/AddSlotForm.tsx` (modified — client-side past-`startsAt` guard, Task 3)
+- `tests/dashboard.spec.ts` (modified — 1 new test, from the ATDD pass)
+- `docs/api-contracts.md` (modified — `POST /api/pickup-slots` request-body comment updated)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — status transitions)
+
+## Change Log
+
+- 2026-08-25: Implemented Story 5.2 in full. `CreateSlotSchema` now rejects a `startsAt` already in the past (server time), independent of the existing `endsAt > startsAt` check. Added the discretionary client-side pre-check to `AddSlotForm.tsx` for UX parity with its existing end-before-start guard. Fixed stale doc (`api-contracts.md`) and a hardcoded-past-literal test fixture (`schema.test.ts`, applied during the ATDD pass) that would otherwise have broken two unrelated tests. Full regression: typecheck clean, lint clean, 92/92 unit, 129/129 e2e (zero skips), production build succeeds. Status → review.
