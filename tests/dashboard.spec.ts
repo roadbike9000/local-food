@@ -306,7 +306,13 @@ test.describe("vendor dashboard (authenticated)", () => {
 
       const starts = new Date(Date.now() + 24 * 60 * 60 * 1000);
       const ends = new Date(starts.getTime() + 60 * 60 * 1000);
-      const toLocal = (d: Date) => d.toISOString().slice(0, 16);
+      // Local wall-clock components, not toISOString() (which is UTC and
+    // would silently shift in any non-UTC timezone) — matches
+    // AddSlotForm.tsx's own toDatetimeLocalValue().
+    const toLocal = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
       await page.locator("#startsAt").fill(toLocal(starts));
       await page.locator("#endsAt").fill(toLocal(ends));
@@ -337,7 +343,13 @@ test.describe("vendor dashboard (authenticated)", () => {
     // blocks before the JS handler ever runs).
     const starts = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const ends = new Date(starts.getTime() - 60 * 60 * 1000); // 1h before starts
-    const toLocal = (d: Date) => d.toISOString().slice(0, 16);
+    // Local wall-clock components, not toISOString() (which is UTC and
+    // would silently shift in any non-UTC timezone) — matches
+    // AddSlotForm.tsx's own toDatetimeLocalValue().
+    const toLocal = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
     await page.locator("#startsAt").fill(toLocal(starts));
     await page.locator("#endsAt").fill(toLocal(ends));

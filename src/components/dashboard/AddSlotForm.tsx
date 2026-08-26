@@ -8,6 +8,14 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+// Formats a Date as a datetime-local input value using its *local* wall-clock
+// components (not toISOString(), which is UTC and would silently shift the
+// displayed value in any non-UTC timezone).
+function toDatetimeLocalValue(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function AddSlotForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -115,6 +123,7 @@ export function AddSlotForm() {
             name="startsAt"
             type="datetime-local"
             required
+            min={toDatetimeLocalValue(new Date())}
             className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
           />
         </div>
