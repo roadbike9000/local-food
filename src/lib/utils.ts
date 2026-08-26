@@ -3,6 +3,12 @@
 /** Turn a name into a URL-safe slug: "Corner Sourdough" -> "corner-sourdough". */
 export function slugify(input: string): string {
   return input
+    // NFD splits each accented letter into its base letter + a combining
+    // mark (e.g. "é" -> "e" + U+0301); stripping marks in that range
+    // transliterates "Café Rosé" -> "cafe-rose" instead of dropping the
+    // accented letters entirely (scenario review, 2026-08-24).
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")

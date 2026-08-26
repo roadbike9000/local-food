@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { test, expect } from "@playwright/test";
 import { getVendorBySlug, deleteProduct, prisma, createTestProduct } from "./helpers/db";
 import { MAX_BASE64_LENGTH } from "../src/app/api/products/upload-image/schema";
+import { deleteImage, extractPublicId, cloudinary } from "../src/lib/cloudinary";
 
 /**
  * API-level coverage for PATCH /api/products/[id] — Story 1.2's new
@@ -259,6 +260,11 @@ test.describe("authenticated product API (Story 1.2, Story 4.1)", () => {
         expect(response.status()).toBe(200);
         const body = await response.json();
         expect(body.imageUrl).toMatch(/^https:\/\/res\.cloudinary\.com\//);
+
+        // Clean up the real Cloudinary asset this test just uploaded — it's
+        // never attached to a Product row, so nothing else will ever delete
+        // it (review-deferred item, resolved 2026-08-26).
+        await deleteImage(body.imageUrl);
       },
     );
 
@@ -286,6 +292,70 @@ test.describe("authenticated product API (Story 1.2, Story 4.1)", () => {
         expect(response.status()).toBe(400);
         const body = await response.json();
         expect(body.error).toMatch(/too large/i);
+      },
+    );
+
+    test(
+      "[P1] DELETE refuses to delete an image still referenced by a Product (400)",
+      async ({ request }) => {
+        // No real Cloudinary asset needed - the in-use check runs against
+        // Prisma before deleteImage() ever touches Cloudinary.
+        const vendor = await getVendorBySlug("corner-sourdough");
+        const imageUrl =
+          "https://res.cloudinary.com/demo/image/upload/v1/local-food/in-use-fixture.jpg";
+        const product = await createTestProduct(vendor.id, { imageUrl });
+
+        try {
+          const response = await request.delete("/api/products/upload-image", {
+            data: { imageUrl },
+          });
+          expect(response.status()).toBe(400);
+          const body = await response.json();
+          expect(body.error).toMatch(/in use/i);
+        } finally {
+          await deleteProduct(product.id);
+        }
+      },
+    );
+
+    test(
+      "[P1] DELETE removes a genuine orphaned upload from Cloudinary (200)",
+      async ({ request }) => {
+        test.skip(
+          !process.env.CLOUDINARY_CLOUD_NAME ||
+            !process.env.CLOUDINARY_API_KEY ||
+            !process.env.CLOUDINARY_API_SECRET,
+          "Cloudinary not configured — CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET missing",
+        );
+
+        const uploadRes = await request.post("/api/products/upload-image", {
+          data: { image: `data:image/png;base64,${testImageBase64}` },
+        });
+        const { imageUrl } = await uploadRes.json();
+
+        const deleteRes = await request.delete("/api/products/upload-image", {
+          data: { imageUrl },
+        });
+        expect(deleteRes.status()).toBe(200);
+
+        // Prove the asset is actually gone from Cloudinary, not just that the
+        // route returned 200 - cloudinary.api.resource() 404s for a
+        // public_id that no longer exists. Cloudinary's admin API isn't
+        // instantly consistent right after destroy() under concurrent load
+        // (reproduced: reliable in isolation, flaked once when other Cloudinary-
+        // touching spec files ran in parallel against the same account) - a
+        // short poll absorbs that lag without weakening what's actually proven.
+        const publicId = extractPublicId(imageUrl);
+        expect(publicId).not.toBeNull();
+        await expect(async () => {
+          let stillExists = true;
+          try {
+            await cloudinary.api.resource(publicId!);
+          } catch {
+            stillExists = false;
+          }
+          expect(stillExists).toBe(false);
+        }).toPass({ timeout: 10_000 });
       },
     );
   });

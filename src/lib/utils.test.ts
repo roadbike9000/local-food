@@ -7,11 +7,16 @@ describe("slugify", () => {
   });
 
   it("strips characters that aren't letters, digits, or spaces", () => {
-    expect(slugify("Jo's Café & Bakery!")).toBe("jo-s-caf-bakery");
+    expect(slugify("Jo's Café & Bakery!")).toBe("jo-s-cafe-bakery");
   });
 
   it("trims leading and trailing hyphens", () => {
     expect(slugify("  --Green Valley--  ")).toBe("green-valley");
+  });
+
+  it("transliterates accented letters instead of dropping them", () => {
+    expect(slugify("Café Rosé")).toBe("cafe-rose");
+    expect(slugify("Núñez Farms")).toBe("nunez-farms");
   });
 });
 
