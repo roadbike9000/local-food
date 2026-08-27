@@ -30,23 +30,24 @@ export function AddSlotForm({ timezone }: { timezone: string }) {
     const capacity = Number(formData.get("capacity"));
     const location = String(formData.get("location") ?? "").trim();
 
-    // Validate the raw datetime-local strings' shape *before* handing them
-    // to zonedWallTimeToUtc — unlike the old plain `new Date(...)` parse,
-    // Intl.DateTimeFormat.formatToParts() throws on a malformed/empty
-    // input instead of yielding a gracefully-NaN Date, so this check must
-    // come first, not after.
-    const WALL_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
-    if (!WALL_TIME_PATTERN.test(startsAtLocal) || !WALL_TIME_PATTERN.test(endsAtLocal)) {
+    // Wall-clock digits are interpreted as being in the vendor's own
+    // configured timezone, not the submitting browser's (Story 6.1, FR17) —
+    // see zonedWallTimeToUtc's doc comment for why. zonedWallTimeToUtc
+    // itself validates shape, rejects a nonexistent DST-gap wall time, and
+    // rejects a bad timezone — all by throwing, so both calls need to be
+    // inside this try (code review, Story 6.1: an earlier version called
+    // these before the try block, so a thrown error left `submitting`
+    // stuck true with no error shown — the form went permanently dead).
+    let startsAt: Date;
+    let endsAt: Date;
+    try {
+      startsAt = zonedWallTimeToUtc(startsAtLocal, timezone);
+      endsAt = zonedWallTimeToUtc(endsAtLocal, timezone);
+    } catch {
       setError("Enter valid start and end times.");
       setSubmitting(false);
       return;
     }
-
-    // Wall-clock digits are interpreted as being in the vendor's own
-    // configured timezone, not the submitting browser's (Story 6.1, FR17) —
-    // see zonedWallTimeToUtc's doc comment for why.
-    const startsAt = zonedWallTimeToUtc(startsAtLocal, timezone);
-    const endsAt = zonedWallTimeToUtc(endsAtLocal, timezone);
     if (endsAt <= startsAt) {
       setError("End time must be after start time.");
       setSubmitting(false);

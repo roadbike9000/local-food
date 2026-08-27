@@ -32,19 +32,24 @@ export async function GET(
   // case (no matching vendorId can have any PickupSlot rows), so this
   // value is never actually rendered; it exists only so the response shape
   // stays well-typed rather than the field being conditionally absent.
-  const vendor = await prisma.vendor.findUnique({
-    where: { id: params.vendorId },
-    select: { timezone: true },
-  });
-
-  const slots = await prisma.pickupSlot.findMany({
-    where: { vendorId: params.vendorId, startsAt: { gte: new Date() } },
-    orderBy: { startsAt: "asc" },
-    // capacity is needed to compute `available` below; createdAt still
-    // isn't - stays out of the select, matching the original review finding
-    // that only the client's actual PickupSlotOption fields belong here.
-    select: { id: true, startsAt: true, endsAt: true, location: true, capacity: true },
-  });
+  // Independent queries - run concurrently, not sequentially (code review,
+  // Story 6.1: an earlier version awaited these one after another for no
+  // reason, adding needless latency to a public per-cart-load endpoint).
+  const [vendor, slots] = await Promise.all([
+    prisma.vendor.findUnique({
+      where: { id: params.vendorId },
+      select: { timezone: true },
+    }),
+    prisma.pickupSlot.findMany({
+      where: { vendorId: params.vendorId, startsAt: { gte: new Date() } },
+      orderBy: { startsAt: "asc" },
+      // capacity is needed to compute `available` below; createdAt still
+      // isn't - stays out of the select, matching the original review
+      // finding that only the client's actual PickupSlotOption fields
+      // belong here.
+      select: { id: true, startsAt: true, endsAt: true, location: true, capacity: true },
+    }),
+  ]);
 
   // A slot is full once PENDING + PAID orders against it reach capacity.
   // PENDING counts too, not just PAID - a customer mid-checkout (Stripe

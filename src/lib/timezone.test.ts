@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { zonedWallTimeToUtc, utcInstantToZonedDatetimeLocal } from "./timezone";
+import {
+  zonedWallTimeToUtc,
+  utcInstantToZonedDatetimeLocal,
+  isValidTimeZone,
+  InvalidWallTimeError,
+} from "./timezone";
 
 describe("zonedWallTimeToUtc", () => {
   // America/New_York is UTC-5 in winter (EST, no DST in effect).
@@ -66,6 +71,79 @@ describe("zonedWallTimeToUtc", () => {
     const result = zonedWallTimeToUtc("2026-06-15T09:00", "UTC");
     expect(result.toISOString()).toBe("2026-06-15T09:00:00.000Z");
   });
+
+  // Code review, Story 6.1: the original DST tests above all sampled 09:00,
+  // which sits *outside* the window a single-pass "resolve the offset at
+  // the naive instant" implementation gets wrong. A single-pass
+  // implementation looks up the offset at the wall-clock digits reinterpreted
+  // as UTC (e.g. "03:00" treated as "03:00Z") rather than at the real
+  // target instant several hours later - if the DST transition falls
+  // between those two instants, the stale offset gets applied. For
+  // America/New_York that window is roughly 03:00-06:59 local on the
+  // spring-forward day and 02:00-05:59 local on the fall-back day. Every
+  // expected value below was independently cross-checked against Python's
+  // zoneinfo (the IANA tz database), not derived from this implementation.
+  describe("the actual DST-transition window a naive single-pass offset lookup gets wrong", () => {
+    it.each([
+      ["2026-03-08T03:00", "2026-03-08T07:00:00.000Z"],
+      ["2026-03-08T04:00", "2026-03-08T08:00:00.000Z"],
+      ["2026-03-08T05:00", "2026-03-08T09:00:00.000Z"],
+      ["2026-03-08T06:00", "2026-03-08T10:00:00.000Z"],
+    ])("spring-forward: %s -> %s", (wallTime, expectedIso) => {
+      expect(zonedWallTimeToUtc(wallTime, "America/New_York").toISOString()).toBe(expectedIso);
+    });
+
+    it.each([
+      ["2026-11-01T02:00", "2026-11-01T07:00:00.000Z"],
+      ["2026-11-01T03:00", "2026-11-01T08:00:00.000Z"],
+      ["2026-11-01T04:00", "2026-11-01T09:00:00.000Z"],
+      ["2026-11-01T05:00", "2026-11-01T10:00:00.000Z"],
+    ])("fall-back: %s -> %s", (wallTime, expectedIso) => {
+      expect(zonedWallTimeToUtc(wallTime, "America/New_York").toISOString()).toBe(expectedIso);
+    });
+  });
+
+  // The spring-forward transition skips an hour entirely - "02:30" never
+  // happens in America/New_York on 2026-03-08 (clocks jump straight from
+  // 02:00:00 to 03:00:00). No offset arithmetic can produce a "correct"
+  // answer for a wall time that never existed; the only honest behavior is
+  // to reject it, which the round-trip check inside zonedWallTimeToUtc
+  // does.
+  it("rejects a wall-clock time that doesn't exist (spring-forward gap)", () => {
+    expect(() => zonedWallTimeToUtc("2026-03-08T02:30", "America/New_York")).toThrow(
+      InvalidWallTimeError,
+    );
+  });
+
+  // The fall-back transition repeats an hour - "01:30" occurs twice on
+  // 2026-11-01 (once as EDT, once as EST an hour later). Pinning the
+  // resolved policy explicitly (earlier/EDT occurrence) rather than leaving
+  // it as unspecified behavior - verified against zoneinfo's fold=0 result.
+  it("resolves an ambiguous wall-clock time (fall-back repeated hour) to its earlier occurrence", () => {
+    const result = zonedWallTimeToUtc("2026-11-01T01:30", "America/New_York");
+    expect(result.toISOString()).toBe("2026-11-01T05:30:00.000Z");
+  });
+
+  it("rejects a malformed wall-clock string", () => {
+    expect(() => zonedWallTimeToUtc("", "America/New_York")).toThrow(InvalidWallTimeError);
+    expect(() => zonedWallTimeToUtc("not-a-date", "America/New_York")).toThrow(
+      InvalidWallTimeError,
+    );
+    expect(() => zonedWallTimeToUtc("2026-01-15T10:00:30", "America/New_York")).toThrow(
+      InvalidWallTimeError,
+    );
+  });
+});
+
+describe("isValidTimeZone", () => {
+  it("accepts a real IANA identifier", () => {
+    expect(isValidTimeZone("America/New_York")).toBe(true);
+    expect(isValidTimeZone("UTC")).toBe(true);
+  });
+
+  it("rejects a made-up identifier", () => {
+    expect(isValidTimeZone("Not/AZone")).toBe(false);
+  });
 });
 
 describe("utcInstantToZonedDatetimeLocal", () => {
@@ -93,5 +171,17 @@ describe("utcInstantToZonedDatetimeLocal", () => {
     const utc = zonedWallTimeToUtc(wallTime, "America/New_York");
     const roundTripped = utcInstantToZonedDatetimeLocal(utc, "America/New_York");
     expect(roundTripped).toBe(wallTime);
+  });
+
+  // Code review, Story 6.1: this is a display/render-path helper (used
+  // directly in AddSlotForm.tsx's JSX, not behind a try/catch) - falls back
+  // to UTC for a bad Vendor.timezone value rather than throwing and
+  // crashing the render.
+  it("falls back to UTC for an invalid timezone instead of throwing", () => {
+    const result = utcInstantToZonedDatetimeLocal(
+      new Date("2026-01-15T14:00:00.000Z"),
+      "Not/AZone",
+    );
+    expect(result).toBe("2026-01-15T14:00");
   });
 });

@@ -69,4 +69,17 @@ describe("formatPickupWindow", () => {
       "Fri, Jan 16, 7:00 AM–9:00 AM",
     );
   });
+
+  // Code review, Story 6.1: two of this function's four call sites are
+  // Server Components (vendors/[slug]/page.tsx, dashboard/pickups/page.tsx)
+  // - Vendor.timezone is an unvalidated free-text column, and an unguarded
+  // Intl RangeError there would 500 the whole storefront/dashboard route,
+  // not just degrade one displayed time.
+  it("falls back to UTC for an invalid timezone instead of throwing", () => {
+    const startsAt = new Date("2026-01-15T17:00:00.000Z");
+    const endsAt = new Date("2026-01-15T19:30:00.000Z");
+    expect(formatPickupWindow(startsAt, endsAt, "Not/AZone")).toBe(
+      "Thu, Jan 15, 5:00 PM–7:30 PM",
+    );
+  });
 });

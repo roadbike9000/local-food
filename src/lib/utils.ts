@@ -1,4 +1,5 @@
 /** Small shared helpers used across the app. */
+import { isValidTimeZone } from "@/lib/timezone";
 
 /** Turn a name into a URL-safe slug: "Corner Sourdough" -> "corner-sourdough". */
 export function slugify(input: string): string {
@@ -31,14 +32,22 @@ export function formatPrice(cents: number, currency = "USD"): string {
  * not an optional one with a runtime-default fallback: a missing argument
  * should be a type error, not a silent fallback to some incorrect implicit
  * zone.
+ *
+ * Falls back to "UTC" for an invalid `timeZone` rather than throwing (code
+ * review, Story 6.1) — `Vendor.timezone` is an unvalidated free-text
+ * column, and two of this function's four call sites are Server Components
+ * (`vendors/[slug]/page.tsx`, `dashboard/pickups/page.tsx`); an unguarded
+ * `Intl` `RangeError` there would 500 the whole storefront/dashboard route,
+ * not just degrade one displayed time.
  */
 export function formatPickupWindow(startsAt: Date, endsAt: Date, timeZone: string): string {
+  const zone = isValidTimeZone(timeZone) ? timeZone : "UTC";
   const day = startsAt.toLocaleDateString("en-US", {
-    timeZone,
+    timeZone: zone,
     weekday: "short",
     month: "short",
     day: "numeric",
   });
-  const opts: Intl.DateTimeFormatOptions = { timeZone, hour: "numeric", minute: "2-digit" };
+  const opts: Intl.DateTimeFormatOptions = { timeZone: zone, hour: "numeric", minute: "2-digit" };
   return `${day}, ${startsAt.toLocaleTimeString("en-US", opts)}–${endsAt.toLocaleTimeString("en-US", opts)}`;
 }

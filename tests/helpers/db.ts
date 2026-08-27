@@ -181,10 +181,13 @@ export async function createTestVendor(
       slug: overrides.slug ?? `test-vendor-playwright-${unique}`,
       deletedAt: overrides.deletedAt ?? null,
       deletedByAdminId: overrides.deletedByAdminId ?? null,
-      // Story 6.1 - omitted, falls through to the schema's own default
-      // ("America/New_York"). Explicit override needed by any test proving
-      // AC #2's timezone-interpretation behavior end-to-end.
-      ...(overrides.timezone !== undefined ? { timezone: overrides.timezone } : {}),
+      // Story 6.1 - `undefined` (not provided) lets Prisma apply the
+      // schema's own default ("America/New_York"), same idiom as the
+      // siblings above. Currently unused by any test (code review found
+      // this while it was implemented via a different, inconsistent
+      // pattern) - kept as a natural extension of this fixture's existing
+      // override shape for whichever future test needs it.
+      timezone: overrides.timezone ?? undefined,
     },
   });
 }

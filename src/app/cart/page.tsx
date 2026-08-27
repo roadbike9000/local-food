@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useCart } from "@/components/CartProvider";
 import { formatPickupWindow, formatPrice } from "@/lib/utils";
+import { isValidTimeZone } from "@/lib/timezone";
 
 // Local shape, not a Prisma model type - keeps this "use client" file from
 // needing to reason about the full Prisma PickupSlot (startsAt/endsAt come
@@ -46,6 +47,11 @@ export default function CartPage() {
     setSelectedSlotId(null);
     setSlotsLoaded(false);
     setSlotsError(false);
+    // Reset alongside the rest of this state when the vendor changes, not
+    // just on the initial mount (code review, Story 6.1) — without this, a
+    // vendor switch briefly re-renders the *previous* vendor's slots in the
+    // *previous* vendor's timezone until the new fetch resolves.
+    setVendorTimezone("UTC");
     if (!vendorId) return;
 
     let cancelled = false;
@@ -54,10 +60,19 @@ export default function CartPage() {
         if (!res.ok) throw new Error("Failed to load pickup times");
         return res.json();
       })
-      .then((data: { slots: PickupSlotOption[]; timezone: string }) => {
+      .then((data: { slots: PickupSlotOption[]; timezone: unknown }) => {
         if (cancelled) return;
         setSlots(data.slots);
-        setVendorTimezone(data.timezone);
+        // data.timezone is cast from res.json(), not runtime-checked by the
+        // type annotation alone (code review, Story 6.1) — a missing/bad
+        // field here must not silently fall through to Intl's own
+        // browser-zone default, since that's the exact bug this story
+        // exists to fix.
+        setVendorTimezone(
+          typeof data.timezone === "string" && isValidTimeZone(data.timezone)
+            ? data.timezone
+            : "UTC",
+        );
         setSlotsLoaded(true);
         // AC #5: auto-select when there's exactly one upcoming slot - no
         // pointless click to "choose" the only option. Skipped when that
