@@ -53,8 +53,9 @@ Lists a vendor's upcoming pickup slots, soonest first (Story 5.1). Public — th
 1. `prisma.pickupSlot.findMany({ where: { vendorId: params.vendorId, startsAt: { gte: new Date() } }, orderBy: { startsAt: "asc" } })` — only upcoming slots.
 2. No vendor-existence check — an unknown `vendorId` returns the same empty-array shape as a real vendor with zero upcoming slots. `POST /api/checkout` re-validates the selected slot's vendor ownership regardless of what this route returns, so this isn't a new trust boundary.
 3. Each slot's `available` is computed server-side: `prisma.order.groupBy({ by: ["pickupSlotId"], where: { pickupSlotId: { in: <slot ids> }, status: { in: ["PENDING", "PAID"] } }, _count: { _all: true } })`, then `bookedCount < capacity`. `PENDING` counts alongside `PAID` — same reasoning as `POST /api/checkout`'s capacity check above. Advisory only — `/cart`'s picker uses it to disable/badge a full slot as "Full" (not required by the AC, matches FR7's out-of-stock precedent: shown, not hidden), but the actual enforcement is `POST /api/checkout`'s own re-check at order-creation time.
+4. Also looks up `Vendor.timezone` (Story 6.1, FR17) — `/cart` needs it to display each slot's window in the vendor's own configured timezone, matching the storefront/dashboard. Falls back to `"UTC"` for an unknown `vendorId`; never actually rendered in that case, since `slots` is also empty.
 
-**Response:** `200 { slots: Array<{ id: string; startsAt: string; endsAt: string; location: string | null; available: boolean }> }`, even for zero slots (not a `404` — "no pickup times available" is a valid, expected state).
+**Response:** `200 { slots: Array<{ id: string; startsAt: string; endsAt: string; location: string | null; available: boolean }>; timezone: string }`, even for zero slots (not a `404` — "no pickup times available" is a valid, expected state).
 
 ---
 
@@ -186,6 +187,7 @@ Creates a pickup slot for the signed-in vendor.
   location?: string,
 }
 ```
+- The wire format is unchanged by Story 6.1 (FR17) — still an absolute ISO instant, both refines still compare absolute instants server-side. What changed is *how the dashboard client computes that instant*: `AddSlotForm.tsx` now interprets its `datetime-local` inputs' wall-clock digits as being in the signed-in vendor's own `Vendor.timezone`, not the submitting browser's local timezone, before converting to ISO. A direct API caller bypassing the dashboard is unaffected — it always sent (and must still send) an absolute instant, never bare wall-clock digits.
 - 401 if unauthenticated; 400 on schema/refinement failure.
 - Response: `201 { slot: PickupSlot }`.
 - Called by the dashboard's "Add slot" button (`AddSlotForm.tsx`).

@@ -167,6 +167,7 @@ export async function createTestVendor(
     slug: string;
     deletedAt: Date | null;
     deletedByAdminId: string | null;
+    timezone: string;
   }> = {},
 ) {
   // Date.now() alone can collide between two workers under
@@ -180,6 +181,10 @@ export async function createTestVendor(
       slug: overrides.slug ?? `test-vendor-playwright-${unique}`,
       deletedAt: overrides.deletedAt ?? null,
       deletedByAdminId: overrides.deletedByAdminId ?? null,
+      // Story 6.1 - omitted, falls through to the schema's own default
+      // ("America/New_York"). Explicit override needed by any test proving
+      // AC #2's timezone-interpretation behavior end-to-end.
+      ...(overrides.timezone !== undefined ? { timezone: overrides.timezone } : {}),
     },
   });
 }

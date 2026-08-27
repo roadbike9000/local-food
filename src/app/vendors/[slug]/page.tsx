@@ -62,6 +62,7 @@ export default async function StorefrontPage({
           {formatPickupWindow(
             vendor.pickupSlots[0].startsAt,
             vendor.pickupSlots[0].endsAt,
+            vendor.timezone,
           )}
           {vendor.pickupSlots[0].location
             ? ` · ${vendor.pickupSlots[0].location}`

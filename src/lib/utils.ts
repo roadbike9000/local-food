@@ -23,13 +23,22 @@ export function formatPrice(cents: number, currency = "USD"): string {
   }).format(cents / 100);
 }
 
-/** Format a pickup window like "Fri, Jul 17, 5:00–7:00 PM". */
-export function formatPickupWindow(startsAt: Date, endsAt: Date): string {
+/**
+ * Format a pickup window like "Fri, Jul 17, 5:00–7:00 PM", displayed in
+ * `timeZone` (the vendor's own configured timezone, Story 6.1, FR17) —
+ * pickup happens at the vendor's physical location regardless of which
+ * timezone the viewer is browsing from, so this is a required parameter,
+ * not an optional one with a runtime-default fallback: a missing argument
+ * should be a type error, not a silent fallback to some incorrect implicit
+ * zone.
+ */
+export function formatPickupWindow(startsAt: Date, endsAt: Date, timeZone: string): string {
   const day = startsAt.toLocaleDateString("en-US", {
+    timeZone,
     weekday: "short",
     month: "short",
     day: "numeric",
   });
-  const opts: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
+  const opts: Intl.DateTimeFormatOptions = { timeZone, hour: "numeric", minute: "2-digit" };
   return `${day}, ${startsAt.toLocaleTimeString("en-US", opts)}–${endsAt.toLocaleTimeString("en-US", opts)}`;
 }

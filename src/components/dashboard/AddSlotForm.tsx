@@ -7,16 +7,9 @@
  */
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { zonedWallTimeToUtc, utcInstantToZonedDatetimeLocal } from "@/lib/timezone";
 
-// Formats a Date as a datetime-local input value using its *local* wall-clock
-// components (not toISOString(), which is UTC and would silently shift the
-// displayed value in any non-UTC timezone).
-function toDatetimeLocalValue(d: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function AddSlotForm() {
+export function AddSlotForm({ timezone }: { timezone: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -37,14 +30,23 @@ export function AddSlotForm() {
     const capacity = Number(formData.get("capacity"));
     const location = String(formData.get("location") ?? "").trim();
 
-    const startsAt = new Date(startsAtLocal);
-    const endsAt = new Date(endsAtLocal);
-
-    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+    // Validate the raw datetime-local strings' shape *before* handing them
+    // to zonedWallTimeToUtc — unlike the old plain `new Date(...)` parse,
+    // Intl.DateTimeFormat.formatToParts() throws on a malformed/empty
+    // input instead of yielding a gracefully-NaN Date, so this check must
+    // come first, not after.
+    const WALL_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+    if (!WALL_TIME_PATTERN.test(startsAtLocal) || !WALL_TIME_PATTERN.test(endsAtLocal)) {
       setError("Enter valid start and end times.");
       setSubmitting(false);
       return;
     }
+
+    // Wall-clock digits are interpreted as being in the vendor's own
+    // configured timezone, not the submitting browser's (Story 6.1, FR17) —
+    // see zonedWallTimeToUtc's doc comment for why.
+    const startsAt = zonedWallTimeToUtc(startsAtLocal, timezone);
+    const endsAt = zonedWallTimeToUtc(endsAtLocal, timezone);
     if (endsAt <= startsAt) {
       setError("End time must be after start time.");
       setSubmitting(false);
@@ -123,7 +125,7 @@ export function AddSlotForm() {
             name="startsAt"
             type="datetime-local"
             required
-            min={toDatetimeLocalValue(new Date())}
+            min={utcInstantToZonedDatetimeLocal(new Date(), timezone)}
             className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
           />
         </div>

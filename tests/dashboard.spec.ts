@@ -331,6 +331,69 @@ test.describe("vendor dashboard (authenticated)", () => {
     }
   });
 
+  // Story 6.1 (FR17): proves AC #2 end-to-end - the wall-clock digits
+  // typed into AddSlotForm are interpreted in the *vendor's* configured
+  // timezone, not the test runner's own machine timezone. Can't use a
+  // second throwaway createTestVendor() fixture here (no Clerk identity
+  // exists for one - AddSlotForm only renders for whichever vendor the
+  // single seeded E2E session is signed in as), so this temporarily
+  // mutates corner-sourdough's own timezone and restores it in `finally`,
+  // same discipline as the location-fixture cleanup pattern already used
+  // throughout this file. Asia/Tokyo (fixed UTC+9, no DST) keeps the
+  // expected instant stable regardless of season or the runner's own zone.
+  test("pickup slot is created relative to the vendor's configured timezone, not the browser's", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const originalTimezone = vendor.timezone;
+    const location = `Playwright TZ Check ${Date.now()}`;
+
+    await prisma.vendor.update({
+      where: { id: vendor.id },
+      data: { timezone: "Asia/Tokyo" },
+    });
+
+    try {
+      await page.goto("/dashboard/pickups");
+      await page.getByRole("button", { name: "Add slot" }).click();
+
+      // A fixed future wall-clock time, entered as-is - AddSlotForm must
+      // interpret "14:00" as 14:00 in Asia/Tokyo (this vendor's
+      // now-configured timezone), not in whatever timezone the browser or
+      // test-runner machine happens to be in.
+      await page.locator("#startsAt").fill("2026-12-15T14:00");
+      await page.locator("#endsAt").fill("2026-12-15T16:00");
+      await page.getByLabel("Location").fill(location);
+
+      await Promise.all([
+        page.waitForResponse("**/api/pickup-slots"),
+        page.getByRole("button", { name: "Save slot" }).click(),
+      ]);
+
+      // Dashboard listing display (AC #4) - re-rendered via router.refresh()
+      // after a successful save, formatted with the same (now-Asia/Tokyo)
+      // vendor.timezone the form itself just used.
+      await expect(
+        page.getByText(`Tue, Dec 15, 2:00 PM–4:00 PM · ${location}`),
+      ).toBeVisible({ timeout: 15_000 });
+
+      // The actual stored instant (AC #2) - 14:00 Asia/Tokyo (UTC+9, no
+      // DST) is 05:00 UTC the same day. Computed independently here, not
+      // by calling this app's own zonedWallTimeToUtc, so this is a genuine
+      // external proof, not a tautology.
+      const created = await prisma.pickupSlot.findFirst({
+        where: { vendorId: vendor.id, location },
+      });
+      expect(created?.startsAt.toISOString()).toBe("2026-12-15T05:00:00.000Z");
+    } finally {
+      await deletePickupSlotByLocation(vendor.id, location);
+      await prisma.vendor.update({
+        where: { id: vendor.id },
+        data: { timezone: originalTimezone },
+      });
+    }
+  });
+
   test("add-slot form shows a validation error when the end time is before the start time", async ({
     page,
   }) => {

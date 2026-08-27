@@ -60,6 +60,14 @@ model Vendor {
   deletedByAdmin   Admin?    @relation("VendorDeletedByAdmin", fields: [deletedByAdminId], references: [id], onDelete: SetNull)
   imageUrl    String? // Cloudinary URL for a banner/logo
   phone       String? // vendor contact number
+  // IANA timezone identifier (e.g. "America/New_York") - pickup-slot
+  // startsAt/endsAt wall-clock input is interpreted relative to this, not
+  // the submitting browser's timezone (Story 6.1, FR17). Every existing
+  // vendor gets this default via the migration itself - a plain @default on
+  // a new NOT NULL column backfills automatically, no per-row derivation
+  // needed (unlike Product.stockQuantity's migration, Story 1.2). No
+  // vendor/admin-facing UI to change it exists yet.
+  timezone    String   @default("America/New_York")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

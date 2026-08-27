@@ -26,6 +26,11 @@ export default function CartPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slots, setSlots] = useState<PickupSlotOption[]>([]);
+  // Story 6.1 (FR17): pickup windows are displayed in the vendor's own
+  // timezone, not the browser's - "UTC" only until the fetch below resolves
+  // and is never actually rendered before then (no slots render until
+  // slotsLoaded is true).
+  const [vendorTimezone, setVendorTimezone] = useState("UTC");
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   // Distinguishes "haven't fetched yet" from "fetched, genuinely zero slots"
   // (review finding) - without this, the zero-slot message paints on every
@@ -49,9 +54,10 @@ export default function CartPage() {
         if (!res.ok) throw new Error("Failed to load pickup times");
         return res.json();
       })
-      .then((data: { slots: PickupSlotOption[] }) => {
+      .then((data: { slots: PickupSlotOption[]; timezone: string }) => {
         if (cancelled) return;
         setSlots(data.slots);
+        setVendorTimezone(data.timezone);
         setSlotsLoaded(true);
         // AC #5: auto-select when there's exactly one upcoming slot - no
         // pointless click to "choose" the only option. Skipped when that
@@ -217,7 +223,7 @@ export default function CartPage() {
         {slotsLoaded && !slotsError && slots.length === 1 && (
           <p className="text-sm text-stone-700">
             <span className="font-medium">Pickup: </span>
-            {formatPickupWindow(new Date(slots[0].startsAt), new Date(slots[0].endsAt))}
+            {formatPickupWindow(new Date(slots[0].startsAt), new Date(slots[0].endsAt), vendorTimezone)}
             {slots[0].location ? ` · ${slots[0].location}` : ""}
             {!slots[0].available && (
               <span className="ml-2 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
@@ -247,7 +253,7 @@ export default function CartPage() {
                   disabled={!slot.available}
                   onChange={() => setSelectedSlotId(slot.id)}
                 />
-                {formatPickupWindow(new Date(slot.startsAt), new Date(slot.endsAt))}
+                {formatPickupWindow(new Date(slot.startsAt), new Date(slot.endsAt), vendorTimezone)}
                 {slot.location ? ` · ${slot.location}` : ""}
                 {!slot.available && (
                   <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">

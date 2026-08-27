@@ -42,10 +42,31 @@ describe("formatPrice", () => {
 
 describe("formatPickupWindow", () => {
   it("formats a same-day window as 'Weekday, Month Day, start–end'", () => {
+    // Constructed via the local-timezone Date constructor and formatted in
+    // that same runtime-local zone (Intl's own resolvedOptions()) - this
+    // test is about the string shape, not about a specific IANA zone, so it
+    // stays machine-timezone-agnostic exactly as it was before Story 6.1
+    // made timeZone a required parameter.
+    const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const startsAt = new Date(2026, 0, 15, 17, 0, 0);
     const endsAt = new Date(2026, 0, 15, 19, 30, 0);
-    expect(formatPickupWindow(startsAt, endsAt)).toBe(
+    expect(formatPickupWindow(startsAt, endsAt, localZone)).toBe(
       "Thu, Jan 15, 5:00 PM–7:30 PM",
+    );
+  });
+
+  // Story 6.1 (FR17): proves the timeZone parameter actually changes the
+  // displayed string, not just that it's accepted - the same absolute
+  // instant, displayed in two different zones, must show different
+  // wall-clock times.
+  it("displays the same instant differently in two different timezones", () => {
+    const startsAt = new Date("2026-01-15T22:00:00.000Z");
+    const endsAt = new Date("2026-01-16T00:00:00.000Z");
+    expect(formatPickupWindow(startsAt, endsAt, "America/New_York")).toBe(
+      "Thu, Jan 15, 5:00 PM–7:00 PM",
+    );
+    expect(formatPickupWindow(startsAt, endsAt, "Asia/Tokyo")).toBe(
+      "Fri, Jan 16, 7:00 AM–9:00 AM",
     );
   });
 });

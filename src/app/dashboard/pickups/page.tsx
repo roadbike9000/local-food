@@ -21,7 +21,7 @@ export default async function DashboardPickupsPage() {
         <h2 className="text-lg font-semibold">Pickup slots</h2>
       </div>
 
-      <AddSlotForm />
+      <AddSlotForm timezone={vendor.timezone} />
 
       {slots.length === 0 ? (
         <p className="text-stone-500">No pickup slots scheduled.</p>
@@ -33,7 +33,7 @@ export default async function DashboardPickupsPage() {
               className="flex items-center justify-between rounded-lg border border-stone-200 bg-white p-3 text-sm"
             >
               <span>
-                {formatPickupWindow(s.startsAt, s.endsAt)}
+                {formatPickupWindow(s.startsAt, s.endsAt, vendor.timezone)}
                 {s.location ? ` · ${s.location}` : ""}
               </span>
               <span className="text-stone-500">

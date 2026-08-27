@@ -26,6 +26,17 @@ export async function GET(
   _req: Request,
   { params }: { params: { vendorId: string } },
 ) {
+  // Story 6.1 (FR17): cart/page.tsx needs the vendor's timezone to display
+  // pickup windows the same way the storefront/dashboard do. An unknown
+  // vendorId falls back to "UTC" - slots will already be empty in that
+  // case (no matching vendorId can have any PickupSlot rows), so this
+  // value is never actually rendered; it exists only so the response shape
+  // stays well-typed rather than the field being conditionally absent.
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: params.vendorId },
+    select: { timezone: true },
+  });
+
   const slots = await prisma.pickupSlot.findMany({
     where: { vendorId: params.vendorId, startsAt: { gte: new Date() } },
     orderBy: { startsAt: "asc" },
@@ -66,5 +77,6 @@ export async function GET(
       location: s.location,
       available: (bookedCountBySlotId.get(s.id) ?? 0) < s.capacity,
     })),
+    timezone: vendor?.timezone ?? "UTC",
   });
 }
