@@ -1,5 +1,5 @@
 # generated: 2026-08-17
-# last_updated: 2026-08-25 (Story 5.1 created)
+# last_updated: 2026-08-27 (Epic 5 done)
 # project: local-food
 # project_key: NOKEY
 # tracking_system: file-system
@@ -73,9 +73,10 @@ development_status:
   4-2-product-image-displays-on-the-storefront: done
   epic-4-retrospective: done
 
-  epic-5: in-progress
+  epic-5: done
   5-1-customer-selects-a-pickup-slot-at-checkout: done
   5-2-pickup-slot-creation-rejects-a-past-start-time: done
+  epic-5-retrospective: done
 
 action_items:
   - epic: 1
@@ -171,7 +172,8 @@ action_items:
   - epic: 4
     action: "When patching a code-review finding, re-run the full regression suite (not just the touched test file) before considering the patch done - Story 4.1's regex-stack-overflow bug would have shipped past a narrower check"
     owner: "Dev"
-    status: open
+    status: done
+    note: "2026-08-27 (Epic 5 retro): confirmed applied and held in both Story 5.1 and 5.2 - each Dev Agent Record shows a full regression re-run (not just touched files) after applying review patches."
   - epic: 4
     action: "Before importing any constant from a route's schema.ts (or similar server-side module) into a \"use client\" component, check whether it reads process.env - a non-NEXT_PUBLIC_-prefixed value silently becomes undefined in the browser bundle with no build error"
     owner: "Dev"
@@ -179,4 +181,20 @@ action_items:
   - epic: 4
     action: "Consider whether create-story should cite doc section headings instead of raw line numbers for any file not being edited in the same commit as the story - line references have now drifted stale twice across two epics (misattribution in 3.1, wrong-field citation in 4.1)"
     owner: "Jeff"
+    status: open
+  - epic: 5
+    action: "Decide whether Story 5.3 (Vendor.timezone) reopens Epic 5 or becomes Epic 6, and schedule its create-story/ATDD pass"
+    owner: "Jeff"
+    status: open
+  - epic: 5
+    action: "When a review finding is deferred but explicitly flagged as more consequential due to the current story's own change, treat that as a signal to make a quick prioritization call rather than let it wait for a future epic to resurface it - this epic's PickupSlot.capacity gap sat live for 2 days after being flagged as urgent"
+    owner: "Jeff"
+    status: open
+  - epic: 5
+    action: "Consider whether create-story should cite doc section headings instead of raw line/file references - carried from Epic 4's retro, now a 3rd recurrence (3.1 misattribution, 4.1 wrong-field citation, 5.2 wrong-file citation)"
+    owner: "Jeff"
+    status: open
+  - epic: 5
+    action: "Before importing any constant from a route's schema.ts into a \"use client\" component, check whether it reads process.env - carried from Epic 4's retro, still unexercised"
+    owner: "Dev"
     status: open
