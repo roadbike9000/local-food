@@ -3,8 +3,11 @@ import {
   getVendorBySlug,
   createTestProduct,
   createTestVendor,
+  createTestPickupSlot,
+  createTestOrder,
   deleteProduct,
   deleteOrder,
+  deletePickupSlotByLocation,
   deleteVendorBySlug,
   prisma,
 } from "./helpers/db";
@@ -325,6 +328,138 @@ test.describe("checkout API", () => {
         expect(order!.pickupSlotId).toBe(slot.id);
       } finally {
         if (order) await deleteOrder(order.id);
+      }
+    },
+  );
+
+  test(
+    "rejects a checkout once the selected slot is at capacity (400)",
+    async ({ request }) => {
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = vendor.products.find((p) => p.stockQuantity >= 1);
+      if (!product) throw new Error("Seed data missing a product with stock");
+      const slot = await createTestPickupSlot(vendor.id, {
+        location: "Capacity Test Full Slot",
+        capacity: 1,
+      });
+      const fixtureOrder = await createTestOrder(vendor.id, {
+        pickupSlotId: slot.id,
+        status: "PENDING",
+      });
+
+      try {
+        const response = await request.post("/api/checkout", {
+          data: {
+            vendorId: vendor.id,
+            pickupSlotId: slot.id,
+            customerName: "Playwright Full Slot Check",
+            customerPhone: "+15005550091",
+            items: [{ productId: product.id, quantity: 1 }],
+          },
+        });
+
+        expect(response.status()).toBe(400);
+        // Distinct message from the slot-not-found case, proving the
+        // capacity check ran (not just any 400 from a bad slot lookup).
+        const body = await response.json();
+        expect(body.error).toBe("Selected pickup time is full");
+
+        const created = await prisma.order.findFirst({
+          where: { vendorId: vendor.id, customerPhone: "+15005550091" },
+        });
+        expect(created).toBeNull();
+      } finally {
+        await deleteOrder(fixtureOrder.id);
+        await deletePickupSlotByLocation(vendor.id, "Capacity Test Full Slot");
+      }
+    },
+  );
+
+  test(
+    "a PAID order counts toward capacity too, not just PENDING",
+    async ({ request }) => {
+      // The decision (2026-08-27) was PENDING + PAID both count - a
+      // customer mid-checkout has already claimed a spot before payment
+      // confirms. This isolates the PAID half of that decision; the
+      // PENDING half is covered by the previous test.
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = vendor.products.find((p) => p.stockQuantity >= 1);
+      if (!product) throw new Error("Seed data missing a product with stock");
+      const slot = await createTestPickupSlot(vendor.id, {
+        location: "Capacity Test PAID Slot",
+        capacity: 1,
+      });
+      const fixtureOrder = await createTestOrder(vendor.id, {
+        pickupSlotId: slot.id,
+        status: "PAID",
+      });
+
+      try {
+        const response = await request.post("/api/checkout", {
+          data: {
+            vendorId: vendor.id,
+            pickupSlotId: slot.id,
+            customerName: "Playwright PAID Capacity Check",
+            customerPhone: "+15005550090",
+            items: [{ productId: product.id, quantity: 1 }],
+          },
+        });
+
+        expect(response.status()).toBe(400);
+        const body = await response.json();
+        expect(body.error).toBe("Selected pickup time is full");
+      } finally {
+        await deleteOrder(fixtureOrder.id);
+        await deletePickupSlotByLocation(vendor.id, "Capacity Test PAID Slot");
+      }
+    },
+  );
+
+  test(
+    "succeeds when under capacity, alongside an existing order on the same slot",
+    async ({ request }) => {
+      // Proves the boundary is bookedCount >= capacity, not > capacity -
+      // one existing order against a capacity-2 slot must still leave room
+      // for a second.
+      const vendor = await getVendorBySlug("corner-sourdough");
+      const product = vendor.products.find((p) => p.stockQuantity >= 1);
+      if (!product) throw new Error("Seed data missing a product with stock");
+      const slot = await createTestPickupSlot(vendor.id, {
+        location: "Capacity Test Room Slot",
+        capacity: 2,
+      });
+      const fixtureOrder = await createTestOrder(vendor.id, {
+        pickupSlotId: slot.id,
+        status: "PENDING",
+      });
+      const customerPhone = `+1500555${Date.now() % 10000}`.padEnd(12, "0");
+
+      try {
+        const response = await request.post("/api/checkout", {
+          data: {
+            vendorId: vendor.id,
+            pickupSlotId: slot.id,
+            customerName: "Playwright Room Left Check",
+            customerPhone,
+            items: [{ productId: product.id, quantity: 1 }],
+          },
+        });
+
+        test.skip(response.status() === 500, "Stripe test keys not configured; skipping");
+        expect(response.status()).toBe(200);
+
+        const created = await prisma.order.findFirst({
+          where: { vendorId: vendor.id, customerPhone },
+        });
+        try {
+          expect(created).not.toBeNull();
+          expect(created!.pickupSlotId).toBe(slot.id);
+        } finally {
+          if (created) await deleteOrder(created.id);
+        }
+      } finally {
+        await deleteOrder(fixtureOrder.id);
+        await deletePickupSlotByLocation(vendor.id, "Capacity Test Room Slot");
       }
     },
   );

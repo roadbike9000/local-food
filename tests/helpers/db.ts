@@ -63,6 +63,9 @@ export async function createTestOrder(
     totalCents: number;
     status: "PENDING" | "PAID" | "READY" | "COMPLETED" | "CANCELLED";
     smsNotified: boolean;
+    // PickupSlot.capacity enforcement: lets capacity tests build a fixture
+    // order bound to a specific slot without a real checkout.
+    pickupSlotId: string;
     // Story 1.4: lets webhook/concurrency tests build a realistic
     // order-with-line-items fixture (needed to exercise per-line
     // decrementStock() calls) without hand-rolling raw Prisma calls in
@@ -85,6 +88,7 @@ export async function createTestOrder(
       status: overrides.status ?? "PENDING",
       smsNotified: overrides.smsNotified ?? false,
       stripeSessionId: overrides.stripeSessionId,
+      pickupSlotId: overrides.pickupSlotId,
       ...(overrides.items ? { items: { create: overrides.items } } : {}),
     },
   });

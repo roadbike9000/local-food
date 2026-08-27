@@ -14,6 +14,7 @@ type PickupSlotOption = {
   startsAt: string;
   endsAt: string;
   location: string | null;
+  available: boolean;
 };
 
 // The cart + checkout page. Collects customer contact info, then calls our
@@ -53,8 +54,11 @@ export default function CartPage() {
         setSlots(data.slots);
         setSlotsLoaded(true);
         // AC #5: auto-select when there's exactly one upcoming slot - no
-        // pointless click to "choose" the only option.
-        if (data.slots.length === 1) setSelectedSlotId(data.slots[0].id);
+        // pointless click to "choose" the only option. Skipped when that
+        // one slot is full - nothing to auto-select into.
+        if (data.slots.length === 1 && data.slots[0].available) {
+          setSelectedSlotId(data.slots[0].id);
+        }
       })
       .catch(() => {
         if (cancelled) return;
@@ -215,6 +219,11 @@ export default function CartPage() {
             <span className="font-medium">Pickup: </span>
             {formatPickupWindow(new Date(slots[0].startsAt), new Date(slots[0].endsAt))}
             {slots[0].location ? ` · ${slots[0].location}` : ""}
+            {!slots[0].available && (
+              <span className="ml-2 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                Full
+              </span>
+            )}
           </p>
         )}
 
@@ -226,17 +235,25 @@ export default function CartPage() {
             {slots.map((slot) => (
               <label
                 key={slot.id}
-                className="flex items-center gap-2 text-sm text-stone-700"
+                className={`flex items-center gap-2 text-sm ${
+                  slot.available ? "text-stone-700" : "text-stone-400"
+                }`}
               >
                 <input
                   type="radio"
                   name="pickupSlot"
                   value={slot.id}
                   checked={selectedSlotId === slot.id}
+                  disabled={!slot.available}
                   onChange={() => setSelectedSlotId(slot.id)}
                 />
                 {formatPickupWindow(new Date(slot.startsAt), new Date(slot.endsAt))}
                 {slot.location ? ` · ${slot.location}` : ""}
+                {!slot.available && (
+                  <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                    Full
+                  </span>
+                )}
               </label>
             ))}
           </fieldset>
