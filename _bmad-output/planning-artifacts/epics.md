@@ -33,6 +33,7 @@ FR13: Vendor is notified via a dashboard banner of any Product still at the plac
 FR14: Vendor can upload a photo for a product; customers see it on the storefront (listing and detail).
 FR15: Customer selects a pickup slot during checkout; the resulting Order is linked to that slot.
 FR16: A vendor cannot create a pickup slot whose start time has already passed.
+FR17: A pickup slot's `startsAt`/`endsAt` are interpreted relative to that vendor's own configured timezone, not the timezone of whoever's browser is creating the slot.
 
 ### NonFunctional Requirements
 
@@ -53,6 +54,7 @@ NFR4: No new external dependency is introduced — Admin auth reuses Clerk, stoc
 - `Product.imageUrl` already exists in the schema (Cloudinary URL) and is already accepted by `CreateProductSchema`, but has zero UI wiring anywhere (no upload, no display) — Epic 4 wires it end-to-end. No schema migration needed for the single-image scope decided for this epic (see Epic 4 below).
 - `Order.pickupSlotId` already exists in the schema (nullable) but is never set — `POST /api/checkout` has no reference to `PickupSlot` at all today. Epic 5 wires checkout to capture and validate a slot selection; no schema migration needed for Story 5.1.
 - Epic 4 and Epic 5 are both standalone — no dependency on Epics 1-3 or on each other.
+- `Vendor` has no timezone field today — `AddSlotForm.tsx` interprets its `datetime-local` input using whoever's browser submits the form, with nothing stored about which timezone that was. Epic 6 adds `Vendor.timezone` (new, backfilled column) and threads it through slot creation. No date library (`date-fns`/`luxon`/`dayjs`) exists in this codebase today — Epic 6 either adds one or does the UTC-offset conversion manually; a decision for that story, not decided here.
 
 ### UX Design Requirements
 
@@ -75,6 +77,7 @@ FR10: Epic 3 — low-stock SMS alert
 FR14: Epic 4 — vendor product image upload + storefront display
 FR15: Epic 5 — checkout captures pickup-slot selection, Order links to it
 FR16: Epic 5 — pickup slot creation rejects a past start time
+FR17: Epic 6 — pickup-slot times interpreted relative to the vendor's own timezone
 
 ## Epic List
 
@@ -98,6 +101,10 @@ Vendors can upload a photo for each product so customers see what they're actual
 Customer orders are linked to the pickup slot they were placed against, and a vendor can't create a slot that's already in the past. Standalone — no dependency on Epics 1-3, though Story 5.1 touches the same `/api/checkout` route Epic 1 built on.
 **FRs covered:** FR15, FR16
 **Scope note:** these two epics are the direct result of a scenario review with Jeff (2026-08-24) — see `scenarios from Jeff/Local Food Scnearios from Jeff.rtf`. Two of that review's four scenarios (vendor delete+re-add, ASCII punctuation in names) turned out to already be correctly handled by existing code and did **not** produce a new epic; see `deferred-work.md`'s new entry for the one small adjacent gap they did surface (accented/non-ASCII names). Jeff's date/timezone scenario surfaced a real, concrete prerequisite gap (orders were never linked to pickup slots at all — closed by Story 5.1) and a mechanical validation gap (Story 5.2), but the deeper question behind it — does this app need an explicit vendor-storefront timezone concept — is still open and deliberately **not** resolved here. See `deferred-work.md`'s open decision entry.
+
+### Epic 6: Vendor Pickup-Slot Timezone
+A vendor's pickup-slot times are interpreted relative to that vendor's own configured timezone, not the timezone of whoever's browser happened to submit the slot form. Resolves the open timezone question Epic 5 deliberately left unanswered (`deferred-work.md`, decided by Jeff 2026-08-26, scoped into a story here on 2026-08-27). Deliberately a new epic rather than a reopening of Epic 5 — Epic 5 closed with its original 2-story scope and a completed retrospective; this is genuinely new, standalone follow-up work, not a gap in Epic 5's own stories.
+**FRs covered:** FR17
 
 ## Epic 1: Accurate Stock & Cart
 
@@ -365,4 +372,34 @@ So that customers are never offered a pickup window that's already over.
 
 *(FR16.)*
 
-**Not yet a story:** the vendor-storefront-timezone question this epic's scenario review raised is now decided (2026-08-26, Jeff: add `Vendor.timezone`, compute all slot/cutoff times relative to it — see `deferred-work.md`) but not yet scoped or implemented. A future Story 5.3 should cover: the `Vendor.timezone` schema migration, threading it through `AddSlotForm.tsx`'s `datetime-local` handling, and any checkout/storefront "upcoming" logic that currently assumes a single implicit timezone. Doesn't block 5.1/5.2, which already shipped.
+**Not yet a story (as of Epic 5's own completion):** the vendor-storefront-timezone question this epic's scenario review raised was decided (2026-08-26, Jeff: add `Vendor.timezone`, compute all slot/cutoff times relative to it — see `deferred-work.md`) but not yet scoped or implemented as of Epic 5's retrospective. It's now scoped as Story 6.1, below — a new epic rather than a reopening of this one (Epic 5 closed with its original 2-story scope intact).
+
+## Epic 6: Vendor Pickup-Slot Timezone
+
+A vendor's pickup-slot times are interpreted relative to that vendor's own configured timezone, not the timezone of whoever's browser happened to submit the slot form. Standalone — no dependency on Epics 1-4; builds on Epic 5's `PickupSlot`/checkout wiring but doesn't require any further changes to it (the `startsAt`/`endsAt` comparisons Epic 5 added already compare absolute instants and are timezone-agnostic by construction — see Story 5.2's own Dev Notes).
+
+### Story 6.1: Pickup-slot times are interpreted in the vendor's own timezone
+
+As a vendor,
+I want the pickup times I enter to be understood as *my* local time, not the browser's,
+So that a slot I create is never silently off by however many hours separate my timezone from whoever's device submitted the form.
+
+**Acceptance Criteria:**
+
+**Given** the `Vendor` model has no timezone concept today
+**When** this story ships
+**Then** `Vendor` gains a `timezone` column (IANA timezone identifier, e.g. `"America/New_York"`) with a sane default, backfilled for every existing vendor — no admin/vendor-facing UI to *change* it is required by this story, just the field existing and being used
+
+**Given** a vendor submitting `AddSlotForm.tsx`'s `datetime-local` inputs
+**When** they enter a `startsAt`/`endsAt`
+**Then** the value is interpreted as being in that vendor's configured `timezone`, not the submitting browser's local timezone, before being converted to the absolute UTC instant stored in `PickupSlot.startsAt`/`endsAt` — closes the exact gap named in the original scenario review: someone in a different timezone than the vendor's actual business location can no longer silently create a slot that's off by the offset between the two
+
+**Given** the existing past-`startsAt` rejection (`CreateSlotSchema`, Story 5.2) and the existing "upcoming slots" queries (Story 5.1's public pickup-slots route, `POST /api/checkout`'s slot lookup)
+**When** this story ships
+**Then** both continue to work correctly without modification — they already compare absolute UTC instants (`new Date()` on the server vs. the stored instant), which is timezone-agnostic by construction; confirm this holds rather than assuming, and note explicitly in Completion Notes if a gap is found
+
+**Given** the storefront's "Next pickup" banner (`formatPickupWindow`, `vendors/[slug]/page.tsx`) and the vendor dashboard's own slot listing
+**When** a pickup time is displayed
+**Then** define and document which timezone it's displayed in (the vendor's configured timezone is the natural choice for both surfaces, since pickup happens at the vendor's physical location regardless of which timezone the viewer is browsing from) — this is a real design decision this story needs to make explicitly, not inherit by accident from `formatPickupWindow`'s current browser-local behavior
+
+*(FR17. Decision needed during story creation: this codebase has no date library today (`grep` confirms no `date-fns`/`luxon`/`dayjs`/`date-fns-tz` in `package.json`) — whether to add one (`date-fns-tz` is a natural minimal fit) or hand-roll the offset conversion with raw `Intl.DateTimeFormat` is an explicit choice this story needs to make, not a default to inherit.)*
