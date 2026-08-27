@@ -63,6 +63,22 @@ export async function POST(req: Request) {
     );
   }
 
+  // Capacity check - PENDING counts alongside PAID, not just PAID, since a
+  // customer mid-checkout (Stripe Checkout session open, not yet paid) has
+  // already claimed a spot. Point-in-time check, not an atomic reservation
+  // under concurrent checkouts for the same slot's last spot - same,
+  // already-accepted tradeoff as the stock-sufficiency check below (see
+  // that check's own comment and api-contracts.md).
+  const bookedCount = await prisma.order.count({
+    where: { pickupSlotId: pickupSlot.id, status: { in: ["PENDING", "PAID"] } },
+  });
+  if (bookedCount >= pickupSlot.capacity) {
+    return NextResponse.json(
+      { error: "Selected pickup time is full" },
+      { status: 400 },
+    );
+  }
+
   // A cart can list the same product across multiple lines; aggregate the
   // requested quantity per product so both checks below evaluate total
   // demand, not each line in isolation (otherwise e.g. two lines of

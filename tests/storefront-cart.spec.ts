@@ -9,6 +9,8 @@ import {
   deleteVendorBySlug,
   createTestPickupSlot,
   deletePickupSlotByLocation,
+  createTestOrder,
+  deleteOrder,
   prisma,
 } from "./helpers/db";
 import { uploadImage } from "../src/lib/cloudinary";
@@ -671,6 +673,92 @@ test.describe("pickup slot selection at checkout (Story 5.1)", () => {
         await expect(page.getByRole("button", { name: /checkout/i })).toBeDisabled();
       } finally {
         await deleteProduct(product.id);
+        await deleteVendorBySlug(vendor.slug);
+      }
+    },
+  );
+
+  test(
+    "[P1] a full single slot is shown but not auto-selected, and Checkout stays disabled",
+    async ({ page }) => {
+      // AC #5's auto-select regression risk: without the available check,
+      // this slot (the only one) would auto-select despite being full,
+      // letting the customer reach a Checkout click that only then 400s.
+      const vendor = await createTestVendor();
+      const product = await createTestProduct(vendor.id);
+      const slot = await createTestPickupSlot(vendor.id, {
+        location: "Full Single Slot",
+        capacity: 1,
+      });
+      const fixtureOrder = await createTestOrder(vendor.id, {
+        pickupSlotId: slot.id,
+        status: "PENDING",
+      });
+
+      try {
+        await page.goto(`/vendors/${vendor.slug}`);
+        await page.getByRole("button", { name: "Add" }).click();
+        await page.getByRole("link", { name: /cart/i }).click();
+        await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+        await page.getByPlaceholder("Your name").fill("Playwright Full Single Slot");
+        await page
+          .getByPlaceholder("Mobile number (for pickup texts)")
+          .fill("+15005550089");
+
+        await expect(page.getByText("Full")).toBeVisible();
+        await expect(page.getByRole("button", { name: /checkout/i })).toBeDisabled();
+      } finally {
+        await deleteOrder(fixtureOrder.id);
+        await deleteProduct(product.id);
+        await deletePickupSlotByLocation(vendor.id, "Full Single Slot");
+        await deleteVendorBySlug(vendor.slug);
+      }
+    },
+  );
+
+  test(
+    "[P1] 2 slots, one full: the full one is disabled and badged, the other stays selectable",
+    async ({ page }) => {
+      const vendor = await createTestVendor();
+      const product = await createTestProduct(vendor.id);
+      const fullSlot = await createTestPickupSlot(vendor.id, {
+        location: "Full Slot Of Two",
+        capacity: 1,
+      });
+      const openSlot = await createTestPickupSlot(vendor.id, {
+        location: "Open Slot Of Two",
+        capacity: 1,
+      });
+      const fixtureOrder = await createTestOrder(vendor.id, {
+        pickupSlotId: fullSlot.id,
+        status: "PENDING",
+      });
+
+      try {
+        await page.goto(`/vendors/${vendor.slug}`);
+        await page.getByRole("button", { name: "Add" }).click();
+        await page.getByRole("link", { name: /cart/i }).click();
+        await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+        await page.getByPlaceholder("Your name").fill("Playwright Two Slots One Full");
+        await page
+          .getByPlaceholder("Mobile number (for pickup texts)")
+          .fill("+15005550088");
+
+        const fullRadio = page.getByRole("radio", { name: /Full Slot Of Two/ });
+        const openRadio = page.getByRole("radio", { name: /Open Slot Of Two/ });
+
+        await expect(fullRadio).toBeDisabled();
+        await expect(openRadio).toBeEnabled();
+
+        const checkoutButton = page.getByRole("button", { name: /checkout/i });
+        await expect(checkoutButton).toBeDisabled();
+        await openRadio.check();
+        await expect(checkoutButton).toBeEnabled();
+      } finally {
+        await deleteOrder(fixtureOrder.id);
+        await deleteProduct(product.id);
+        await deletePickupSlotByLocation(vendor.id, "Full Slot Of Two");
+        await deletePickupSlotByLocation(vendor.id, "Open Slot Of Two");
         await deleteVendorBySlug(vendor.slug);
       }
     },
