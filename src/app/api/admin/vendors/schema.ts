@@ -13,4 +13,8 @@ export const CreateVendorSchema = z.object({
   slug: z.string().trim().min(1),
   phone: z.string().optional(),
   description: z.string().optional(),
+  // ATDD red-phase stub (Story 7.1) — correctly typed and defaults to the
+  // schema default, but not yet validated against isValidTimeZone();
+  // dev-story adds `.refine(isValidTimeZone, "Invalid timezone")`.
+  timezone: z.string().default("America/New_York"),
 });
