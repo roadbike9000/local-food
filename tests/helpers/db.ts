@@ -167,6 +167,7 @@ export async function createTestVendor(
     slug: string;
     deletedAt: Date | null;
     deletedByAdminId: string | null;
+    timezone: string;
   }> = {},
 ) {
   // Date.now() alone can collide between two workers under
@@ -180,6 +181,13 @@ export async function createTestVendor(
       slug: overrides.slug ?? `test-vendor-playwright-${unique}`,
       deletedAt: overrides.deletedAt ?? null,
       deletedByAdminId: overrides.deletedByAdminId ?? null,
+      // Story 6.1 - `undefined` (not provided) lets Prisma apply the
+      // schema's own default ("America/New_York"), same idiom as the
+      // siblings above. Currently unused by any test (code review found
+      // this while it was implemented via a different, inconsistent
+      // pattern) - kept as a natural extension of this fixture's existing
+      // override shape for whichever future test needs it.
+      timezone: overrides.timezone ?? undefined,
     },
   });
 }

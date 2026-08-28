@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useCart } from "@/components/CartProvider";
 import { formatPickupWindow, formatPrice } from "@/lib/utils";
+import { isValidTimeZone } from "@/lib/timezone";
 
 // Local shape, not a Prisma model type - keeps this "use client" file from
 // needing to reason about the full Prisma PickupSlot (startsAt/endsAt come
@@ -26,6 +27,11 @@ export default function CartPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slots, setSlots] = useState<PickupSlotOption[]>([]);
+  // Story 6.1 (FR17): pickup windows are displayed in the vendor's own
+  // timezone, not the browser's - "UTC" only until the fetch below resolves
+  // and is never actually rendered before then (no slots render until
+  // slotsLoaded is true).
+  const [vendorTimezone, setVendorTimezone] = useState("UTC");
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   // Distinguishes "haven't fetched yet" from "fetched, genuinely zero slots"
   // (review finding) - without this, the zero-slot message paints on every
@@ -41,6 +47,11 @@ export default function CartPage() {
     setSelectedSlotId(null);
     setSlotsLoaded(false);
     setSlotsError(false);
+    // Reset alongside the rest of this state when the vendor changes, not
+    // just on the initial mount (code review, Story 6.1) — without this, a
+    // vendor switch briefly re-renders the *previous* vendor's slots in the
+    // *previous* vendor's timezone until the new fetch resolves.
+    setVendorTimezone("UTC");
     if (!vendorId) return;
 
     let cancelled = false;
@@ -49,9 +60,19 @@ export default function CartPage() {
         if (!res.ok) throw new Error("Failed to load pickup times");
         return res.json();
       })
-      .then((data: { slots: PickupSlotOption[] }) => {
+      .then((data: { slots: PickupSlotOption[]; timezone: unknown }) => {
         if (cancelled) return;
         setSlots(data.slots);
+        // data.timezone is cast from res.json(), not runtime-checked by the
+        // type annotation alone (code review, Story 6.1) — a missing/bad
+        // field here must not silently fall through to Intl's own
+        // browser-zone default, since that's the exact bug this story
+        // exists to fix.
+        setVendorTimezone(
+          typeof data.timezone === "string" && isValidTimeZone(data.timezone)
+            ? data.timezone
+            : "UTC",
+        );
         setSlotsLoaded(true);
         // AC #5: auto-select when there's exactly one upcoming slot - no
         // pointless click to "choose" the only option. Skipped when that
@@ -217,7 +238,7 @@ export default function CartPage() {
         {slotsLoaded && !slotsError && slots.length === 1 && (
           <p className="text-sm text-stone-700">
             <span className="font-medium">Pickup: </span>
-            {formatPickupWindow(new Date(slots[0].startsAt), new Date(slots[0].endsAt))}
+            {formatPickupWindow(new Date(slots[0].startsAt), new Date(slots[0].endsAt), vendorTimezone)}
             {slots[0].location ? ` · ${slots[0].location}` : ""}
             {!slots[0].available && (
               <span className="ml-2 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
@@ -247,7 +268,7 @@ export default function CartPage() {
                   disabled={!slot.available}
                   onChange={() => setSelectedSlotId(slot.id)}
                 />
-                {formatPickupWindow(new Date(slot.startsAt), new Date(slot.endsAt))}
+                {formatPickupWindow(new Date(slot.startsAt), new Date(slot.endsAt), vendorTimezone)}
                 {slot.location ? ` · ${slot.location}` : ""}
                 {!slot.available && (
                   <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
