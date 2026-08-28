@@ -1,6 +1,10 @@
+---
+baseline_commit: 7b79ef684169f395e3201468bf75664364d1ffae
+---
+
 # Story 7.1: Admin sets a vendor's real timezone
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -22,35 +26,35 @@ so that `Vendor.timezone` reflects where the vendor actually operates instead of
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: `timezone` on vendor creation (AC #1, #5)
-  - [ ] `src/app/api/admin/vendors/schema.ts` — add `timezone: z.string().refine(isValidTimeZone, "Invalid timezone").default("America/New_York")` (or equivalent shape) to `CreateVendorSchema`, importing `isValidTimeZone` from `@/lib/timezone`. Match the existing field style (`.trim()` isn't relevant here — a timezone identifier has no meaningful whitespace-only case, but a malformed string must still be rejected).
-  - [ ] `src/app/api/admin/vendors/route.ts` — pass `parsed.data.timezone` into `prisma.vendor.create()`'s `data`.
-  - [ ] `src/components/admin/AddVendorForm.tsx` — add a `timezone` field to the form. A plain `<select>` populated from `Intl.supportedValuesOf("timeZone")` is the natural fit (no new dependency; this is the same runtime API `isValidTimeZone()` considered and rejected for *validation* in Story 6.1 because it excludes `"UTC"` — that gap doesn't matter here since `"UTC"` isn't a real vendor location and `America/New_York` is still the sane default). Default the selection to `"America/New_York"`, matching the schema default.
-  - [ ] `docs/api-contracts.md` — update `POST /api/admin/vendors`'s request-body documentation for the new field. [Source: docs/api-contracts.md#`POST /api/admin/vendors`]
+- [x] Task 1: `timezone` on vendor creation (AC #1, #5)
+  - [x] `src/app/api/admin/vendors/schema.ts` — add `timezone: z.string().refine(isValidTimeZone, "Invalid timezone").default("America/New_York")` (or equivalent shape) to `CreateVendorSchema`, importing `isValidTimeZone` from `@/lib/timezone`. Match the existing field style (`.trim()` isn't relevant here — a timezone identifier has no meaningful whitespace-only case, but a malformed string must still be rejected).
+  - [x] `src/app/api/admin/vendors/route.ts` — pass `parsed.data.timezone` into `prisma.vendor.create()`'s `data`.
+  - [x] `src/components/admin/AddVendorForm.tsx` — add a `timezone` field to the form. A plain `<select>` populated from `Intl.supportedValuesOf("timeZone")` is the natural fit (no new dependency; this is the same runtime API `isValidTimeZone()` considered and rejected for *validation* in Story 6.1 because it excludes `"UTC"` — that gap doesn't matter here since `"UTC"` isn't a real vendor location and `America/New_York` is still the sane default). Default the selection to `"America/New_York"`, matching the schema default.
+  - [x] `docs/api-contracts.md` — update `POST /api/admin/vendors`'s request-body documentation for the new field. [Source: docs/api-contracts.md#`POST /api/admin/vendors`]
 
-- [ ] Task 2: New route to edit an existing vendor's timezone (AC #2, #5)
-  - [ ] New file `src/app/api/admin/vendors/[id]/schema.ts` — `UpdateVendorSchema` with a single `timezone` field, same `isValidTimeZone()` refine as Task 1 (factor the refine into a shared constant/function between the two schema files if that avoids duplicating the error message, but don't force a shared base schema if the two files' other fields diverge later — a single duplicated refine call is cheap).
-  - [ ] New file `src/app/api/admin/vendors/[id]/route.ts` — `PATCH /api/admin/vendors/[id]`. Auth: `getCurrentAdmin()`, `401` if none, same as every other admin route (`POST /api/admin/vendors`, the deactivate route) — **not** covered by `middleware.ts`'s matcher (`/admin(.*)` matches page routes, not this API path), same reasoning documented in both existing admin route files. No ownership scoping needed (admin operates across all vendors, same as deactivate). Parse body against `UpdateVendorSchema`, `400` on failure. Look up the vendor by `params.id`; `404` if not found (a plain `findUnique`-then-`update` is fine here — unlike deactivate's `updateMany` atomic-claim pattern, there's no concurrent-writer race to guard against for a single scalar field with no state-machine semantics). Update `timezone`, return `200 { vendor }`.
-  - [ ] `docs/api-contracts.md` — add a new `### PATCH /api/admin/vendors/[id]` section, matching the existing `POST .../deactivate` section's format (auth, request/response shape, behavior). [Source: docs/api-contracts.md#`POST /api/admin/vendors/[id]/deactivate`]
+- [x] Task 2: New route to edit an existing vendor's timezone (AC #2, #5)
+  - [x] New file `src/app/api/admin/vendors/[id]/schema.ts` — `UpdateVendorSchema` with a single `timezone` field, same `isValidTimeZone()` refine as Task 1 (factor the refine into a shared constant/function between the two schema files if that avoids duplicating the error message, but don't force a shared base schema if the two files' other fields diverge later — a single duplicated refine call is cheap).
+  - [x] New file `src/app/api/admin/vendors/[id]/route.ts` — `PATCH /api/admin/vendors/[id]`. Auth: `getCurrentAdmin()`, `401` if none, same as every other admin route (`POST /api/admin/vendors`, the deactivate route) — **not** covered by `middleware.ts`'s matcher (`/admin(.*)` matches page routes, not this API path), same reasoning documented in both existing admin route files. No ownership scoping needed (admin operates across all vendors, same as deactivate). Parse body against `UpdateVendorSchema`, `400` on failure. Look up the vendor by `params.id`; `404` if not found (a plain `findUnique`-then-`update` is fine here — unlike deactivate's `updateMany` atomic-claim pattern, there's no concurrent-writer race to guard against for a single scalar field with no state-machine semantics). Update `timezone`, return `200 { vendor }`.
+  - [x] `docs/api-contracts.md` — add a new `### PATCH /api/admin/vendors/[id]` section, matching the existing `POST .../deactivate` section's format (auth, request/response shape, behavior). [Source: docs/api-contracts.md#`POST /api/admin/vendors/[id]/deactivate`]
 
-- [ ] Task 3: Admin UI to edit an existing vendor's timezone (AC #3)
-  - [ ] `src/app/admin/vendors/page.tsx` — the vendors table currently has Name/Slug/Status columns with no per-row edit affordance (`DeactivateVendorButton` is the only row action). Add a timezone column and an edit affordance — a new client component (e.g. `src/components/admin/EditVendorTimezoneControl.tsx`) following `DeactivateVendorButton.tsx`'s established shape: `"use client"`, local `submitting`/`error` state, `fetch` to the new `PATCH` route, `router.refresh()` on success. A `<select>` (same `Intl.supportedValuesOf("timeZone")` source as `AddVendorForm`) is simpler to implement correctly than a free-text input plus client-side validation, and avoids a round-trip just to discover a typo'd zone name — prefer it unless there's a concrete reason not to.
-  - [ ] No `window.confirm()` needed here (unlike `DeactivateVendorButton`) — changing a timezone is fully reversible by changing it back, unlike deactivation's real customer-facing, hard-to-undo consequence.
+- [x] Task 3: Admin UI to edit an existing vendor's timezone (AC #3)
+  - [x] `src/app/admin/vendors/page.tsx` — the vendors table currently has Name/Slug/Status columns with no per-row edit affordance (`DeactivateVendorButton` is the only row action). Add a timezone column and an edit affordance — a new client component (e.g. `src/components/admin/EditVendorTimezoneControl.tsx`) following `DeactivateVendorButton.tsx`'s established shape: `"use client"`, local `submitting`/`error` state, `fetch` to the new `PATCH` route, `router.refresh()` on success. A `<select>` (same `Intl.supportedValuesOf("timeZone")` source as `AddVendorForm`) is simpler to implement correctly than a free-text input plus client-side validation, and avoids a round-trip just to discover a typo'd zone name — prefer it unless there's a concrete reason not to.
+  - [x] No `window.confirm()` needed here (unlike `DeactivateVendorButton`) — changing a timezone is fully reversible by changing it back, unlike deactivation's real customer-facing, hard-to-undo consequence.
 
-- [ ] Task 4: Confirm existing read-side machinery picks up an edited timezone with no separate propagation step (AC #4)
-  - [ ] This task is verification, not new code — Story 6.1 already built `AddSlotForm.tsx`, `formatPickupWindow()`, and `GET /api/vendors/[vendorId]/pickup-slots` to read `Vendor.timezone` fresh via Prisma on every request/render; there is no cache layer between `Vendor.timezone` and any of these read sites today (confirmed: `src/app/vendors/[slug]/page.tsx` has no `export const revalidate`, and the dynamic-rendering fix from Story 1.3's deferred-work entry already forces `vendors/[slug]/page.tsx` to `force-dynamic`). Confirm this by testing it directly (Task 5's e2e test), not by re-reading the code and asserting it should work.
-  - [ ] If a gap is found (e.g. a caching layer this story's author didn't anticipate), note it explicitly in Completion Notes — don't silently patch around it without recording that AC #4's original assumption was wrong.
+- [x] Task 4: Confirm existing read-side machinery picks up an edited timezone with no separate propagation step (AC #4)
+  - [x] This task is verification, not new code — Story 6.1 already built `AddSlotForm.tsx`, `formatPickupWindow()`, and `GET /api/vendors/[vendorId]/pickup-slots` to read `Vendor.timezone` fresh via Prisma on every request/render; there is no cache layer between `Vendor.timezone` and any of these read sites today (confirmed: `src/app/vendors/[slug]/page.tsx` has no `export const revalidate`, and the dynamic-rendering fix from Story 1.3's deferred-work entry already forces `vendors/[slug]/page.tsx` to `force-dynamic`). Confirm this by testing it directly (Task 5's e2e test), not by re-reading the code and asserting it should work.
+  - [x] If a gap is found (e.g. a caching layer this story's author didn't anticipate), note it explicitly in Completion Notes — don't silently patch around it without recording that AC #4's original assumption was wrong.
 
-- [ ] Task 5: Tests (AC #1-#5)
-  - [ ] `src/app/api/admin/vendors/schema.test.ts` — extend for the new `timezone` field: accepts a valid IANA identifier, accepts an omitted value (falls back to the schema default), rejects a malformed/unrecognized one. Mirrors this file's existing pattern (see `rejects an empty name` etc.).
-  - [ ] New `src/app/api/admin/vendors/[id]/schema.test.ts` — same shape of coverage (valid/malformed) for `UpdateVendorSchema`.
-  - [ ] New API-level Playwright coverage for `PATCH /api/admin/vendors/[id]`, matching `tests/admin-vendors-api.spec.ts`'s and `tests/admin-deactivate-vendor.spec.ts`'s established conventions (admin-authenticated `request.patch()` calls, not full UI interaction) — covers: successful update, unauthenticated `401`, malformed timezone `400`, nonexistent vendor id `404`.
-  - [ ] New/extended UI-level Playwright coverage in `tests/admin-vendors.spec.ts`, matching its established conventions (real form interaction via the admin Playwright fixture) — covers: `AddVendorForm` accepting a non-default timezone selection and the created vendor persisting it (AC #1), and the new edit affordance changing an existing vendor's timezone (AC #3).
-  - [ ] The AC #4 read-side confirmation test: extend or add to `tests/dashboard.spec.ts`'s existing timezone-aware coverage (Story 6.1 added a test that temporarily mutates `corner-sourdough`'s timezone directly via test helpers) — this story's version should instead go through the real admin `PATCH` route to change the timezone, then assert the vendor dashboard's pickup-slot display picks up the new value, proving the full admin-edit-to-display path works end-to-end, not just the lower-level mutation Story 6.1's test used. Restore the original timezone in `finally`, same discipline as Story 6.1's test.
+- [x] Task 5: Tests (AC #1-#5)
+  - [x] `src/app/api/admin/vendors/schema.test.ts` — extend for the new `timezone` field: accepts a valid IANA identifier, accepts an omitted value (falls back to the schema default), rejects a malformed/unrecognized one. Mirrors this file's existing pattern (see `rejects an empty name` etc.).
+  - [x] New `src/app/api/admin/vendors/[id]/schema.test.ts` — same shape of coverage (valid/malformed) for `UpdateVendorSchema`.
+  - [x] New API-level Playwright coverage for `PATCH /api/admin/vendors/[id]`, matching `tests/admin-vendors-api.spec.ts`'s and `tests/admin-deactivate-vendor.spec.ts`'s established conventions (admin-authenticated `request.patch()` calls, not full UI interaction) — covers: successful update, unauthenticated `401`, malformed timezone `400`, nonexistent vendor id `404`.
+  - [x] New/extended UI-level Playwright coverage in `tests/admin-vendors.spec.ts`, matching its established conventions (real form interaction via the admin Playwright fixture) — covers: `AddVendorForm` accepting a non-default timezone selection and the created vendor persisting it (AC #1), and the new edit affordance changing an existing vendor's timezone (AC #3).
+  - [x] The AC #4 read-side confirmation test: extend or add to `tests/dashboard.spec.ts`'s existing timezone-aware coverage (Story 6.1 added a test that temporarily mutates `corner-sourdough`'s timezone directly via test helpers) — this story's version should instead go through the real admin `PATCH` route to change the timezone, then assert the vendor dashboard's pickup-slot display picks up the new value, proving the full admin-edit-to-display path works end-to-end, not just the lower-level mutation Story 6.1's test used. Restore the original timezone in `finally`, same discipline as Story 6.1's test.
 
-- [ ] Task 6: Docs sync (housekeeping, matches established precedent)
-  - [ ] `docs/data-models.md`'s `Vendor.timezone` row — remove the now-stale "No vendor/admin-facing UI to change it exists yet" clause, replace with a reference to this story's admin UI. [Source: docs/data-models.md#Vendor]
-  - [ ] `docs/api-contracts.md` — confirm the `POST /api/admin/vendors` and new `PATCH /api/admin/vendors/[id]` sections are both complete and consistent with Task 1/2's actual implementation before considering this task done.
+- [x] Task 6: Docs sync (housekeeping, matches established precedent)
+  - [x] `docs/data-models.md`'s `Vendor.timezone` row — remove the now-stale "No vendor/admin-facing UI to change it exists yet" clause, replace with a reference to this story's admin UI. [Source: docs/data-models.md#Vendor]
+  - [x] `docs/api-contracts.md` — confirm the `POST /api/admin/vendors` and new `PATCH /api/admin/vendors/[id]` sections are both complete and consistent with Task 1/2's actual implementation before considering this task done.
 
 ## Dev Notes
 
@@ -93,8 +97,43 @@ so that `Vendor.timezone` reflects where the vendor actually operates instead of
 
 ### Agent Model Used
 
+claude-sonnet-5
+
 ### Debug Log References
+
+- ATDD red-phase run (before this dev-story session): `npx vitest run` — 127 passed, 2 failed (both malformed-timezone rejection cases, the only genuinely unimplemented behavior). `npx tsc --noEmit` and `npm run lint` clean against the stubs.
+- Task 1/2 green-phase run: `npx vitest run` — 129/129 passed after adding `.refine(isValidTimeZone, "Invalid timezone")` to both schemas; both previously-red cases flipped with no test-file changes needed, confirming the ATDD scaffolds pinned the right behavior.
+- Full regression after all tasks: `npx vitest run` 129/129, `npx tsc --noEmit` clean, `npm run lint` clean, `npm run build` succeeds (new `/api/admin/vendors/[id]` route registered).
+- `CI=true npx playwright test` (full suite): first run — 1 failure, the new AC #4 test (`tests/dashboard.spec.ts`), same assertion (`patchResponse.ok()`) failing identically on both retries. Second full run — identical failure, same test, same line. Consistent, reproducible, not intermittent — investigated rather than dismissed. Isolated runs of the same test (alone, and alongside every other admin-session-consuming spec file) passed clean every time, narrowing the trigger to something specific to running deep into a long (~4 min) full-suite wall-clock run.
+- Root cause: the test used a bare `request.newContext({ storageState: adminAuthFile })` — an API-only context that never loads any page/JS, so Clerk's session cookie is used exactly as captured by global-setup at suite start, with no live refresh. Every other authenticated test in this codebase uses a real `page` with a `page.goto("/")` warm-up, letting Clerk's client-side SDK refresh the session — this test's admin identity had no equivalent, so its captured cookie could go stale by the time it ran late in a long suite. Fixed by opening a real second browser context/page (`browser.newContext({ storageState: adminAuthFile })` + `page.goto("/")`) and using `adminPage.request.patch(...)` instead of a bare API context.
+- Post-fix verification: `CI=true npx playwright test` (full suite) — run 1: 145/145 passed. Run 2: 144 passed, 1 flaky (`tests/admin-vendors.spec.ts`'s pre-existing "AC #3" test, a `Test timeout of 45000ms exceeded` that passed on Playwright's automatic retry) — a *different*, unrelated test than either of the two runs that failed before the fix, self-healed on retry, matching this project's already-documented pre-existing Clerk-session-TTL-under-full-suite-wall-clock-runtime flakiness class (Story 6.1's own investigation found the identical pattern: different unrelated tests failing on different runs, clean in isolation). This story's own new test (the one that was actually broken) passed clean on both post-fix runs — confirmed fixed, not just no-longer-reproducing.
 
 ### Completion Notes List
 
+- All 5 ACs implemented and verified. AC #1 (create-time field): `CreateVendorSchema` gains `timezone` with `isValidTimeZone()` validation and `"America/New_York"` default; `AddVendorForm.tsx` gets a `<select>` sourced from `Intl.supportedValuesOf("timeZone")`. AC #2 (edit-time field): new `PATCH /api/admin/vendors/[id]` route + `UpdateVendorSchema`, same validation. AC #3 (admin UI): new `EditVendorTimezoneControl.tsx`, wired into `/admin/vendors`'s table as a new Timezone column — deliberately rendered for deactivated vendors too (not hidden), since there's no reason admin shouldn't be able to correct a timezone on a deactivated vendor. AC #4 (read-side machinery, no separate propagation): verified by real end-to-end test, not by inspection — see Debug Log. AC #5 (malformed rejection, reusing `isValidTimeZone()`): both schemas call the same existing `src/lib/timezone.ts` helper, not a re-derived check — confirmed by the ATDD red-phase tests pinning the exact error message/path.
+- No task or AC required a settings-UI decision beyond what was already decided during story creation (admin-set field only) — nothing deferred on that front.
+- Task 4 found no gap: Story 6.1's read-side machinery genuinely has no cache layer between it and `Vendor.timezone` (confirmed both by static inspection — `force-dynamic` on the relevant routes/pages — and by the real end-to-end test in Task 5).
+- One genuine test-infrastructure bug found and fixed during this session, unrelated to any story AC: see Debug Log's root-cause note. Recorded here rather than silently folded into "implementation," since it's a real lesson (API-only Playwright contexts don't get Clerk's live session refresh that browser-page contexts do) that could recur in a future story reaching for the same `request.newContext()` shortcut for an authenticated-but-headless API call.
+- Full regression clean: `npx tsc --noEmit`, `npm run lint`, 129/129 Vitest, `npm run build`, and 2 consecutive full Playwright suite runs post-fix (145/145, then 144/145 + 1 flaky-but-passed-on-retry unrelated pre-existing test).
+
 ### File List
+
+- `src/app/api/admin/vendors/schema.ts` (modified — `timezone` field)
+- `src/app/api/admin/vendors/schema.test.ts` (modified — 3 new cases)
+- `src/app/api/admin/vendors/route.ts` (modified — passes `timezone` through)
+- `src/app/api/admin/vendors/[id]/schema.ts` (new — `UpdateVendorSchema`)
+- `src/app/api/admin/vendors/[id]/schema.test.ts` (new — 3 cases)
+- `src/app/api/admin/vendors/[id]/route.ts` (new — `PATCH` handler)
+- `src/components/admin/AddVendorForm.tsx` (modified — timezone `<select>`)
+- `src/components/admin/EditVendorTimezoneControl.tsx` (new)
+- `src/app/admin/vendors/page.tsx` (modified — new Timezone column)
+- `docs/api-contracts.md` (modified — `POST /api/admin/vendors` request body updated, new `PATCH /api/admin/vendors/[id]` section)
+- `docs/data-models.md` (modified — `Vendor.timezone` row updated)
+- `tests/admin-vendors-edit-api.spec.ts` (new — API-level `PATCH` coverage)
+- `tests/admin-vendors.spec.ts` (modified — 2 new UI-level cases)
+- `tests/dashboard.spec.ts` (modified — new AC #4 end-to-end case)
+- `_bmad-output/test-artifacts/atdd-checklist-7-1-admin-sets-a-vendors-real-timezone.md` (new, from the prior ATDD pass)
+
+## Change Log
+
+- 2026-08-28: Initial implementation — all 6 tasks, all 5 ACs. Includes one test-infrastructure fix (found and resolved during this same session, not a separate review round): the new AC #4 Playwright test's admin session needed a real browser page, not a bare `request.newContext()`, to avoid a stale-cookie 401 late in a full-suite run.

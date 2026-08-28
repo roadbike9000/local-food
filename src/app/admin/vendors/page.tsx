@@ -3,6 +3,7 @@ import { getCurrentAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
 import { AddVendorForm } from "@/components/admin/AddVendorForm";
 import { DeactivateVendorButton } from "@/components/admin/DeactivateVendorButton";
+import { EditVendorTimezoneControl } from "@/components/admin/EditVendorTimezoneControl";
 
 // Admin vendor onboarding + deactivation (Stories 2.2/2.3, AD-6). Same
 // per-page gate as src/app/admin/page.tsx - no shared layout guard exists
@@ -34,6 +35,7 @@ export default async function AdminVendorsPage() {
             <tr className="border-b border-stone-200 text-left text-stone-500">
               <th className="py-2">Name</th>
               <th className="py-2">Slug</th>
+              <th className="py-2">Timezone</th>
               <th className="py-2">Status</th>
             </tr>
           </thead>
@@ -42,6 +44,13 @@ export default async function AdminVendorsPage() {
               <tr key={v.id} className="border-b border-stone-100">
                 <td className="py-2">{v.name}</td>
                 <td className="py-2">{v.slug}</td>
+                <td className="py-2">
+                  <EditVendorTimezoneControl
+                    vendorId={v.id}
+                    vendorName={v.name}
+                    currentTimezone={v.timezone}
+                  />
+                </td>
                 <td className="py-2">
                   {v.deletedAt ? (
                     <span className="text-stone-500">Deactivated</span>

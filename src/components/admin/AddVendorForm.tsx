@@ -11,9 +11,17 @@ import { slugify } from "@/lib/utils";
 
 type CreatedVendor = { name: string; slug: string };
 
+// Full IANA list from the runtime itself - no static list to maintain,
+// no new dependency. Real, already-available API (Story 6.1's
+// isValidTimeZone() considered and rejected it for *validation* only
+// because it excludes "UTC", which doesn't matter for a <select> of real
+// vendor locations).
+const TIME_ZONES = Intl.supportedValuesOf("timeZone");
+
 export function AddVendorForm() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [timezone, setTimezone] = useState("America/New_York");
   // Auto-suggests the slug from the name until the admin edits the slug
   // field themselves - a common "auto-fill until touched" pattern, not
   // full auto-generation with no admin control (AC #1 has the admin
@@ -54,6 +62,7 @@ export function AddVendorForm() {
           slug,
           phone: phone || undefined,
           description: description || undefined,
+          timezone,
         }),
       });
 
@@ -73,6 +82,7 @@ export function AddVendorForm() {
       setName("");
       setSlug("");
       setSlugTouched(false);
+      setTimezone("America/New_York");
     } catch {
       setError("Network error. Check your connection and try again.");
     } finally {
@@ -159,6 +169,25 @@ export function AddVendorForm() {
           name="description"
           className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
         />
+      </div>
+
+      <div>
+        <label htmlFor="timezone" className="block text-sm text-stone-600">
+          Timezone
+        </label>
+        <select
+          id="timezone"
+          name="timezone"
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value)}
+          className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
+        >
+          {TIME_ZONES.map((tz) => (
+            <option key={tz} value={tz}>
+              {tz}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error ? (

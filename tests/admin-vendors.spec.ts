@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "@playwright/test";
-import { deleteVendorBySlug } from "./helpers/db";
+import { createTestVendor, deleteVendorBySlug, prisma } from "./helpers/db";
 
 /**
  * UI-level coverage for /admin/vendors (Story 2.2, Task 5/6/8) — the admin
@@ -146,6 +146,64 @@ test.describe("admin vendor creation (authenticated as admin)", () => {
       // created" assertion (Task 8), which has direct Prisma access via the
       // db helpers; this test only proves the UI-visible behavior (error
       // shown, no navigation).
+    },
+  );
+
+  test(
+    "[P1] admin creates a vendor with a non-default timezone and it persists (Story 7.1, AC #1)",
+    async ({ page }) => {
+      const uniqueSuffix = Date.now();
+      const vendorName = `Test Vendor TZ ${uniqueSuffix}`;
+      const vendorSlug = `test-vendor-tz-${uniqueSuffix}`;
+
+      try {
+        await page.goto("/admin/vendors");
+
+        const form = page.getByRole("form", { name: "Add vendor" });
+        await form.getByLabel("Name").fill(vendorName);
+        await form.getByLabel("Slug").fill(vendorSlug);
+        await form.getByLabel("Timezone").selectOption("Asia/Tokyo");
+
+        const [response] = await Promise.all([
+          page.waitForResponse("**/api/admin/vendors"),
+          form.getByRole("button", { name: "Save vendor" }).click(),
+        ]);
+        expect(response.status()).toBe(201);
+
+        const persisted = await prisma.vendor.findUnique({
+          where: { slug: vendorSlug },
+        });
+        expect(persisted?.timezone).toBe("Asia/Tokyo");
+      } finally {
+        await deleteVendorBySlug(vendorSlug);
+      }
+    },
+  );
+
+  test(
+    "[P1] admin edits an existing vendor's timezone from the vendors list (Story 7.1, AC #3)",
+    async ({ page }) => {
+      const vendor = await createTestVendor({ timezone: "America/New_York" });
+
+      try {
+        await page.goto("/admin/vendors");
+
+        const timezoneSelect = page.getByLabel(`Timezone for ${vendor.name}`);
+        await expect(timezoneSelect).toHaveValue("America/New_York");
+
+        const [response] = await Promise.all([
+          page.waitForResponse(`**/api/admin/vendors/${vendor.id}`),
+          timezoneSelect.selectOption("Asia/Tokyo"),
+        ]);
+        expect(response.status()).toBe(200);
+
+        const persisted = await prisma.vendor.findUnique({
+          where: { id: vendor.id },
+        });
+        expect(persisted?.timezone).toBe("Asia/Tokyo");
+      } finally {
+        await deleteVendorBySlug(vendor.slug);
+      }
     },
   );
 });
