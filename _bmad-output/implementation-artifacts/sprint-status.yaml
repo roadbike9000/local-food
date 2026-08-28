@@ -206,7 +206,8 @@ action_items:
   - epic: 6
     action: "Decide what to do about every vendor defaulting to America/New_York with no settings UI - accept permanently, or scope a follow-up story for vendor-configurable timezone"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-28: decided - keep America/New_York as the default, but build real support for vendors in other timezones (not accept-and-ignore). Not yet scoped into a story - needs a create-story pass."
   - epic: 6
     action: "For any future story involving timezone/offset/DST-adjacent logic, require test coverage that sweeps a range of times across a transition, not a single picked time on the transition day - this epic's bug survived explicit 'DST boundary' tests that all happened to sample a safe hour"
     owner: "Dev"
