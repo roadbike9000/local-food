@@ -185,7 +185,8 @@ action_items:
   - epic: 4
     action: "Consider whether create-story should cite doc section headings instead of raw line numbers for any file not being edited in the same commit as the story - line references have now drifted stale twice across two epics (misattribution in 3.1, wrong-field citation in 4.1)"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-28: decided - headings, not line numbers. Enforced via _bmad/custom/bmad-create-story.toml persistent_facts."
   - epic: 5
     action: "Decide whether Story 5.3 (Vendor.timezone) reopens Epic 5 or becomes Epic 6, and schedule its create-story/ATDD pass"
     owner: "Jeff"
@@ -194,11 +195,13 @@ action_items:
   - epic: 5
     action: "When a review finding is deferred but explicitly flagged as more consequential due to the current story's own change, treat that as a signal to make a quick prioritization call rather than let it wait for a future epic to resurface it - this epic's PickupSlot.capacity gap sat live for 2 days after being flagged as urgent"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-28: ratified as standing rule (option A) - any deferred finding a reviewer explicitly flags as more consequential gets surfaced to Jeff immediately (not left to be noticed later in deferred-work.md)."
   - epic: 5
     action: "Consider whether create-story should cite doc section headings instead of raw line/file references - carried from Epic 4's retro, now a 3rd recurrence (3.1 misattribution, 4.1 wrong-field citation, 5.2 wrong-file citation)"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-28: decided - headings, not line numbers. Enforced via _bmad/custom/bmad-create-story.toml persistent_facts."
   - epic: 5
     action: "Before importing any constant from a route's schema.ts into a \"use client\" component, check whether it reads process.env - carried from Epic 4's retro, still unexercised"
     owner: "Dev"
@@ -215,7 +218,8 @@ action_items:
   - epic: 6
     action: "Consider whether create-story should cite doc section headings instead of raw line numbers - carried a 4th epic, still unaddressed"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-28: decided - headings, not line numbers. Enforced via _bmad/custom/bmad-create-story.toml persistent_facts."
   - epic: 6
     action: "Before importing any constant from a route's schema.ts into a \"use client\" component, check whether it reads process.env - carried, still unexercised"
     owner: "Dev"
