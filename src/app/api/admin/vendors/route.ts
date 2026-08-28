@@ -41,6 +41,7 @@ export async function POST(req: Request) {
         slug: result.slug,
         phone: parsed.data.phone,
         description: parsed.data.description,
+        timezone: parsed.data.timezone,
         clerkUserId: null,
         createdByAdminId: admin.id,
       },

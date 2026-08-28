@@ -78,6 +78,7 @@ FR14: Epic 4 — vendor product image upload + storefront display
 FR15: Epic 5 — checkout captures pickup-slot selection, Order links to it
 FR16: Epic 5 — pickup slot creation rejects a past start time
 FR17: Epic 6 — pickup-slot times interpreted relative to the vendor's own timezone
+FR18: Epic 7 — vendor's real timezone can be set (not permanently pinned to the schema default)
 
 ## Epic List
 
@@ -105,6 +106,10 @@ Customer orders are linked to the pickup slot they were placed against, and a ve
 ### Epic 6: Vendor Pickup-Slot Timezone
 A vendor's pickup-slot times are interpreted relative to that vendor's own configured timezone, not the timezone of whoever's browser happened to submit the slot form. Resolves the open timezone question Epic 5 deliberately left unanswered (`deferred-work.md`, decided by Jeff 2026-08-26, scoped into a story here on 2026-08-27). Deliberately a new epic rather than a reopening of Epic 5 — Epic 5 closed with its original 2-story scope and a completed retrospective; this is genuinely new, standalone follow-up work, not a gap in Epic 5's own stories.
 **FRs covered:** FR17
+
+### Epic 7: Vendor Timezone Configuration
+A vendor's real timezone can actually be set, so `Vendor.timezone` reflects reality instead of every vendor being permanently pinned to the schema default (`America/New_York`) with no way to change it. Direct follow-up to Epic 6's code review (`deferred-work.md`, decided by Jeff 2026-08-28): keep `America/New_York` as the default, but the system must genuinely support vendors located elsewhere. Deliberately a new epic rather than a reopening of Epic 6 — Epic 6 closed with its original 1-story scope and a completed retrospective; Epic 6 already built the read-side timezone-aware machinery (`AddSlotForm`, `formatPickupWindow`, checkout/storefront display), so this epic is specifically the write-side gap it left open.
+**FRs covered:** FR18
 
 ## Epic 1: Accurate Stock & Cart
 
@@ -403,3 +408,37 @@ So that a slot I create is never silently off by however many hours separate my 
 **Then** define and document which timezone it's displayed in (the vendor's configured timezone is the natural choice for both surfaces, since pickup happens at the vendor's physical location regardless of which timezone the viewer is browsing from) — this is a real design decision this story needs to make explicitly, not inherit by accident from `formatPickupWindow`'s current browser-local behavior
 
 *(FR17. Decision needed during story creation: this codebase has no date library today (`grep` confirms no `date-fns`/`luxon`/`dayjs`/`date-fns-tz` in `package.json`) — whether to add one (`date-fns-tz` is a natural minimal fit) or hand-roll the offset conversion with raw `Intl.DateTimeFormat` is an explicit choice this story needs to make, not a default to inherit.)*
+
+## Epic 7: Vendor Timezone Configuration
+
+A vendor's real timezone can actually be set by an admin, so `Vendor.timezone` reflects reality instead of every vendor being permanently pinned to the schema default. Standalone — no dependency on Epics 1-5; builds on Epic 6's read-side timezone machinery (`AddSlotForm.tsx`, `formatPickupWindow`, checkout/storefront display) but doesn't require any changes to it — that machinery already correctly reads whatever `Vendor.timezone` holds, this epic just gives it a real way to be set to something other than the default.
+
+### Story 7.1: Admin sets a vendor's real timezone
+
+As an admin,
+I want to set a vendor's real IANA timezone at creation and edit it later for an existing vendor,
+So that `Vendor.timezone` reflects where the vendor actually operates instead of silently defaulting to `America/New_York` with no way to correct it.
+
+**Acceptance Criteria:**
+
+**Given** the admin "add vendor" form (`CreateVendorSchema`-backed, `src/app/api/admin/vendors/route.ts`) has no timezone field today
+**When** this story ships
+**Then** the create form and schema gain a `timezone` field (IANA identifier, e.g. `"America/Los_Angeles"`), defaulting to `"America/New_York"` but changeable by admin at creation time — validated server-side with `isValidTimeZone()` (`src/lib/timezone.ts`, built in Story 6.1), not a new duplicate check
+
+**Given** no route exists today to edit any field of an already-created vendor — only `POST /api/admin/vendors/[id]/deactivate` exists, nothing lets admin correct a vendor's data after onboarding
+**When** this story ships
+**Then** a new route (e.g. `PATCH /api/admin/vendors/[id]`) lets admin update an existing vendor's `timezone`, validated the same way as creation, so a vendor onboarded with the wrong default isn't permanently stuck with it
+
+**Given** the admin vendors list page (`src/app/admin/vendors/page.tsx`) has no per-vendor edit affordance today
+**When** this story ships
+**Then** admin can view and change a vendor's timezone from this page (inline edit or a per-vendor edit view — implementer's choice) without needing direct database access
+
+**Given** Story 6.1's existing read-side machinery (`AddSlotForm.tsx`'s conversion calls, `formatPickupWindow()`, the pickup-slots API's `timezone` field) already reads `Vendor.timezone` fresh on every request
+**When** an admin changes an existing vendor's timezone value
+**Then** `AddSlotForm`, checkout, and storefront pickup-slot display all reflect the new value on their next read — no separate propagation, cache invalidation, or backfill step needed; confirm this holds rather than assume, and note explicitly in Completion Notes if a gap is found
+
+**Given** a malformed or unrecognized timezone string
+**When** admin submits it, at creation or edit
+**Then** the request is rejected server-side with a validation error before any write, reusing `isValidTimeZone()` rather than duplicating that check inline in the schema
+
+*(FR18. Scope decision made during story creation (Jeff, 2026-08-28): admin-set field only — no new vendor-facing self-service settings surface. Matches this app's existing pattern (admin already owns vendor onboarding per Epic 2); vendors have no self-service settings page anywhere in this app today, and building the first one was explicitly out of scope for this epic.)*

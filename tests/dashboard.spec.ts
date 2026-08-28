@@ -9,6 +9,7 @@ import {
   deleteOrder,
   createTestProduct,
   deleteProduct,
+  createTestPickupSlot,
   prisma,
 } from "./helpers/db";
 
@@ -420,6 +421,92 @@ test.describe("vendor dashboard (authenticated)", () => {
         where: { id: vendor.id },
         data: { timezone: originalTimezone },
       });
+    }
+  });
+
+  // Story 7.1 (FR18), AC #4: proves the write path this story adds (a real
+  // admin-authenticated PATCH /api/admin/vendors/[id] call, not a direct
+  // Prisma mutation like the Story 6.1 test above) composes correctly
+  // with the existing read-side machinery Story 6.1 already built - the
+  // dashboard listing reflects the admin's edit on its next read, with no
+  // separate propagation, cache invalidation, or backfill step. Needs both
+  // the vendor session (this describe block's page fixture, to view the
+  // dashboard) and a separate admin-authenticated API context (to make
+  // the real edit) - skips gracefully if either credential set is missing.
+  const adminAuthFile = join(process.cwd(), "playwright/.auth/admin.json");
+
+  test("admin-edited vendor timezone is reflected in the vendor's dashboard listing with no separate step", async ({
+    page,
+    browser,
+  }) => {
+    test.skip(
+      !existsSync(adminAuthFile),
+      "No admin session — E2E_ADMIN_EMAIL/CLERK_SECRET_KEY not configured",
+    );
+
+    const vendor = await getVendorBySlug("corner-sourdough");
+    const originalTimezone = vendor.timezone;
+    const location = `Playwright AC4 Check ${Date.now()}`;
+
+    // A real second browser page (admin session), not a bare
+    // request.newContext() - confirmed by reproduction (2 consecutive
+    // full-suite runs, same failure both times, always this test) that a
+    // storageState-only APIRequestContext never runs any page JS, so
+    // Clerk's session cookie is used exactly as captured at global-setup
+    // time with no live refresh. This test can run late in a long
+    // full-suite wall-clock run (~4 minutes), past that session's TTL, and
+    // silently 401s with no page ever having loaded to refresh it. A real
+    // page.goto() warm-up - the same one every other authenticated test in
+    // this codebase already relies on - lets Clerk's client-side SDK do
+    // its normal refresh.
+    const adminContext = await browser.newContext({ storageState: adminAuthFile });
+    const adminPage = await adminContext.newPage();
+    await adminPage.goto("/");
+
+    // Same "relative to now" reasoning as the Story 6.1 test above -
+    // avoids a hardcoded calendar date going stale against the
+    // past-startsAt rejection. A slightly different offset (205 vs 200
+    // days) than that test purely so the two tests' slots never collide
+    // if they ever ran concurrently against the same vendor.
+    const future = new Date(Date.now() + 205 * 24 * 60 * 60 * 1000);
+    const y = future.getUTCFullYear();
+    const m = future.getUTCMonth();
+    const d = future.getUTCDate();
+    const expectedDay = new Date(Date.UTC(y, m, d)).toLocaleDateString("en-US", {
+      timeZone: "UTC",
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+
+    try {
+      const patchResponse = await adminPage.request.patch(
+        `/api/admin/vendors/${vendor.id}`,
+        { data: { timezone: "Asia/Tokyo" } },
+      );
+      expect(patchResponse.ok()).toBe(true);
+
+      // Slot created directly via the DB helper, not through AddSlotForm's
+      // UI - that conversion path already has dedicated coverage (the
+      // Story 6.1 test above and src/lib/timezone.test.ts). This test's
+      // own job is narrowly the *display* side: 14:00-16:00 Asia/Tokyo
+      // (UTC+9, no DST) is 05:00-07:00 UTC the same day.
+      await createTestPickupSlot(vendor.id, {
+        location,
+        startsAt: new Date(Date.UTC(y, m, d, 5, 0, 0)),
+        endsAt: new Date(Date.UTC(y, m, d, 7, 0, 0)),
+      });
+
+      await page.goto("/dashboard/pickups");
+      await expect(
+        page.getByText(`${expectedDay}, 2:00 PM–4:00 PM · ${location}`),
+      ).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await deletePickupSlotByLocation(vendor.id, location);
+      await adminPage.request.patch(`/api/admin/vendors/${vendor.id}`, {
+        data: { timezone: originalTimezone },
+      });
+      await adminContext.close();
     }
   });
 

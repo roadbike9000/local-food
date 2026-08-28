@@ -133,13 +133,14 @@ Admin-only vendor onboarding (Story 2.2). Creates a `Vendor` unbound from any Cl
   slug: string,          // trimmed, min length 1 after trimming — format/normalization/uniqueness resolved server-side, not by this schema
   phone?: string,
   description?: string,
+  timezone?: string,     // IANA identifier, e.g. "America/Los_Angeles" — validated via isValidTimeZone() (Story 7.1); defaults to "America/New_York" if omitted
 }
 ```
 
 **Auth:** `getCurrentAdmin()` — `401 { error: "Unauthorized" }` if no current admin. **Not covered by `middleware.ts`'s matcher** (`/admin(.*)` matches page routes under `/admin/*`, not this route's `/api/admin/vendors` path) — this self-check is the sole gate, same as every other API route in this codebase.
 
 **Behavior:**
-1. `req.json().catch(() => null)` then `safeParse` → `400 { error: "Invalid request" }` on failure. `name`/`slug` are trimmed and must be non-empty after trimming.
+1. `req.json().catch(() => null)` then `safeParse` → `400 { error: "Invalid request" }` on failure. `name`/`slug` are trimmed and must be non-empty after trimming. `timezone`, if provided, must be a real IANA identifier (`isValidTimeZone()`, `src/lib/timezone.ts`) or the request is rejected the same way.
 2. `resolveVendorSlug(slug)` (`src/lib/vendor.ts`, AD-7) normalizes the slug via `slugify()` — **the stored/returned `slug` can differ from what was submitted** (e.g. `"Corner Bakery"` → `"corner-bakery"`), and a submission that normalizes to an empty string (all-punctuation/whitespace input) is rejected rather than creating an unreachable vendor. Then checks the normalized slug against existing `Vendor.slug` values — a collision → `409 { error: "The slug \"...\" is already in use — try a different one." }`.
 3. Creates the `Vendor` with `clerkUserId: null` (unbound until claimed, AD-8 — binding happens manually, out-of-band, later) and `createdByAdminId` set to the acting admin's `Admin.id` (AD-5 — attribution targets the row id, not `clerkUserId`). The create is wrapped in its own `try/catch`: a same-slug race between two concurrent requests (both pass step 2's check before either creates) is caught as a Prisma `P2002` and mapped to the identical friendly `409` — a raw Prisma unique-constraint failure should never reach the client either way. Any other DB failure → `500`, `Sentry.captureException`.
 
@@ -166,6 +167,28 @@ Admin-only vendor deactivation (Story 2.3). Soft-deletes a `Vendor` — never a 
 - The vendor's storefront (`GET /vendors/{slug}`) stays reachable (`200`, name still shown) but replaces the listing/pickup-slot banner with a "no longer available" message — not a `404`.
 - `POST /api/checkout` rejects any new order for the vendor's products: `400 { error: "This vendor is no longer accepting orders" }`.
 - Existing orders in any non-terminal status continue their normal fulfillment lifecycle unchanged (pickup, SMS, status updates) — the vendor's own `/dashboard/*` access is completely untouched by deactivation.
+
+---
+
+### `PATCH /api/admin/vendors/[id]`
+Admin-only vendor edit (Story 7.1). Narrowly scoped to `timezone` only — no route existed to edit any vendor field after creation before this story (only deactivate, above).
+
+**Request body** (`UpdateVendorSchema`):
+```ts
+{
+  timezone: string,  // IANA identifier, e.g. "America/Los_Angeles" — validated via isValidTimeZone(), required (no default — this is an explicit edit, not a creation)
+}
+```
+
+**Auth:** `getCurrentAdmin()` — `401 { error: "Unauthorized" }` if no current admin. Not covered by `middleware.ts`'s matcher, same reasoning as `POST /api/admin/vendors`.
+
+**Behavior:**
+1. `req.json().catch(() => null)` then `safeParse` → `400 { error: "Invalid request" }` on failure — includes a missing or malformed `timezone`.
+2. `prisma.vendor.findUnique({ where: { id: params.id } })` — `404 { error: "Not found" }` if the vendor doesn't exist. No ownership scoping (an admin route legitimately operates across all vendors).
+3. `prisma.vendor.update()` sets `timezone`. No optimistic-concurrency/version field — unlike `PATCH /api/products/[id]`'s `stockVersion`, `Vendor.timezone` has exactly one writer (this route) and no concurrent-decrement-style race to guard against.
+4. Story 6.1's existing read-side machinery (`AddSlotForm.tsx`, `formatPickupWindow()`, `GET /api/vendors/[vendorId]/pickup-slots`) reads `Vendor.timezone` fresh via Prisma on every request — the new value takes effect immediately on the vendor's/customers' next read, no separate propagation step.
+
+**Response:** `200 { vendor: Vendor }` — the current (just-updated) row.
 
 ---
 
