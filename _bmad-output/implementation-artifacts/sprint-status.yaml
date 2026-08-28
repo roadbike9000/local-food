@@ -82,6 +82,9 @@ development_status:
   6-1-pickup-slot-times-interpreted-in-vendors-own-timezone: done
   epic-6-retrospective: done
 
+  epic-7: backlog
+  7-1-admin-sets-a-vendors-real-timezone: backlog
+
 action_items:
   - epic: 1
     action: "Fix the stale Clerk vendor auth fixture (playwright/.auth/vendor.json) and build an equivalent Admin test-identity fixture before Epic 2's first story lands"
