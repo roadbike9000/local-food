@@ -1,5 +1,5 @@
 # generated: 2026-08-17
-# last_updated: 2026-08-27 (Story 6.1 code-reviewed and done; Epic 6 done)
+# last_updated: 2026-08-27 (Epic 6 retrospective done)
 # project: local-food
 # project_key: NOKEY
 # tracking_system: file-system
@@ -80,6 +80,7 @@ development_status:
 
   epic-6: done
   6-1-pickup-slot-times-interpreted-in-vendors-own-timezone: done
+  epic-6-retrospective: done
 
 action_items:
   - epic: 1
@@ -188,7 +189,8 @@ action_items:
   - epic: 5
     action: "Decide whether Story 5.3 (Vendor.timezone) reopens Epic 5 or becomes Epic 6, and schedule its create-story/ATDD pass"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-08-27: decided new Epic 6, not reopening Epic 5. Scoped as Story 6.1, create-story -> ATDD -> dev-story -> code-review all run same day. Epic 6 done, PR #11 open."
   - epic: 5
     action: "When a review finding is deferred but explicitly flagged as more consequential due to the current story's own change, treat that as a signal to make a quick prioritization call rather than let it wait for a future epic to resurface it - this epic's PickupSlot.capacity gap sat live for 2 days after being flagged as urgent"
     owner: "Jeff"
@@ -199,5 +201,21 @@ action_items:
     status: open
   - epic: 5
     action: "Before importing any constant from a route's schema.ts into a \"use client\" component, check whether it reads process.env - carried from Epic 4's retro, still unexercised"
+    owner: "Dev"
+    status: open
+  - epic: 6
+    action: "Decide what to do about every vendor defaulting to America/New_York with no settings UI - accept permanently, or scope a follow-up story for vendor-configurable timezone"
+    owner: "Jeff"
+    status: open
+  - epic: 6
+    action: "For any future story involving timezone/offset/DST-adjacent logic, require test coverage that sweeps a range of times across a transition, not a single picked time on the transition day - this epic's bug survived explicit 'DST boundary' tests that all happened to sample a safe hour"
+    owner: "Dev"
+    status: open
+  - epic: 6
+    action: "Consider whether create-story should cite doc section headings instead of raw line numbers - carried a 4th epic, still unaddressed"
+    owner: "Jeff"
+    status: open
+  - epic: 6
+    action: "Before importing any constant from a route's schema.ts into a \"use client\" component, check whether it reads process.env - carried, still unexercised"
     owner: "Dev"
     status: open
