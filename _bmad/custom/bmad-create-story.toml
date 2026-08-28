@@ -1,0 +1,8 @@
+# Team override for bmad-create-story. See skill's customize.toml for
+# merge rules (this file deep-merges over the skill's defaults).
+
+[workflow]
+
+persistent_facts = [
+  "When citing epics.md, prd.md, architecture.md, or any other planning/reference doc as a source for a story, cite the section heading (e.g. \"epics.md § Epic 6 / Story 6.1\"), never a raw line number. Line numbers drift stale as docs are edited; headings survive edits. Decided 2026-08-28 (Jeff), after this recurred across 4 epics (2, 3, 4, 5) of stale line-reference findings in code review.",
+]
