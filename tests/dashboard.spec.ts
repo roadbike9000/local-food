@@ -448,21 +448,6 @@ test.describe("vendor dashboard (authenticated)", () => {
     const originalTimezone = vendor.timezone;
     const location = `Playwright AC4 Check ${Date.now()}`;
 
-    // A real second browser page (admin session), not a bare
-    // request.newContext() - confirmed by reproduction (2 consecutive
-    // full-suite runs, same failure both times, always this test) that a
-    // storageState-only APIRequestContext never runs any page JS, so
-    // Clerk's session cookie is used exactly as captured at global-setup
-    // time with no live refresh. This test can run late in a long
-    // full-suite wall-clock run (~4 minutes), past that session's TTL, and
-    // silently 401s with no page ever having loaded to refresh it. A real
-    // page.goto() warm-up - the same one every other authenticated test in
-    // this codebase already relies on - lets Clerk's client-side SDK do
-    // its normal refresh.
-    const adminContext = await browser.newContext({ storageState: adminAuthFile });
-    const adminPage = await adminContext.newPage();
-    await adminPage.goto("/");
-
     // Same "relative to now" reasoning as the Story 6.1 test above -
     // avoids a hardcoded calendar date going stale against the
     // past-startsAt rejection. A slightly different offset (205 vs 200
@@ -479,7 +464,28 @@ test.describe("vendor dashboard (authenticated)", () => {
       day: "numeric",
     });
 
+    // adminContext creation lives inside this try (code review finding: a
+    // throw during the warm-up navigation previously leaked the context,
+    // since it was created before the try) - closed in `finally` below,
+    // guarded since creation itself could be what threw.
+    let adminContext: Awaited<ReturnType<typeof browser.newContext>> | undefined;
+
     try {
+      // A real second browser page (admin session), not a bare
+      // request.newContext() - confirmed by reproduction (2 consecutive
+      // full-suite runs, same failure both times, always this test) that a
+      // storageState-only APIRequestContext never runs any page JS, so
+      // Clerk's session cookie is used exactly as captured at global-setup
+      // time with no live refresh. This test can run late in a long
+      // full-suite wall-clock run (~4 minutes), past that session's TTL, and
+      // silently 401s with no page ever having loaded to refresh it. A real
+      // page.goto() warm-up - the same one every other authenticated test in
+      // this codebase already relies on - lets Clerk's client-side SDK do
+      // its normal refresh.
+      adminContext = await browser.newContext({ storageState: adminAuthFile });
+      const adminPage = await adminContext.newPage();
+      await adminPage.goto("/");
+
       const patchResponse = await adminPage.request.patch(
         `/api/admin/vendors/${vendor.id}`,
         { data: { timezone: "Asia/Tokyo" } },
@@ -503,10 +509,21 @@ test.describe("vendor dashboard (authenticated)", () => {
       ).toBeVisible({ timeout: 15_000 });
     } finally {
       await deletePickupSlotByLocation(vendor.id, location);
-      await adminPage.request.patch(`/api/admin/vendors/${vendor.id}`, {
+      // Restored via a direct Prisma write, not the admin PATCH route
+      // (code review finding: the prior version restored via
+      // adminPage.request.patch() with no assertion on the result - a
+      // failed restore would silently leave the shared seeded vendor
+      // pinned to Asia/Tokyo, poisoning every later run). A direct write
+      // can't 401 or otherwise fail the way a second network call through
+      // an admin session can - matches Story 6.1's own test, which
+      // restores this exact same way for this exact same reason.
+      await prisma.vendor.update({
+        where: { id: vendor.id },
         data: { timezone: originalTimezone },
       });
-      await adminContext.close();
+      if (adminContext) {
+        await adminContext.close();
+      }
     }
   });
 

@@ -44,11 +44,11 @@ describe("CreateVendorSchema", () => {
     );
   });
 
-  // Story 7.1, AC #1/#5. The production schema's `timezone` field exists
-  // and defaults correctly (trivial plumbing, already implemented) — the
-  // "rejects a malformed timezone string" case below is the one genuinely
-  // red test here, since nothing validates the value against
-  // isValidTimeZone() yet.
+  // Story 7.1, AC #1/#5. Validated via isSelectableTimeZone() - only
+  // Intl.supportedValuesOf("timeZone")'s own canonical list is accepted,
+  // matching AddVendorForm.tsx's <select> exactly (code review finding:
+  // the broader isValidTimeZone() accepts values, e.g. "UTC"/"US/Eastern",
+  // that aren't in that <select>'s options).
   it("defaults timezone to America/New_York when omitted", () => {
     expect(CreateVendorSchema.parse(validBody).timezone).toBe("America/New_York");
   });
@@ -62,8 +62,21 @@ describe("CreateVendorSchema", () => {
   });
 
   it("rejects a malformed timezone string", () => {
+    const result = CreateVendorSchema.safeParse({ ...validBody, timezone: "Not/AZone" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.path).toEqual(["timezone"]);
+      expect(result.error.issues[0]?.message).toBe("Invalid timezone");
+    }
+  });
+
+  it("rejects a value not in Intl.supportedValuesOf(\"timeZone\") even though it's a real, constructible zone", () => {
+    // "UTC" is accepted by isValidTimeZone() (Story 6.1's broader check,
+    // used for read-side display fallback) but deliberately rejected here
+    // - this schema must stay in sync with AddVendorForm.tsx's <select>,
+    // which doesn't offer "UTC" as an option (code review finding).
     expect(
-      CreateVendorSchema.safeParse({ ...validBody, timezone: "Not/AZone" }).success,
+      CreateVendorSchema.safeParse({ ...validBody, timezone: "UTC" }).success,
     ).toBe(false);
   });
 });

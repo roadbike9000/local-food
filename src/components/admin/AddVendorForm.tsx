@@ -8,15 +8,9 @@
  */
 import { useState, type FormEvent } from "react";
 import { slugify } from "@/lib/utils";
+import { SELECTABLE_TIME_ZONES } from "@/lib/timezone";
 
 type CreatedVendor = { name: string; slug: string };
-
-// Full IANA list from the runtime itself - no static list to maintain,
-// no new dependency. Real, already-available API (Story 6.1's
-// isValidTimeZone() considered and rejected it for *validation* only
-// because it excludes "UTC", which doesn't matter for a <select> of real
-// vendor locations).
-const TIME_ZONES = Intl.supportedValuesOf("timeZone");
 
 export function AddVendorForm() {
   const [name, setName] = useState("");
@@ -182,7 +176,7 @@ export function AddVendorForm() {
           onChange={(e) => setTimezone(e.target.value)}
           className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
         >
-          {TIME_ZONES.map((tz) => (
+          {SELECTABLE_TIME_ZONES.map((tz) => (
             <option key={tz} value={tz}>
               {tz}
             </option>

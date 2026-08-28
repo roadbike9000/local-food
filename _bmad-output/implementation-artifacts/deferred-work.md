@@ -1,5 +1,28 @@
 # Deferred Work
 
+## Deferred from: code review of story-7-1-admin-sets-a-vendors-real-timezone (2026-08-28)
+
+- source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
+  summary: Two pre-existing spec files (`tests/admin-vendors-api.spec.ts`, `tests/admin-deactivate-vendor.spec.ts`) still assert "not covered by middleware" (false — `middleware.ts`'s `isProtectedApiRoute` matcher does cover `/api/admin(.*)`) and carry the same bare-`request`-fixture-plus-static-`storageState` session pattern this story's own review diagnosed as a stale-cookie risk late in a long full-suite run.
+  evidence: Code review (Blind Hunter, Edge Case Hunter, Acceptance Auditor, all independently). This story's own new file (`tests/admin-vendors-edit-api.spec.ts`) was fixed in place (switched to a real `page` + warm-up); these two pre-existing siblings were not, since they're untouched by this story's diff and a cross-file sweep is bigger scope than one story.
+  Not decided — pre-existing pattern, worth a dedicated pass (correct the stale middleware claim everywhere it appears, apply the `page`+warm-up pattern to every admin-session API spec file).
+
+- source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
+  summary: `EditVendorTimezoneControl`'s native `<select>` fires `onChange` (and a `PATCH`) on every keyboard arrow-key traversal, not just a final selection — a keyboard admin can issue a burst of writes before landing on their intended zone.
+  evidence: Code review (Edge Case Hunter, Acceptance Auditor). Low real-world impact: each write is individually valid, the final landed value is always correct, and `Vendor.timezone` has no other invariant coupled to it (no partial/torn state possible). The "right" fix (debounce vs. explicit Save button vs. commit-on-blur) is a UX choice, not an unambiguous patch.
+
+- source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
+  summary: Module-scope `Intl.supportedValuesOf("timeZone")` in two `"use client"` components (`AddVendorForm.tsx`, `EditVendorTimezoneControl.tsx`, via `src/lib/timezone.ts`'s `SELECTABLE_TIME_ZONES`) risks a React hydration mismatch if the server's Node ICU tzdata ever disagrees with a visiting browser's ICU.
+  evidence: Code review (Blind Hunter, Edge Case Hunter). Currently latent, not observed in this environment. Multiple valid fixes exist (server-computed list passed as a prop, `suppressHydrationWarning`, client-only render) with different tradeoffs — worth a deliberate choice rather than a reflexive patch.
+
+- source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
+  summary: No test covers the deliberate decision to omit `assertVendorActive()`/a `deletedAt` check from the new `PATCH /api/admin/vendors/[id]` route (a deactivated vendor's timezone can still be corrected by admin) — a future reviewer applying AD-4 uniformly across all vendor routes could "fix" this silently, removing intended behavior.
+  evidence: Code review (Blind Hunter). The underlying decision is reasonable and already documented in Completion Notes; only the regression-guard test is missing.
+
+- source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
+  summary: `EditVendorTimezoneControl`'s `getByLabel(\`Timezone for ${vendor.name}\`)` locator (`tests/admin-vendors.spec.ts`) isn't guaranteed unique — `Vendor.name` has no unique constraint, so two same-named vendors would trip a Playwright strict-mode violation.
+  evidence: Code review (Edge Case Hunter). Currently harmless — test fixtures use `Date.now()`-suffixed unique names — a latent test-fragility risk worth hardening later (scope by row instead of by name).
+
 ## Deferred from: code review of story-6-1-pickup-slot-times-interpreted-in-vendors-own-timezone (2026-08-27)
 
 - source_spec: `_bmad-output/implementation-artifacts/6-1-pickup-slot-times-interpreted-in-vendors-own-timezone.md`

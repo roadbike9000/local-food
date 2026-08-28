@@ -5,34 +5,50 @@
  * PATCHes /api/admin/vendors/[id], then router.refresh() on success - same
  * shape as DeactivateVendorButton.tsx.
  *
- * No window.confirm() (unlike DeactivateVendorButton) - changing a
- * timezone is fully reversible by changing it back, unlike deactivation's
- * real customer-facing, hard-to-undo consequence.
+ * The <select> only renders once the admin clicks "Edit" (code review
+ * finding: rendering all ~418 options for every row unconditionally added
+ * roughly 21,000 <option> elements to this page) - plain text otherwise.
+ *
+ * window.confirm() only when the vendor has existing pickup slots (Jeff's
+ * decision, code review) - changing timezone doesn't touch a slot's
+ * stored instant, but silently changes its *displayed* wall-clock time,
+ * which may no longer match what a customer's SMS confirmation said.
+ * DeactivateVendorButton's confirm() is the precedent for a real,
+ * consequential action in this same admin table.
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-
-// Same runtime source as AddVendorForm.tsx - no new dependency, no static
-// list to keep in sync.
-const TIME_ZONES = Intl.supportedValuesOf("timeZone");
+import { SELECTABLE_TIME_ZONES } from "@/lib/timezone";
 
 type EditVendorTimezoneControlProps = {
   vendorId: string;
   vendorName: string;
   currentTimezone: string;
+  hasPickupSlots: boolean;
 };
 
 export function EditVendorTimezoneControl({
   vendorId,
   vendorName,
   currentTimezone,
+  hasPickupSlots,
 }: EditVendorTimezoneControlProps) {
   const router = useRouter();
+  const [editing, setEditing] = useState(false);
   const [timezone, setTimezone] = useState(currentTimezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleChange(value: string) {
+    if (
+      hasPickupSlots &&
+      !window.confirm(
+        `${vendorName} has existing pickup slots. Changing the timezone won't move their scheduled time, but it will change how that time is *displayed* everywhere - including to customers who may already have a confirmation quoting the old time. Continue?`,
+      )
+    ) {
+      return;
+    }
+
     const previous = timezone;
     setTimezone(value);
     setSubmitting(true);
@@ -56,6 +72,7 @@ export function EditVendorTimezoneControl({
         return;
       }
 
+      setEditing(false);
       router.refresh();
     } catch {
       setTimezone(previous);
@@ -65,6 +82,26 @@ export function EditVendorTimezoneControl({
     }
   }
 
+  if (!editing) {
+    return (
+      <div>
+        <span className="text-xs">{timezone}</span>{" "}
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-xs text-brand hover:underline"
+        >
+          Edit
+        </button>
+        {error ? (
+          <p role="alert" aria-live="polite" className="mt-1 text-xs text-red-600">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div>
       <select
@@ -72,9 +109,11 @@ export function EditVendorTimezoneControl({
         value={timezone}
         disabled={submitting}
         onChange={(e) => handleChange(e.target.value)}
+        onBlur={() => !submitting && setEditing(false)}
+        autoFocus
         className="rounded-md border border-stone-300 px-2 py-1 text-xs disabled:opacity-50"
       >
-        {TIME_ZONES.map((tz) => (
+        {SELECTABLE_TIME_ZONES.map((tz) => (
           <option key={tz} value={tz}>
             {tz}
           </option>

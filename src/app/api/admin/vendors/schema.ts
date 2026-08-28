@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isValidTimeZone } from "@/lib/timezone";
+import { isSelectableTimeZone } from "@/lib/timezone";
 
 // Kept out of route.ts — Next's route-type checker only allows a fixed set
 // of named exports (HTTP verbs, config, etc.) from a route file.
@@ -15,8 +15,10 @@ export const CreateVendorSchema = z.object({
   phone: z.string().optional(),
   description: z.string().optional(),
   // IANA timezone identifier (Story 7.1, FR18). Validated via
-  // isValidTimeZone() (src/lib/timezone.ts, Story 6.1) — the single source
-  // of truth for "is this a real zone" across this codebase; not
-  // re-derived here.
-  timezone: z.string().refine(isValidTimeZone, "Invalid timezone").default("America/New_York"),
+  // isSelectableTimeZone() (src/lib/timezone.ts) rather than the broader
+  // isValidTimeZone() — this write path must stay in sync with
+  // AddVendorForm.tsx's <select>, which only offers the same canonical
+  // list (code review finding: isValidTimeZone() alone accepts values,
+  // e.g. "UTC"/"US/Eastern", that aren't in that <select>'s options).
+  timezone: z.string().refine(isSelectableTimeZone, "Invalid timezone").default("America/New_York"),
 });

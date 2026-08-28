@@ -19,6 +19,12 @@ export default async function AdminVendorsPage() {
   const vendors = await prisma.vendor.findMany({
     orderBy: { createdAt: "desc" },
     take: 50,
+    // _count.pickupSlots feeds EditVendorTimezoneControl's confirm-before-edit
+    // decision (code review, Story 7.1) - changing a vendor's timezone
+    // doesn't move a slot's stored instant, but does change its displayed
+    // wall-clock time, which may no longer match a customer's existing
+    // confirmation.
+    include: { _count: { select: { pickupSlots: true } } },
   });
 
   return (
@@ -49,6 +55,7 @@ export default async function AdminVendorsPage() {
                     vendorId={v.id}
                     vendorName={v.name}
                     currentTimezone={v.timezone}
+                    hasPickupSlots={v._count.pickupSlots > 0}
                   />
                 </td>
                 <td className="py-2">

@@ -42,6 +42,29 @@ export function isValidTimeZone(timeZone: string): boolean {
   }
 }
 
+/**
+ * The canonical set of IANA timezone identifiers this codebase lets a
+ * human choose from (Story 7.1) — `Intl.supportedValuesOf("timeZone")`'s
+ * own list: modern canonical zone names only, no legacy aliases
+ * (`"US/Eastern"`), fixed-offset strings (`"+05:00"`), or the `"UTC"`
+ * special case `isValidTimeZone()` deliberately accepts for read-side
+ * fallback use. Single source of truth for every timezone `<select>`
+ * (`AddVendorForm.tsx`, `EditVendorTimezoneControl.tsx`) *and* every
+ * write-path validator (`CreateVendorSchema`, `UpdateVendorSchema`) — code
+ * review found `isValidTimeZone()` alone was too permissive for a write
+ * path feeding a `<select>`: it accepts values (verified: `"UTC"`,
+ * `"US/Eastern"`, `"+05:00"`, `"EST5EDT"`, `"GMT"`) that aren't in this
+ * list, so a vendor set to one of them via a direct API call would leave
+ * every `<select>` unable to display or re-select its own stored value.
+ */
+export const SELECTABLE_TIME_ZONES = Intl.supportedValuesOf("timeZone");
+const SELECTABLE_TIME_ZONE_SET = new Set(SELECTABLE_TIME_ZONES);
+
+/** True if `timeZone` is in `SELECTABLE_TIME_ZONES` — the stricter check for a write path that must stay in sync with a `<select>`'s own option list. */
+export function isSelectableTimeZone(timeZone: string): boolean {
+  return SELECTABLE_TIME_ZONE_SET.has(timeZone);
+}
+
 function offsetAtInstant(instant: Date, timeZone: string): number {
   const dtf = new Intl.DateTimeFormat("en-US", { ...ZONED_PARTS_FORMAT, timeZone });
   const parts = Object.fromEntries(dtf.formatToParts(instant).map((p) => [p.type, p.value]));

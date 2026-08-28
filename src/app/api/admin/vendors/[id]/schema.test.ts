@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { UpdateVendorSchema } from "./schema";
 
-// Story 7.1, AC #2/#5. The production schema's `timezone` field exists but
-// isn't validated yet (red-phase stub) — the "rejects a malformed
-// timezone string" case is the one genuinely red test here (it fails today
-// because nothing rejects a bad value); the other two already pass against
-// the stub's correct typing/required-field plumbing, which isn't the
-// behavior this story needs to newly implement.
+// Story 7.1, AC #2/#5. Validated via isSelectableTimeZone() - only
+// Intl.supportedValuesOf("timeZone")'s own canonical list is accepted,
+// matching EditVendorTimezoneControl.tsx's <select> exactly (code review
+// finding: the broader isValidTimeZone() accepts values, e.g.
+// "UTC"/"US/Eastern", that aren't in that <select>'s options).
 describe("UpdateVendorSchema", () => {
   it("accepts a valid IANA timezone and preserves it", () => {
     const result = UpdateVendorSchema.safeParse({ timezone: "America/Los_Angeles" });
@@ -32,5 +31,14 @@ describe("UpdateVendorSchema", () => {
       expect(result.error.issues[0]?.path).toEqual(["timezone"]);
       expect(result.error.issues[0]?.message).toBe("Required");
     }
+  });
+
+  it("rejects a value not in Intl.supportedValuesOf(\"timeZone\") even though it's a real, constructible zone", () => {
+    // "UTC" is accepted by isValidTimeZone() (Story 6.1's broader check,
+    // used for read-side display fallback) but deliberately rejected here
+    // - this schema must stay in sync with EditVendorTimezoneControl.tsx's
+    // <select>, which doesn't offer "UTC" as an option (code review
+    // finding).
+    expect(UpdateVendorSchema.safeParse({ timezone: "UTC" }).success).toBe(false);
   });
 });

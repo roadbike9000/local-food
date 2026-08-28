@@ -188,6 +188,16 @@ test.describe("admin vendor creation (authenticated as admin)", () => {
       try {
         await page.goto("/admin/vendors");
 
+        // Timezone renders as plain text with an "Edit" affordance until
+        // clicked (code review, Story 7.1: an always-rendered <select> per
+        // row added ~21,000 <option> elements to this page) - the row
+        // itself doesn't expose an accessible name to scope by, but this
+        // fixture's Date.now()-suffixed vendor.name is unique enough for
+        // getByText here.
+        const row = page.locator("tr", { hasText: vendor.name });
+        await expect(row.getByText("America/New_York")).toBeVisible();
+        await row.getByRole("button", { name: "Edit" }).click();
+
         const timezoneSelect = page.getByLabel(`Timezone for ${vendor.name}`);
         await expect(timezoneSelect).toHaveValue("America/New_York");
 
