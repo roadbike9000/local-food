@@ -8,11 +8,21 @@
  */
 import { useState, type FormEvent } from "react";
 import { slugify } from "@/lib/utils";
-import { SELECTABLE_TIME_ZONES } from "@/lib/timezone";
 
 type CreatedVendor = { name: string; slug: string };
 
-export function AddVendorForm() {
+type AddVendorFormProps = {
+  // Computed server-side (src/app/admin/vendors/page.tsx) and passed down
+  // rather than called here (code review, Story 7.1: Intl.supportedValuesOf()
+  // at client-component module scope risks a hydration mismatch if the
+  // server's Node ICU tzdata ever disagrees with a visiting browser's -
+  // sourcing it from the server makes it authoritative for both the SSR
+  // output and what the client hydrates against, since it never gets
+  // independently recomputed client-side).
+  timeZones: readonly string[];
+};
+
+export function AddVendorForm({ timeZones }: AddVendorFormProps) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [timezone, setTimezone] = useState("America/New_York");
@@ -176,7 +186,7 @@ export function AddVendorForm() {
           onChange={(e) => setTimezone(e.target.value)}
           className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
         >
-          {SELECTABLE_TIME_ZONES.map((tz) => (
+          {timeZones.map((tz) => (
             <option key={tz} value={tz}>
               {tz}
             </option>

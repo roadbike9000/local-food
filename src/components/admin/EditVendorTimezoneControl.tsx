@@ -18,13 +18,18 @@
  */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { SELECTABLE_TIME_ZONES } from "@/lib/timezone";
 
 type EditVendorTimezoneControlProps = {
   vendorId: string;
   vendorName: string;
   currentTimezone: string;
   hasPickupSlots: boolean;
+  // Computed server-side (src/app/admin/vendors/page.tsx) and passed down
+  // rather than called here - see AddVendorForm.tsx's matching prop for
+  // why (code review, Story 7.1: avoids a client/server ICU hydration
+  // mismatch risk from Intl.supportedValuesOf() at client-component module
+  // scope).
+  timeZones: readonly string[];
 };
 
 export function EditVendorTimezoneControl({
@@ -32,6 +37,7 @@ export function EditVendorTimezoneControl({
   vendorName,
   currentTimezone,
   hasPickupSlots,
+  timeZones,
 }: EditVendorTimezoneControlProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -113,7 +119,7 @@ export function EditVendorTimezoneControl({
         autoFocus
         className="rounded-md border border-stone-300 px-2 py-1 text-xs disabled:opacity-50"
       >
-        {SELECTABLE_TIME_ZONES.map((tz) => (
+        {timeZones.map((tz) => (
           <option key={tz} value={tz}>
             {tz}
           </option>
