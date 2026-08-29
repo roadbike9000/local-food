@@ -83,6 +83,41 @@ test.describe("PATCH /api/admin/vendors/[id] (ATDD, Story 7.1)", () => {
     );
 
     test(
+      "[P1] updates a deactivated vendor's timezone too (200) - deliberate, no assertVendorActive() check",
+      async ({ page }) => {
+        // Pins a deliberate decision (Completion Notes, Story 7.1): this
+        // route intentionally has no deletedAt/assertVendorActive() guard,
+        // unlike every customer-facing route (AD-4) - admin should still be
+        // able to correct a deactivated vendor's data. Without this test, a
+        // future reviewer applying AD-4 uniformly across all vendor routes
+        // could "fix" this silently, removing intended behavior (code
+        // review, deferred-work.md).
+        const vendor = await createTestVendor({
+          timezone: "America/New_York",
+          deletedAt: new Date(),
+        });
+
+        try {
+          const response = await page.request.patch(`/api/admin/vendors/${vendor.id}`, {
+            data: { timezone: "Asia/Tokyo" },
+          });
+
+          expect(response.status()).toBe(200);
+
+          const persisted = await prisma.vendor.findUnique({
+            where: { id: vendor.id },
+          });
+          expect(persisted?.timezone).toBe("Asia/Tokyo");
+          // Confirms this test's own fixture is genuinely deactivated, not
+          // a false positive from a fixture default drifting later.
+          expect(persisted?.deletedAt).not.toBeNull();
+        } finally {
+          await deleteVendorBySlug(vendor.slug);
+        }
+      },
+    );
+
+    test(
       "[P0] rejects a malformed timezone string (400, value unchanged)",
       async ({ page }) => {
         const vendor = await createTestVendor({ timezone: "America/New_York" });

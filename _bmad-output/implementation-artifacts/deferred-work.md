@@ -18,6 +18,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
   summary: No test covers the deliberate decision to omit `assertVendorActive()`/a `deletedAt` check from the new `PATCH /api/admin/vendors/[id]` route (a deactivated vendor's timezone can still be corrected by admin) — a future reviewer applying AD-4 uniformly across all vendor routes could "fix" this silently, removing intended behavior.
   evidence: Code review (Blind Hunter). The underlying decision is reasonable and already documented in Completion Notes; only the regression-guard test is missing.
+  **RESOLVED 2026-08-29:** Added `tests/admin-vendors-edit-api.spec.ts`'s `"updates a deactivated vendor's timezone too (200) - deliberate, no assertVendorActive() check"` test — creates a pre-deactivated fixture (`createTestVendor({ deletedAt: new Date() })`), PATCHes its timezone, asserts `200` + persisted change + confirms the fixture was genuinely deactivated (not a drifted default). Verified passing (6/6 in the file). This pins the decision so a future AD-4 sweep can't silently remove it.
 
 - source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
   summary: `EditVendorTimezoneControl`'s `getByLabel(\`Timezone for ${vendor.name}\`)` locator (`tests/admin-vendors.spec.ts`) isn't guaranteed unique — `Vendor.name` has no unique constraint, so two same-named vendors would trip a Playwright strict-mode violation.
