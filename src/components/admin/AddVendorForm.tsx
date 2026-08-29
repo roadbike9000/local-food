@@ -11,14 +11,18 @@ import { slugify } from "@/lib/utils";
 
 type CreatedVendor = { name: string; slug: string };
 
-// Full IANA list from the runtime itself - no static list to maintain,
-// no new dependency. Real, already-available API (Story 6.1's
-// isValidTimeZone() considered and rejected it for *validation* only
-// because it excludes "UTC", which doesn't matter for a <select> of real
-// vendor locations).
-const TIME_ZONES = Intl.supportedValuesOf("timeZone");
+type AddVendorFormProps = {
+  // Computed server-side (src/app/admin/vendors/page.tsx) and passed down
+  // rather than called here (code review, Story 7.1: Intl.supportedValuesOf()
+  // at client-component module scope risks a hydration mismatch if the
+  // server's Node ICU tzdata ever disagrees with a visiting browser's -
+  // sourcing it from the server makes it authoritative for both the SSR
+  // output and what the client hydrates against, since it never gets
+  // independently recomputed client-side).
+  timeZones: readonly string[];
+};
 
-export function AddVendorForm() {
+export function AddVendorForm({ timeZones }: AddVendorFormProps) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [timezone, setTimezone] = useState("America/New_York");
@@ -182,7 +186,7 @@ export function AddVendorForm() {
           onChange={(e) => setTimezone(e.target.value)}
           className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
         >
-          {TIME_ZONES.map((tz) => (
+          {timeZones.map((tz) => (
             <option key={tz} value={tz}>
               {tz}
             </option>

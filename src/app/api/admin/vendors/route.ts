@@ -5,10 +5,11 @@
  *   AD-8), attributed to the acting admin (createdByAdminId, AD-5)
  *
  * Auth is enforced by loading the admin tied to the current Clerk user.
- * NOT covered by middleware.ts's isProtectedRoute matcher (/admin(.*)
- * matches page routes, not this route's /api/admin/vendors path) - this
- * self-check is the only thing standing between a signed-in vendor and
- * admin-only vendor creation, same as every other API route in this repo.
+ * Also gated by middleware.ts's isProtectedApiRoute matcher
+ * (/api/admin(.*)), which rejects a signed-out caller with 401 before this
+ * handler ever runs - that layer only proves "signed in", not "is an
+ * Admin", so this route's own getCurrentAdmin() check below is still
+ * required (see middleware.ts's own comment for why the split exists).
  */
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
@@ -26,7 +27,10 @@ export async function POST(req: Request) {
 
   const parsed = CreateVendorSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid request" },
+      { status: 400 },
+    );
   }
 
   const result = await resolveVendorSlug(parsed.data.slug);

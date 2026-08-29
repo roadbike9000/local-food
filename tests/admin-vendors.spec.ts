@@ -188,7 +188,21 @@ test.describe("admin vendor creation (authenticated as admin)", () => {
       try {
         await page.goto("/admin/vendors");
 
-        const timezoneSelect = page.getByLabel(`Timezone for ${vendor.name}`);
+        // Timezone renders as plain text with an "Edit" affordance until
+        // clicked (code review, Story 7.1: an always-rendered <select> per
+        // row added ~21,000 <option> elements to this page) - plain text
+        // otherwise. Scoped by vendor.slug (DB-unique, @unique in
+        // prisma/schema.prisma), not vendor.name - Vendor.name has no
+        // unique constraint, so two same-named vendors would trip a
+        // Playwright strict-mode violation if this scoped by name instead
+        // (code review finding). The <select> itself is then located via
+        // its role within this already-uniquely-scoped row, not by its
+        // name-based aria-label, for the same reason.
+        const row = page.locator("tr", { hasText: vendor.slug });
+        await expect(row.getByText("America/New_York")).toBeVisible();
+        await row.getByRole("button", { name: "Edit" }).click();
+
+        const timezoneSelect = row.getByRole("combobox");
         await expect(timezoneSelect).toHaveValue("America/New_York");
 
         const [response] = await Promise.all([

@@ -12,12 +12,22 @@ import { createTestVendor, deleteVendorBySlug, prisma } from "./helpers/db";
  * the seeded Admin (playwright/.auth/admin.json, Story 2.1's fixture),
  * the 401 case deliberately uses the *Vendor* session
  * (playwright/.auth/vendor.json) instead — proving the route's own
- * getCurrentAdmin() check rejects a signed-in-but-not-admin caller. This
- * route is NOT covered by middleware.ts's /admin(.*) matcher (its real
- * path, /api/admin/vendors/[id], is a different prefix — same reasoning
- * as the sibling spec files' headers), so that self-check is the only
- * thing standing between a regular vendor and admin-only vendor edits. A
- * final fully-unauthenticated case needs no fixture at all.
+ * getCurrentAdmin() check rejects a signed-in-but-not-admin caller
+ * (middleware.ts's isProtectedApiRoute matcher only proves "signed in",
+ * not "is an Admin" — see its own comment for why the split exists). A
+ * final fully-unauthenticated case needs no fixture at all and is caught
+ * by middleware before this route's own check ever runs.
+ *
+ * Uses the `page` fixture (with a page.goto("/") warm-up), not a bare
+ * `request` fixture, for both authenticated blocks — a storageState-only
+ * APIRequestContext never runs any page JS, so Clerk's session cookie is
+ * used exactly as captured at global-setup time with no live refresh
+ * (code review finding, reproduced by an identical failure in
+ * tests/dashboard.spec.ts: a request.newContext()-based admin call
+ * started 401ing once that test ran late enough into a long full-suite
+ * run for the captured cookie to go stale). A real page load lets Clerk's
+ * client-side SDK do its normal refresh, matching every other
+ * authenticated test in this codebase.
  */
 const adminAuthFile = join(process.cwd(), "playwright/.auth/admin.json");
 const vendorAuthFile = join(process.cwd(), "playwright/.auth/vendor.json");
@@ -37,20 +47,24 @@ test.describe("PATCH /api/admin/vendors/[id] (ATDD, Story 7.1)", () => {
     // codebase.
     test.describe.configure({ mode: "serial" });
 
-    test.beforeEach(async () => {
+    test.beforeEach(async ({ page }) => {
       test.skip(
         !existsSync(adminAuthFile),
         "No admin session — E2E_ADMIN_EMAIL/CLERK_SECRET_KEY not configured",
       );
+      // Clerk's saved session needs one full page load to become valid
+      // against the middleware, and to let Clerk's client SDK refresh a
+      // session close to its TTL - see the file header comment.
+      await page.goto("/");
     });
 
     test(
       "[P0] updates an existing vendor's timezone (200, persisted)",
-      async ({ request }) => {
+      async ({ page }) => {
         const vendor = await createTestVendor({ timezone: "America/New_York" });
 
         try {
-          const response = await request.patch(`/api/admin/vendors/${vendor.id}`, {
+          const response = await page.request.patch(`/api/admin/vendors/${vendor.id}`, {
             data: { timezone: "Asia/Tokyo" },
           });
 
@@ -69,12 +83,47 @@ test.describe("PATCH /api/admin/vendors/[id] (ATDD, Story 7.1)", () => {
     );
 
     test(
+      "[P1] updates a deactivated vendor's timezone too (200) - deliberate, no assertVendorActive() check",
+      async ({ page }) => {
+        // Pins a deliberate decision (Completion Notes, Story 7.1): this
+        // route intentionally has no deletedAt/assertVendorActive() guard,
+        // unlike every customer-facing route (AD-4) - admin should still be
+        // able to correct a deactivated vendor's data. Without this test, a
+        // future reviewer applying AD-4 uniformly across all vendor routes
+        // could "fix" this silently, removing intended behavior (code
+        // review, deferred-work.md).
+        const vendor = await createTestVendor({
+          timezone: "America/New_York",
+          deletedAt: new Date(),
+        });
+
+        try {
+          const response = await page.request.patch(`/api/admin/vendors/${vendor.id}`, {
+            data: { timezone: "Asia/Tokyo" },
+          });
+
+          expect(response.status()).toBe(200);
+
+          const persisted = await prisma.vendor.findUnique({
+            where: { id: vendor.id },
+          });
+          expect(persisted?.timezone).toBe("Asia/Tokyo");
+          // Confirms this test's own fixture is genuinely deactivated, not
+          // a false positive from a fixture default drifting later.
+          expect(persisted?.deletedAt).not.toBeNull();
+        } finally {
+          await deleteVendorBySlug(vendor.slug);
+        }
+      },
+    );
+
+    test(
       "[P0] rejects a malformed timezone string (400, value unchanged)",
-      async ({ request }) => {
+      async ({ page }) => {
         const vendor = await createTestVendor({ timezone: "America/New_York" });
 
         try {
-          const response = await request.patch(`/api/admin/vendors/${vendor.id}`, {
+          const response = await page.request.patch(`/api/admin/vendors/${vendor.id}`, {
             data: { timezone: "Not/AZone" },
           });
 
@@ -92,8 +141,8 @@ test.describe("PATCH /api/admin/vendors/[id] (ATDD, Story 7.1)", () => {
 
     test(
       "[P0] editing a nonexistent vendor id returns 404",
-      async ({ request }) => {
-        const response = await request.patch(
+      async ({ page }) => {
+        const response = await page.request.patch(
           "/api/admin/vendors/nonexistent-vendor-id",
           { data: { timezone: "Asia/Tokyo" } },
         );
@@ -105,9 +154,9 @@ test.describe("PATCH /api/admin/vendors/[id] (ATDD, Story 7.1)", () => {
 
   test.describe("as a signed-in vendor (not an admin)", () => {
     // This is the one case in this file that needs the *vendor* fixture,
-    // not the admin one - proves the route's own getCurrentAdmin() check,
-    // not just middleware (which doesn't cover this path at all - see the
-    // file header comment above).
+    // not the admin one - proves the route's own getCurrentAdmin() check
+    // rejects a signed-in-but-not-admin caller (middleware only proves
+    // "signed in" - see the file header comment above).
     test.use({
       storageState: existsSync(vendorAuthFile) ? vendorAuthFile : undefined,
     });
@@ -117,17 +166,18 @@ test.describe("PATCH /api/admin/vendors/[id] (ATDD, Story 7.1)", () => {
     // issue those files already work around.
     test.describe.configure({ mode: "serial" });
 
-    test.beforeEach(async () => {
+    test.beforeEach(async ({ page }) => {
       test.skip(
         !existsSync(vendorAuthFile),
         "No vendor session — E2E_VENDOR_EMAIL/CLERK_SECRET_KEY not configured",
       );
+      await page.goto("/");
     });
 
     test(
       "[P0] a signed-in vendor (not an admin) is rejected (401)",
-      async ({ request }) => {
-        const response = await request.patch(
+      async ({ page }) => {
+        const response = await page.request.patch(
           "/api/admin/vendors/nonexistent-vendor-id",
           { data: { timezone: "Asia/Tokyo" } },
         );
@@ -138,9 +188,11 @@ test.describe("PATCH /api/admin/vendors/[id] (ATDD, Story 7.1)", () => {
   });
 
   // No storageState at all - a genuinely anonymous caller, distinct from
-  // "signed in but not an admin" above. Needs no fixture, so it always
-  // runs regardless of E2E_VENDOR_*/E2E_ADMIN_* configuration, same
-  // pattern the sibling spec files' reviews added.
+  // "signed in but not an admin" above. Needs no fixture (no session to
+  // go stale), so it always runs regardless of E2E_VENDOR_*/E2E_ADMIN_*
+  // configuration, same pattern the sibling spec files' reviews added.
+  // Caught by middleware.ts's isProtectedApiRoute matcher before this
+  // route's own getCurrentAdmin() check ever runs.
   test(
     "[P0] a fully unauthenticated request is rejected (401)",
     async ({ request }) => {
