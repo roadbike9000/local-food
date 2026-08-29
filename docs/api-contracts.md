@@ -153,7 +153,7 @@ Admin-only vendor deactivation (Story 2.3). Soft-deletes a `Vendor` — never a 
 
 **Request body:** none.
 
-**Auth:** `getCurrentAdmin()` — `401 { error: "Unauthorized" }` if no current admin. Not covered by `middleware.ts`'s matcher, same reasoning as `POST /api/admin/vendors`.
+**Auth:** `getCurrentAdmin()` — `401 { error: "Unauthorized" }` if no current admin. Also gated by `middleware.ts`'s `isProtectedApiRoute` matcher (`/api/admin(.*)`), same as `POST /api/admin/vendors` — see that section for why the route's own check is still required.
 
 **Behavior:**
 1. **Atomic claim, not check-then-act**: `prisma.vendor.updateMany({ where: { id: params.id, deletedAt: null }, data: { deletedAt: <now>, deletedByAdminId: <acting admin's Admin.id> } })` (AD-5 — targets the row id, not `clerkUserId`). The `deletedAt: null` guard in the `WHERE` clause means only a genuinely still-active row can be claimed — two concurrent requests can't both "win" and reassign attribution, matching `POST /api/webhooks/stripe`'s `stockDecremented` claim pattern.
