@@ -24,6 +24,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
   summary: `EditVendorTimezoneControl`'s `getByLabel(\`Timezone for ${vendor.name}\`)` locator (`tests/admin-vendors.spec.ts`) isn't guaranteed unique — `Vendor.name` has no unique constraint, so two same-named vendors would trip a Playwright strict-mode violation.
   evidence: Code review (Edge Case Hunter). Currently harmless — test fixtures use `Date.now()`-suffixed unique names — a latent test-fragility risk worth hardening later (scope by row instead of by name).
+  **RESOLVED 2026-08-29:** `tests/admin-vendors.spec.ts`'s edit test now scopes its row by `vendor.slug` (`@unique` in `prisma/schema.prisma`) instead of `vendor.name`, and locates the `<select>` via `row.getByRole("combobox")` within that already-uniquely-scoped row rather than `page.getByLabel()` by name. Two identically-named vendors can no longer collide this locator regardless of naming. Verified passing (4/4 in the file).
 
 ## Deferred from: code review of story-6-1-pickup-slot-times-interpreted-in-vendors-own-timezone (2026-08-27)
 
