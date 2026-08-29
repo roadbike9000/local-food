@@ -12,12 +12,19 @@ import { createTestVendor, deleteVendorBySlug, prisma } from "./helpers/db";
  * admin.json, Story 2.1's fixture), the 401 case deliberately uses the
  * *Vendor* session (playwright/.auth/vendor.json) instead — proving the
  * route's own getCurrentAdmin() check rejects a signed-in-but-not-admin
- * caller. This route is NOT covered by middleware.ts's /admin(.*) matcher
- * (its real path, /api/admin/vendors/[id]/deactivate, is a different
- * prefix — same reasoning as admin-vendors-api.spec.ts's file header), so
- * that self-check is the only thing standing between a regular vendor and
- * admin-only vendor deactivation. A final fully-unauthenticated case needs
- * no fixture at all.
+ * caller (middleware.ts's isProtectedApiRoute matcher, added after this
+ * story shipped, only proves "signed in" - see its own comment for why
+ * the split exists; the fully-unauthenticated case at the bottom of this
+ * file is the one middleware alone actually catches).
+ *
+ * Uses the `page` fixture (with a page.goto("/") warm-up), not a bare
+ * `request` fixture, for both authenticated blocks - a storageState-only
+ * APIRequestContext never runs any page JS, so Clerk's session cookie is
+ * used exactly as captured at global-setup time with no live refresh
+ * (Story 7.1 code review finding, reproduced by an identical failure in
+ * tests/dashboard.spec.ts once that test ran late enough into a long
+ * full-suite run for the captured cookie to go stale). A real page load
+ * lets Clerk's client-side SDK do its normal refresh.
  */
 const adminAuthFile = join(process.cwd(), "playwright/.auth/admin.json");
 const vendorAuthFile = join(process.cwd(), "playwright/.auth/vendor.json");
@@ -36,20 +43,24 @@ test.describe("POST /api/admin/vendors/[id]/deactivate (ATDD, Story 2.3)", () =>
     // authenticated tests exist in this codebase.
     test.describe.configure({ mode: "serial" });
 
-    test.beforeEach(async () => {
+    test.beforeEach(async ({ page }) => {
       test.skip(
         !existsSync(adminAuthFile),
         "No admin session — E2E_ADMIN_EMAIL/CLERK_SECRET_KEY not configured",
       );
+      // Clerk's saved session needs one full page load to become valid
+      // against the middleware, and to let Clerk's client SDK refresh a
+      // session close to its TTL - see the file header comment.
+      await page.goto("/");
     });
 
     test(
       "[P0] deactivates an active vendor: 200, deletedAt set, deletedByAdminId matches the acting admin (AC #1)",
-      async ({ request }) => {
+      async ({ page }) => {
         const vendor = await createTestVendor();
 
         try {
-          const response = await request.post(
+          const response = await page.request.post(
             `/api/admin/vendors/${vendor.id}/deactivate`,
           );
 
@@ -82,7 +93,7 @@ test.describe("POST /api/admin/vendors/[id]/deactivate (ATDD, Story 2.3)", () =>
 
     test(
       "[P0] deactivating an already-deactivated vendor is idempotent: 200, deletedByAdminId unchanged (Task 3)",
-      async ({ request }) => {
+      async ({ page }) => {
         // Pre-deactivated by a *different, real* admin row via the test
         // helper, bypassing the real route entirely - proves the route's
         // atomic-claim guard (updateMany({ where: { deletedAt: null } }))
@@ -101,7 +112,7 @@ test.describe("POST /api/admin/vendors/[id]/deactivate (ATDD, Story 2.3)", () =>
         });
 
         try {
-          const response = await request.post(
+          const response = await page.request.post(
             `/api/admin/vendors/${vendor.id}/deactivate`,
           );
 
@@ -123,8 +134,8 @@ test.describe("POST /api/admin/vendors/[id]/deactivate (ATDD, Story 2.3)", () =>
 
     test(
       "[P0] deactivating a nonexistent vendor id returns 404",
-      async ({ request }) => {
-        const response = await request.post(
+      async ({ page }) => {
+        const response = await page.request.post(
           "/api/admin/vendors/nonexistent-vendor-id/deactivate",
         );
 
@@ -135,9 +146,9 @@ test.describe("POST /api/admin/vendors/[id]/deactivate (ATDD, Story 2.3)", () =>
 
   test.describe("as a signed-in vendor (not an admin)", () => {
     // This is the one case in this file that needs the *vendor* fixture,
-    // not the admin one - proves the route's own getCurrentAdmin() check,
-    // not just middleware (which doesn't cover this path at all - see the
-    // file header comment above).
+    // not the admin one - proves the route's own getCurrentAdmin() check
+    // rejects a signed-in-but-not-admin caller (middleware only proves
+    // "signed in" - see the file header comment above).
     test.use({
       storageState: existsSync(vendorAuthFile) ? vendorAuthFile : undefined,
     });
@@ -146,17 +157,18 @@ test.describe("POST /api/admin/vendors/[id]/deactivate (ATDD, Story 2.3)", () =>
     // Clerk/Playwright concurrency issue those files already work around.
     test.describe.configure({ mode: "serial" });
 
-    test.beforeEach(async () => {
+    test.beforeEach(async ({ page }) => {
       test.skip(
         !existsSync(vendorAuthFile),
         "No vendor session — E2E_VENDOR_EMAIL/CLERK_SECRET_KEY not configured",
       );
+      await page.goto("/");
     });
 
     test(
       "[P0] a signed-in vendor (not an admin) is rejected (401)",
-      async ({ request }) => {
-        const response = await request.post(
+      async ({ page }) => {
+        const response = await page.request.post(
           "/api/admin/vendors/nonexistent-vendor-id/deactivate",
         );
 
@@ -168,7 +180,9 @@ test.describe("POST /api/admin/vendors/[id]/deactivate (ATDD, Story 2.3)", () =>
   // No storageState at all - a genuinely anonymous caller, distinct from
   // "signed in but not an admin" above. Needs no fixture, so it always
   // runs regardless of E2E_VENDOR_*/E2E_ADMIN_* configuration, same
-  // pattern admin-vendors-api.spec.ts's review added.
+  // pattern admin-vendors-api.spec.ts's review added. Caught by
+  // middleware.ts's isProtectedApiRoute matcher before this route's own
+  // getCurrentAdmin() check ever runs.
   test(
     "[P0] a fully unauthenticated request is rejected (401)",
     async ({ request }) => {

@@ -12,10 +12,19 @@ import { deleteVendorBySlug, prisma } from "./helpers/db";
  * admin.json, Story 2.1's fixture), and the 401 case deliberately uses the
  * *Vendor* session (playwright/.auth/vendor.json) instead - proving the
  * route's own getCurrentAdmin() check rejects a signed-in-but-not-admin
- * caller. This route is NOT covered by middleware.ts's /admin(.*) matcher
- * (its real path, /api/admin/vendors, is a different prefix - see the
- * story's Task 4 notes), so that self-check is the only thing standing
- * between a regular vendor and admin-only vendor creation.
+ * caller (middleware.ts's isProtectedApiRoute matcher, added after this
+ * story shipped, only proves "signed in" - see its own comment for why
+ * the split exists; the fully-unauthenticated case at the bottom of this
+ * file is the one middleware alone actually catches).
+ *
+ * Uses the `page` fixture (with a page.goto("/") warm-up), not a bare
+ * `request` fixture, for both authenticated blocks - a storageState-only
+ * APIRequestContext never runs any page JS, so Clerk's session cookie is
+ * used exactly as captured at global-setup time with no live refresh
+ * (Story 7.1 code review finding, reproduced by an identical failure in
+ * tests/dashboard.spec.ts once that test ran late enough into a long
+ * full-suite run for the captured cookie to go stale). A real page load
+ * lets Clerk's client-side SDK do its normal refresh.
  */
 const adminAuthFile = join(process.cwd(), "playwright/.auth/admin.json");
 const vendorAuthFile = join(process.cwd(), "playwright/.auth/vendor.json");
@@ -34,16 +43,20 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
     // codebase.
     test.describe.configure({ mode: "serial" });
 
-    test.beforeEach(async () => {
+    test.beforeEach(async ({ page }) => {
       test.skip(
         !existsSync(adminAuthFile),
         "No admin session — E2E_ADMIN_EMAIL/CLERK_SECRET_KEY not configured",
       );
+      // Clerk's saved session needs one full page load to become valid
+      // against the middleware, and to let Clerk's client SDK refresh a
+      // session close to its TTL - see the file header comment.
+      await page.goto("/");
     });
 
     test(
       "[P0] creates a vendor with clerkUserId: null and createdByAdminId set to the acting admin (201)",
-      async ({ request }) => {
+      async ({ page }) => {
         const unique = Date.now();
         const name = `Test Vendor ${unique}`;
         const slug = `test-vendor-${unique}`;
@@ -53,7 +66,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
         let createdSlug: string | undefined;
 
         try {
-          const response = await request.post("/api/admin/vendors", {
+          const response = await page.request.post("/api/admin/vendors", {
             data: {
               name,
               slug,
@@ -89,7 +102,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
 
     test(
       "[P0] normalizes a denormalized slug rather than storing it verbatim — review finding",
-      async ({ request }) => {
+      async ({ page }) => {
         // slugify() lowercases, replaces non-alphanumeric runs with a
         // single "-", and trims leading/trailing "-". A slug submitted as
         // typed text (spaces, capitals) must come back normalized, not
@@ -100,7 +113,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
         const expectedSlug = `test-vendor-${unique}`;
 
         try {
-          const response = await request.post("/api/admin/vendors", {
+          const response = await page.request.post("/api/admin/vendors", {
             data: { name: `Test Vendor ${unique}`, slug: submittedSlug },
           });
 
@@ -120,7 +133,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
 
     test(
       "[P0] rejects a slug that collides with a seeded vendor (409, no duplicate row)",
-      async ({ request }) => {
+      async ({ page }) => {
         // corner-sourdough is one of the two seeded vendors (prisma/
         // seed.ts) - the deliberate collision target called out in this
         // story's Testing Standards Summary. Never touch the seeded row
@@ -130,7 +143,7 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
           where: { slug: collidingSlug },
         });
 
-        const response = await request.post("/api/admin/vendors", {
+        const response = await page.request.post("/api/admin/vendors", {
           data: { name: `Test Vendor ${Date.now()}`, slug: collidingSlug },
         });
 
@@ -147,14 +160,14 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
 
     test(
       "[P0] rejects a slug that normalizes to empty (409, no unreachable vendor created) — review finding",
-      async ({ request }) => {
+      async ({ page }) => {
         // slugify() strips every non-alphanumeric character, so an
         // all-punctuation slug like "!!!" would otherwise normalize to ""
         // and create a Vendor whose storefront (/vendors/) matches no
         // route. resolveVendorSlug() rejects this before create() runs.
         const beforeCount = await prisma.vendor.count({ where: { slug: "" } });
 
-        const response = await request.post("/api/admin/vendors", {
+        const response = await page.request.post("/api/admin/vendors", {
           data: { name: `Test Vendor ${Date.now()}`, slug: "!!!" },
         });
 
@@ -169,8 +182,8 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
 
     test(
       "[P0] rejects a request body missing the required name field (400)",
-      async ({ request }) => {
-        const response = await request.post("/api/admin/vendors", {
+      async ({ page }) => {
+        const response = await page.request.post("/api/admin/vendors", {
           data: { slug: `test-vendor-${Date.now()}` },
         });
 
@@ -181,9 +194,9 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
 
   test.describe("as a signed-in vendor (not an admin)", () => {
     // This is the one case in this file that needs the *vendor* fixture,
-    // not the admin one - proves the route's own getCurrentAdmin() check,
-    // not just middleware (which doesn't cover this path at all - see the
-    // file header comment above).
+    // not the admin one - proves the route's own getCurrentAdmin() check
+    // rejects a signed-in-but-not-admin caller (middleware only proves
+    // "signed in" - see the file header comment above).
     test.use({
       storageState: existsSync(vendorAuthFile) ? vendorAuthFile : undefined,
     });
@@ -192,17 +205,18 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
     // issue those files already work around.
     test.describe.configure({ mode: "serial" });
 
-    test.beforeEach(async () => {
+    test.beforeEach(async ({ page }) => {
       test.skip(
         !existsSync(vendorAuthFile),
         "No vendor session — E2E_VENDOR_EMAIL/CLERK_SECRET_KEY not configured",
       );
+      await page.goto("/");
     });
 
     test(
       "[P0] a signed-in vendor (not an admin) is rejected (401)",
-      async ({ request }) => {
-        const response = await request.post("/api/admin/vendors", {
+      async ({ page }) => {
+        const response = await page.request.post("/api/admin/vendors", {
           data: {
             name: `Test Vendor ${Date.now()}`,
             slug: `test-vendor-${Date.now()}`,
@@ -218,7 +232,9 @@ test.describe("POST /api/admin/vendors (ATDD, Story 2.2)", () => {
   // "signed in but not an admin" above. Needs no fixture, so it always
   // runs regardless of E2E_VENDOR_*/E2E_ADMIN_* configuration (review
   // finding: this case was previously untested even though nothing about
-  // it required the missing admin credentials).
+  // it required the missing admin credentials). Caught by middleware.ts's
+  // isProtectedApiRoute matcher before this route's own getCurrentAdmin()
+  // check ever runs.
   test("[P0] a fully unauthenticated request is rejected (401)", async ({
     request,
   }) => {
