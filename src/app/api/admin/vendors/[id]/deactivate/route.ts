@@ -6,9 +6,9 @@
  *   explicitly out of scope (Story 2.3).
  *
  * Auth is enforced by loading the admin tied to the current Clerk user.
- * NOT covered by middleware.ts's isProtectedRoute matcher (/admin(.*)
- * matches page routes, not this route's /api/admin/vendors/... path) -
- * same reasoning as POST /api/admin/vendors (Story 2.2).
+ * Also gated by middleware.ts's isProtectedApiRoute matcher
+ * (/api/admin(.*)), same as POST /api/admin/vendors - see that route's
+ * comment for why this route's own check is still required.
  */
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
