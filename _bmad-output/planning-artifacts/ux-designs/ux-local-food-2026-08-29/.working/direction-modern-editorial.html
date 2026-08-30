@@ -1,0 +1,333 @@
+<!--
+  DIRECTION: Modern Editorial
+  Clean, magazine-style register — oversized tight-tracking display type,
+  hairline rules, numbered product listings, a single mustard accent against
+  black-on-off-white. Motion (implied, static here): the hairline under the
+  vendor name would sweep in on load, and the item numbers would count up
+  from 00 as the list settles.
+-->
+<title>Corner Sourdough — Modern Editorial</title>
+<style>
+  /*
+    PALETTE — Modern Editorial
+    --paper:      #f7f5f0   (page background)
+    --surface:    #ffffff   (card / row surface)
+    --ink:        #111111   (primary text / headlines)
+    --ink-soft:   #58554c   (secondary text)
+    --mustard:    #e2a53a   (single accent — pickup, price, CTA)
+    --mustard-deep: #b5811f (hover / emphasis)
+    --line:       #dcd8cc   (hairline rules)
+    --out-bg:     #ece9e0
+  */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e7e3d8;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #111111;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .design-note {
+    max-width: 900px;
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #111111;
+    padding: 16px 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #111111;
+  }
+  .design-note strong {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #b5811f;
+    margin-bottom: 6px;
+  }
+
+  .browser {
+    width: 100%;
+    max-width: 1180px;
+    background: #ffffff;
+    overflow: hidden;
+    box-shadow: 0 30px 60px -20px rgba(17,17,17,0.35), 0 2px 8px rgba(17,17,17,0.1);
+  }
+  .browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #111111;
+    padding: 10px 14px;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: #4a4a4a; }
+  .url-bar {
+    flex: 1;
+    background: #2a2a2a;
+    border-radius: 3px;
+    padding: 5px 12px;
+    font-size: 12px;
+    color: #cfcfcf;
+    letter-spacing: 0.01em;
+  }
+
+  .page { background: #f7f5f0; }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 48px;
+    border-bottom: 1px solid #111111;
+  }
+  .site-name {
+    font-size: 15px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+  }
+  .cart {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+  }
+  .cart-badge {
+    background: #111111;
+    color: #f7f5f0;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  .hero {
+    padding: 64px 48px 0;
+    display: grid;
+    grid-template-columns: 2.2fr 1fr;
+    gap: 40px;
+    align-items: end;
+  }
+  .kicker {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #b5811f;
+    font-weight: 700;
+    margin-bottom: 18px;
+  }
+  h1.vendor-name {
+    font-size: 84px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 0.92;
+    margin-bottom: 0;
+  }
+  .hero-rule {
+    height: 3px;
+    background: #111111;
+    margin-top: 26px;
+  }
+  .vendor-desc {
+    font-size: 16px;
+    color: #58554c;
+    line-height: 1.5;
+    padding-bottom: 8px;
+    border-left: 2px solid #e2a53a;
+    padding-left: 16px;
+  }
+
+  .pickup {
+    margin: 30px 48px 0;
+    padding: 18px 0;
+    border-top: 1px solid #dcd8cc;
+    border-bottom: 1px solid #dcd8cc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .pickup .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: #58554c;
+    font-weight: 700;
+  }
+  .pickup .detail {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111111;
+  }
+  .pickup .tag {
+    background: #e2a53a;
+    color: #111111;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 5px 12px;
+    border-radius: 3px;
+  }
+
+  .menu-heading {
+    padding: 56px 48px 4px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .menu-heading h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    font-weight: 800;
+  }
+  .menu-heading .count {
+    font-size: 12px;
+    color: #58554c;
+  }
+
+  .products {
+    padding: 8px 48px 56px;
+  }
+  .product {
+    display: grid;
+    grid-template-columns: 52px 74px 1fr auto auto;
+    align-items: center;
+    gap: 24px;
+    padding: 26px 0;
+    border-bottom: 1px solid #dcd8cc;
+  }
+  .p-num {
+    font-size: 14px;
+    color: #b5811f;
+    font-weight: 800;
+  }
+  .thumb {
+    width: 62px;
+    height: 62px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .thumb.loaf {
+    background:
+      repeating-linear-gradient(64deg, transparent 0 8px, rgba(20,10,4,0.14) 8px 10px),
+      linear-gradient(160deg, #d7a468, #7c4a1c 80%);
+  }
+  .thumb.rye {
+    background-image:
+      radial-gradient(circle, rgba(15,8,3,0.65) 1.2px, transparent 1.5px);
+    background-size: 8px 8px;
+    background-color: #6b3f1e;
+  }
+  .thumb.bun {
+    background: conic-gradient(from 30deg, #dba86a, #8f5323, #d29d5f, #7c4718, #dba86a);
+    border-radius: 50%;
+  }
+  .p-name { font-size: 19px; font-weight: 700; }
+  .p-desc { font-size: 13px; color: #58554c; margin-top: 3px; }
+  .p-price {
+    font-size: 17px;
+    font-weight: 800;
+    color: #111111;
+    justify-self: end;
+  }
+  .add-btn {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 800;
+    background: transparent;
+    color: #111111;
+    border: 1.5px solid #111111;
+    border-radius: 0;
+    padding: 11px 20px;
+    cursor: default;
+    white-space: nowrap;
+  }
+</style>
+
+<div class="design-note">
+  <strong>Direction: Modern Editorial</strong>
+  A food-magazine register — oversized tight-tracking display type, hairline
+  rules, numbered listings, and one mustard accent against black-on-off-white.
+  In motion the hairline beneath the vendor name would sweep in on load and
+  the numbers would count up as the list resolves.
+</div>
+
+<div class="browser">
+  <div class="browser-bar">
+    <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="url-bar">localfood.app/vendors/corner-sourdough</div>
+  </div>
+  <div class="page">
+    <div class="site-header">
+      <div class="site-name">Local Food</div>
+      <div class="cart">Cart <span class="cart-badge">2</span></div>
+    </div>
+
+    <div class="hero">
+      <div>
+        <div class="kicker">Vendor Profile — Weekend Bakery</div>
+        <h1 class="vendor-name">Corner<br>Sourdough</h1>
+      </div>
+      <p class="vendor-desc">Naturally leavened breads baked fresh every weekend.</p>
+    </div>
+    <div class="hero-rule" style="margin-left:48px; margin-right:48px;"></div>
+
+    <div class="pickup">
+      <div>
+        <div class="label">Next Pickup</div>
+        <div class="detail">Saturday, 9:00 AM – 12:00 PM · 123 Main St</div>
+      </div>
+      <div class="tag">This Weekend</div>
+    </div>
+
+    <div class="menu-heading">
+      <h2>Menu</h2>
+      <div class="count">03 Items</div>
+    </div>
+    <div class="products">
+      <div class="product">
+        <div class="p-num">01</div>
+        <div class="thumb loaf"></div>
+        <div>
+          <div class="p-name">Classic Sourdough Loaf</div>
+          <div class="p-desc">Crusty, tangy, 800g.</div>
+        </div>
+        <div class="p-price">$9.00</div>
+        <button class="add-btn">Add to cart</button>
+      </div>
+      <div class="product">
+        <div class="p-num">02</div>
+        <div class="thumb rye"></div>
+        <div>
+          <div class="p-name">Seeded Rye</div>
+          <div class="p-desc">Caraway and sunflower seeds.</div>
+        </div>
+        <div class="p-price">$11.00</div>
+        <button class="add-btn">Add to cart</button>
+      </div>
+      <div class="product">
+        <div class="p-num">03</div>
+        <div class="thumb bun"></div>
+        <div>
+          <div class="p-name">Cinnamon Morning Bun</div>
+          <div class="p-desc">Laminated dough, sold by the half dozen.</div>
+        </div>
+        <div class="p-price">$15.00</div>
+        <button class="add-btn">Add to cart</button>
+      </div>
+    </div>
+  </div>
+</div>

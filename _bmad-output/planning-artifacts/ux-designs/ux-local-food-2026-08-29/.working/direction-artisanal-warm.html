@@ -1,0 +1,388 @@
+<!--
+  DIRECTION: Artisanal Warm
+  Cozy, hand-crafted farmers-market register. Leans into the "baked by a real
+  person this weekend" story with a serif display face, parchment texture,
+  a hand-drawn divider, and torn/stamped badge details. Motion (implied,
+  static here): the pickup banner would carry a slow warm glow pulse and
+  product cards would settle in with a gentle stagger-fade on load.
+-->
+<title>Corner Sourdough — Artisanal Warm</title>
+<style>
+  /*
+    PALETTE — Artisanal Warm
+    --parchment:      #f4e8d3   (page background)
+    --parchment-deep:  #ecd9b8   (texture stripe)
+    --paper:           #fffaf0   (card surface)
+    --rust:            #b5502f  (primary brand / headings accent)
+    --rust-deep:       #7c3a20  (hover / emphasis)
+    --gold:            #d4a24c  (secondary accent, badges)
+    --ink:             #3a2a1d  (primary text)
+    --ink-soft:        #6b5842  (secondary text)
+    --line:            #d9c39c  (hairlines)
+    --sold-out-bg:     #e6ddc9
+  */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e3d6bc;
+    font-family: Georgia, "Times New Roman", serif;
+    color: #3a2a1d;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .design-note {
+    max-width: 900px;
+    width: 100%;
+    background: #fffaf0;
+    border: 2px dashed #b5502f;
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #3a2a1d;
+  }
+  .design-note strong {
+    display: block;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: #b5502f;
+    margin-bottom: 4px;
+  }
+
+  /* Browser chrome */
+  .browser {
+    width: 100%;
+    max-width: 1180px;
+    background: #fffaf0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 30px 60px -20px rgba(58, 42, 29, 0.45), 0 2px 8px rgba(58,42,29,0.15);
+  }
+  .browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #e9dcc4;
+    padding: 10px 14px;
+    border-bottom: 1px solid #d9c39c;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .dot.r { background: #e0605a; }
+  .dot.y { background: #e3b04b; }
+  .dot.g { background: #6fa876; }
+  .url-bar {
+    flex: 1;
+    background: #fffaf0;
+    border: 1px solid #d9c39c;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    color: #6b5842;
+  }
+
+  .page {
+    background: #f4e8d3;
+    background-image: repeating-linear-gradient(135deg, transparent 0 40px, rgba(180,140,90,0.05) 40px 80px);
+  }
+
+  /* Site header */
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 40px;
+    background: #fffaf0;
+    border-bottom: 3px solid #b5502f;
+  }
+  .site-name {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #7c3a20;
+  }
+  .site-name span { color: #d4a24c; }
+  .cart {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    color: #3a2a1d;
+    background: #f4e8d3;
+    border: 1px solid #d9c39c;
+    border-radius: 999px;
+    padding: 7px 16px 7px 12px;
+  }
+  .cart-badge {
+    background: #b5502f;
+    color: #fffaf0;
+    font-weight: 700;
+    border-radius: 999px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  /* Hero */
+  .hero {
+    padding: 48px 40px 30px;
+    text-align: left;
+  }
+  .kicker {
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: #d4a24c;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  h1.vendor-name {
+    font-size: 52px;
+    line-height: 1.05;
+    color: #7c3a20;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+  }
+  .vendor-desc {
+    font-size: 18px;
+    color: #6b5842;
+    max-width: 560px;
+    line-height: 1.5;
+    font-style: italic;
+  }
+
+  .squiggle {
+    width: 100%;
+    height: 18px;
+    margin: 30px 0 0;
+    background-repeat: repeat-x;
+    background-size: 34px 18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='18' viewBox='0 0 34 18'%3E%3Cpath d='M0 9 Q 8.5 0 17 9 T 34 9' stroke='%23d4a24c' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    opacity: 0.8;
+  }
+
+  /* Pickup banner */
+  .pickup {
+    margin: 26px 40px 8px;
+    background: linear-gradient(120deg, #b5502f, #8a3a22);
+    color: #fffaf0;
+    border-radius: 14px;
+    padding: 20px 26px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 12px 24px -10px rgba(124,58,32,0.5);
+  }
+  .pickup-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .pickup-text .label {
+    font-family: -apple-system, sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    opacity: 0.85;
+    margin-bottom: 3px;
+  }
+  .pickup-text .detail {
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  /* Menu section */
+  .menu-heading {
+    padding: 40px 40px 6px;
+    font-size: 28px;
+    color: #7c3a20;
+    font-weight: 400;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .menu-heading .count {
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    color: #a08a6d;
+    font-weight: 600;
+  }
+
+  .products {
+    padding: 10px 40px 44px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .product {
+    display: flex;
+    gap: 22px;
+    align-items: center;
+    background: #fffaf0;
+    border: 1px solid #e6d5b3;
+    border-radius: 16px;
+    padding: 18px 22px;
+    box-shadow: 0 4px 14px -8px rgba(58,42,29,0.15);
+  }
+  .thumb {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: inset 0 -6px 10px rgba(0,0,0,0.15);
+  }
+  .thumb.loaf {
+    background:
+      repeating-linear-gradient(64deg, transparent 0 9px, rgba(50,25,8,0.16) 9px 11px),
+      radial-gradient(ellipse at 32% 26%, #e6ac6c, #a5661f 75%);
+  }
+  .thumb.rye {
+    background-image:
+      radial-gradient(circle, rgba(20,10,4,0.7) 1.3px, transparent 1.6px),
+      radial-gradient(circle, rgba(240,220,180,0.5) 1px, transparent 1.4px);
+    background-size: 9px 9px, 13px 13px;
+    background-position: 0 0, 4px 6px;
+    background-color: #7a4a24;
+  }
+  .thumb.bun {
+    background: conic-gradient(from 20deg, #e7bd80, #a5652f, #e0b078, #96591f, #e7bd80);
+  }
+  .thumb.soldout { filter: grayscale(0.7) brightness(0.85); opacity: 0.6; }
+
+  .info { flex: 1; }
+  .p-name {
+    font-size: 21px;
+    color: #3a2a1d;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .badge {
+    font-family: -apple-system, sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .badge.fresh { background: #ecd9b8; color: #7c3a20; }
+  .badge.out { background: #d9c8ad; color: #6b5842; }
+  .p-desc {
+    font-family: -apple-system, sans-serif;
+    font-size: 14px;
+    color: #6b5842;
+    margin-bottom: 10px;
+  }
+  .p-price {
+    font-family: -apple-system, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #b5502f;
+  }
+  .add-btn {
+    font-family: -apple-system, sans-serif;
+    background: #b5502f;
+    color: #fffaf0;
+    border: none;
+    border-radius: 999px;
+    padding: 11px 22px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+    cursor: default;
+    box-shadow: 0 6px 14px -6px rgba(124,58,32,0.5);
+  }
+  .add-btn.disabled {
+    background: #d9c8ad;
+    color: #8a7a5f;
+    box-shadow: none;
+  }
+</style>
+
+<div class="design-note">
+  <strong>Direction: Artisanal Warm</strong>
+  A cozy, hand-crafted farmers-market register — serif display type, parchment
+  texture, a hand-drawn divider, and rounded loaf-shaped product art in place
+  of photography. In motion this would breathe: the pickup banner glows
+  gently, and product rows settle in with a soft staggered fade as if fresh
+  off the rack.
+</div>
+
+<div class="browser">
+  <div class="browser-bar">
+    <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+    <div class="url-bar">localfood.app/vendors/corner-sourdough</div>
+  </div>
+  <div class="page">
+    <div class="site-header">
+      <div class="site-name">Local <span>Food</span></div>
+      <div class="cart">🧺 Cart <span class="cart-badge">2</span></div>
+    </div>
+
+    <div class="hero">
+      <div class="kicker">Weekend Bakery</div>
+      <h1 class="vendor-name">Corner Sourdough</h1>
+      <p class="vendor-desc">Naturally leavened breads baked fresh every weekend.</p>
+    </div>
+    <div class="squiggle"></div>
+
+    <div class="pickup">
+      <div class="pickup-icon">🕘</div>
+      <div class="pickup-text">
+        <div class="label">Next Pickup</div>
+        <div class="detail">Saturday, 9:00 AM – 12:00 PM · 123 Main St</div>
+      </div>
+    </div>
+
+    <div class="menu-heading">Menu <span class="count">3 items</span></div>
+    <div class="products">
+      <div class="product">
+        <div class="thumb loaf"></div>
+        <div class="info">
+          <div class="p-name">Classic Sourdough Loaf <span class="badge fresh">Baked Fresh</span></div>
+          <div class="p-desc">Crusty, tangy, 800g.</div>
+          <div class="p-price">$9.00</div>
+        </div>
+        <button class="add-btn">Add to cart</button>
+      </div>
+      <div class="product">
+        <div class="thumb rye"></div>
+        <div class="info">
+          <div class="p-name">Seeded Rye <span class="badge fresh">Baked Fresh</span></div>
+          <div class="p-desc">Caraway and sunflower seeds.</div>
+          <div class="p-price">$11.00</div>
+        </div>
+        <button class="add-btn">Add to cart</button>
+      </div>
+      <div class="product">
+        <div class="thumb bun soldout"></div>
+        <div class="info">
+          <div class="p-name">Cinnamon Morning Bun <span class="badge out">Sold Out</span></div>
+          <div class="p-desc">Laminated dough, sold by the half dozen.</div>
+          <div class="p-price">$15.00</div>
+        </div>
+        <button class="add-btn disabled">Sold out</button>
+      </div>
+    </div>
+  </div>
+</div>

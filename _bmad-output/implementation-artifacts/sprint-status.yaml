@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-08-17
-last_updated: 2026-08-28 (Story 7.1 code review complete, done)
+last_updated: 2026-08-29 (Epic 7 retrospective done)
 project: local-food
 project_key: NOKEY
 tracking_system: file-system
@@ -82,8 +82,9 @@ development_status:
   6-1-pickup-slot-times-interpreted-in-vendors-own-timezone: done
   epic-6-retrospective: done
 
-  epic-7: in-progress
+  epic-7: done
   7-1-admin-sets-a-vendors-real-timezone: done
+  epic-7-retrospective: done
 
 action_items:
   - epic: 1
@@ -225,5 +226,13 @@ action_items:
     note: "2026-08-28: decided - headings, not line numbers. Enforced via _bmad/custom/bmad-create-story.toml persistent_facts."
   - epic: 6
     action: "Before importing any constant from a route's schema.ts into a \"use client\" component, check whether it reads process.env - carried, still unexercised"
+    owner: "Dev"
+    status: open
+  - epic: 7
+    action: "For any future story involving timezone/offset/DST-adjacent logic, require test coverage that sweeps a range of times across a transition - carried from Epic 6's retro, still unexercised (2nd epic running)"
+    owner: "Dev"
+    status: open
+  - epic: 7
+    action: "Before importing any constant from a route's schema.ts into a \"use client\" component, check whether it reads process.env - carried, still unexercised (4th epic running)"
     owner: "Dev"
     status: open

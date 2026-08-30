@@ -1,0 +1,368 @@
+<!--
+  DIRECTION: Artisanal Warm v3 — Homepage (vendor directory)
+  Extends the confirmed Artisanal Warm v3 storefront language (same palette,
+  type scale, card/badge/button shapes, squiggle divider) to the homepage.
+  Vendor cards use CSS-only gradient/pattern accents (bakery vs. farm motifs)
+  in place of photography — the app has no vendor-photo field yet, so this
+  is a pure visual-language reskin, not a new-feature mock.
+-->
+<title>Local Food — Artisanal Warm v3 (homepage)</title>
+<style>
+  /*
+    PALETTE — Artisanal Warm v3 ("Terracotta & Olive") — confirmed direction
+    --cream:           #f7ecd8   (page background)
+    --cream-deep:      #ecdcc0   (texture stripe / outer frame)
+    --paper:           #fffdf6   (card / header surface)
+    --terracotta:      #a83f22   (primary brand / buttons / links)
+    --terracotta-deep: #7a2e19   (headings, hover/emphasis, price)
+    --olive:            #55622f  (secondary accent — kicker, "Food" wordmark)
+    --olive-deep:       #3d4722  (badge text on sage panels)
+    --sage-light:       #dde3c8  (badge "fresh"/"available" panel background)
+    --ink:              #2b2015  (primary text)
+    --ink-soft:         #5c4d3a  (secondary text/labels)
+    --line:             #ddc79f  (hairlines)
+    --sold-out-bg:      #e6dbc0
+  */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e6d3ad;
+    font-family: Georgia, "Times New Roman", serif;
+    color: #2b2015;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .design-note {
+    max-width: 900px;
+    width: 100%;
+    background: #fffdf6;
+    border: 2px dashed #a83f22;
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #2b2015;
+  }
+  .design-note strong {
+    display: block;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: #a83f22;
+    margin-bottom: 4px;
+  }
+
+  /* Browser chrome */
+  .browser {
+    width: 100%;
+    max-width: 1180px;
+    background: #fffdf6;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 30px 60px -20px rgba(43, 32, 21, 0.45), 0 2px 8px rgba(43,32,21,0.15);
+  }
+  .browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #ecdcc0;
+    padding: 10px 14px;
+    border-bottom: 1px solid #ddc79f;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .dot.r { background: #e0605a; }
+  .dot.y { background: #e3b04b; }
+  .dot.g { background: #6fa876; }
+  .url-bar {
+    flex: 1;
+    background: #fffdf6;
+    border: 1px solid #ddc79f;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    color: #5c4d3a;
+  }
+
+  .page {
+    background: #f7ecd8;
+    background-image: repeating-linear-gradient(135deg, transparent 0 40px, rgba(120,60,30,0.05) 40px 80px);
+  }
+
+  /* Site header */
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 40px;
+    background: #fffdf6;
+    border-bottom: 3px solid #a83f22;
+  }
+  .site-name {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #7a2e19;
+  }
+  .site-name span { color: #55622f; }
+  .cart {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    color: #2b2015;
+    background: #f7ecd8;
+    border: 1px solid #ddc79f;
+    border-radius: 999px;
+    padding: 7px 16px 7px 12px;
+  }
+  .cart-badge {
+    background: #a83f22;
+    color: #fffdf6;
+    font-weight: 700;
+    border-radius: 999px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  /* Hero */
+  .hero {
+    padding: 48px 40px 30px;
+    text-align: left;
+  }
+  .kicker {
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: #55622f;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  h1.page-title {
+    font-size: 46px;
+    line-height: 1.08;
+    color: #7a2e19;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+  }
+  .page-subhead {
+    font-size: 18px;
+    color: #5c4d3a;
+    max-width: 560px;
+    line-height: 1.5;
+    font-style: italic;
+  }
+
+  .squiggle {
+    width: 100%;
+    height: 18px;
+    margin: 30px 0 0;
+    background-repeat: repeat-x;
+    background-size: 34px 18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='18' viewBox='0 0 34 18'%3E%3Cpath d='M0 9 Q 8.5 0 17 9 T 34 9' stroke='%2355622f' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    opacity: 0.8;
+  }
+
+  /* Vendor directory grid */
+  .section-heading {
+    padding: 40px 40px 6px;
+    font-size: 24px;
+    color: #7a2e19;
+    font-weight: 400;
+  }
+  .vendor-grid {
+    padding: 10px 40px 48px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  .vendor-card {
+    background: #fffdf6;
+    border: 1px solid #e9dbb9;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 10px 24px -14px rgba(43,32,21,0.25);
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  /* Category accent panels — CSS-only pattern art, no photography */
+  .card-accent {
+    position: relative;
+    height: 150px;
+    flex-shrink: 0;
+  }
+  .card-accent.bakery {
+    background:
+      radial-gradient(circle at 50% 42%, #c9673f 0%, #a83f22 46%, #7a2e19 100%),
+      repeating-linear-gradient(45deg, rgba(255,253,246,0.07) 0 3px, transparent 3px 14px);
+  }
+  .card-accent.bakery::after {
+    /* scored-crust cross-hatch, evoking a sourdough loaf top without a photo */
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(35deg, transparent 0 24px, rgba(255,253,246,0.22) 24px 27px, transparent 27px 60px),
+      repeating-linear-gradient(-35deg, transparent 0 24px, rgba(255,253,246,0.16) 24px 27px, transparent 27px 60px);
+    mask-image: radial-gradient(circle at 50% 55%, #000 0 55px, transparent 90px);
+    -webkit-mask-image: radial-gradient(circle at 50% 55%, #000 0 55px, transparent 90px);
+  }
+  .card-accent.farm {
+    background:
+      linear-gradient(160deg, #6b7a3c 0%, #55622f 55%, #3d4722 100%);
+  }
+  .card-accent.farm::after {
+    /* plowed-row furrows, evoking a farm field without a photo */
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(100deg, rgba(221,227,200,0.16) 0 8px, transparent 8px 34px);
+  }
+  .accent-icon {
+    position: absolute;
+    left: 20px;
+    bottom: -22px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #fffdf6;
+    border: 3px solid #fffdf6;
+    box-shadow: 0 8px 16px -8px rgba(43,32,21,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+  .card-accent.bakery .accent-icon { color: #7a2e19; }
+  .card-accent.farm .accent-icon { color: #55622f; }
+
+  .vendor-card-body {
+    padding: 34px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+  .vendor-card .kicker { margin-bottom: 2px; }
+  .vendor-card-name {
+    font-size: 24px;
+    color: #2b2015;
+    font-weight: 400;
+    margin-bottom: 2px;
+  }
+  .vendor-card-desc {
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-size: 15px;
+    color: #5c4d3a;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .vendor-card-footer {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .badge {
+    font-family: -apple-system, sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .badge.available { background: #dde3c8; color: #3d4722; }
+  .view-btn {
+    font-family: -apple-system, sans-serif;
+    background: #a83f22;
+    color: #fffdf6;
+    border-radius: 999px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: 0 6px 14px -6px rgba(122,46,25,0.5);
+  }
+  .vendor-card:hover .view-btn { background: #7a2e19; }
+</style>
+
+<div class="design-note">
+  <strong>Homepage — Artisanal Warm v3 (vendor directory)</strong>
+  Same confirmed palette, type, and component shapes as the locked vendor-page
+  direction (browser chrome, squiggle divider, pill buttons/badges). Vendor
+  cards use CSS-only gradient/pattern accents — a scored terracotta "loaf"
+  motif for bakery vendors, a furrowed olive "field" motif for farms — since
+  no vendor-photo field exists yet; this is a reskin pass, not a new field.
+</div>
+
+<div class="browser">
+  <div class="browser-bar">
+    <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+    <div class="url-bar">localfood.app</div>
+  </div>
+  <div class="page">
+    <div class="site-header">
+      <div class="site-name">Local <span>Food</span></div>
+      <div class="cart"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:1px" xmlns="http://www.w3.org/2000/svg"><path d="M4 8h12l-1.3 8.2a1 1 0 0 1-1 .8H6.3a1 1 0 0 1-1-.8L4 8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 8V6a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6.6 11.3l.6 3.6M13.4 11.3l-.6 3.6M10 11.3v3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg> Cart <span class="cart-badge">2</span></div>
+    </div>
+
+    <div class="hero">
+      <div class="kicker">Local Marketplace</div>
+      <h1 class="page-title">Find local food near you</h1>
+      <p class="page-subhead">Order from independent bakers, farmers, and makers for pickup.</p>
+    </div>
+    <div class="squiggle" style="margin: 0 40px; width: calc(100% - 80px);"></div>
+
+    <div class="section-heading">Vendors near you</div>
+    <div class="vendor-grid">
+      <a class="vendor-card" href="/vendors/corner-sourdough">
+        <div class="card-accent bakery">
+          <div class="accent-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 12.5c0-4.7 3.6-8.5 8-8.5s8 3.8 8 8.5v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 10.5l1.6 4.2M12 9l1.6 5.5M16 10.5l1.6 4.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+        </div>
+        <div class="vendor-card-body">
+          <div class="kicker">Weekend Bakery</div>
+          <div class="vendor-card-name">Corner Sourdough</div>
+          <p class="vendor-card-desc">Naturally leavened breads baked fresh every weekend.</p>
+          <div class="vendor-card-footer">
+            <span class="badge available">3 items available</span>
+            <span class="view-btn">View menu</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="vendor-card" href="/vendors/green-valley-produce">
+        <div class="card-accent farm">
+          <div class="accent-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21c3-1 5-6 4.5-11-4.7-.7-8.7 2-9.5 6-.5 2.5.5 4.3 5 5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M16.2 9.8c1-.9 2.4-1.1 3.4-.5M15.5 7.5c.4-1.1 1.5-1.9 2.8-1.9M13.7 6.1c.1-1.1.8-2.1 1.8-2.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+        </div>
+        <div class="vendor-card-body">
+          <div class="kicker">Family Farm</div>
+          <div class="vendor-card-name">Green Valley Produce</div>
+          <p class="vendor-card-desc">Seasonal vegetables from a 5-acre family farm.</p>
+          <div class="vendor-card-footer">
+            <span class="badge available">2 items available</span>
+            <span class="view-btn">View menu</span>
+          </div>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>

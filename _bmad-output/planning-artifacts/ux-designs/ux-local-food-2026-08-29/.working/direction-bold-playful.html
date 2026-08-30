@@ -1,0 +1,363 @@
+<!--
+  DIRECTION: Bold Playful
+  High-energy, neo-brutalist-meets-fun register — thick black outlines,
+  hard drop shadows, color-blocked cards tilted off-axis, chunky rounded
+  type, sticker badges. Motion (implied, static here): cards would wiggle
+  and settle into their tilt on load, and the add-to-cart buttons would
+  squish/bounce on press.
+-->
+<title>Corner Sourdough — Bold Playful</title>
+<style>
+  /*
+    PALETTE — Bold Playful
+    --bg:        #fff2df   (page background)
+    --ink:       #17140f   (outlines / primary text)
+    --pink:      #ff6b9d   (card — sourdough)
+    --yellow:    #ffd23f   (card — rye)
+    --teal:      #06d6a0   (card — cinnamon bun)
+    --purple:    #a78bfa   (header / pickup banner)
+    --card-white: #fffdf9  (name/desc panels)
+    --sold-gray: #cfcac0   (sold-out state)
+  */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #efe2c8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: #17140f;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .design-note {
+    max-width: 900px;
+    width: 100%;
+    background: #ffd23f;
+    border: 3px solid #17140f;
+    border-radius: 14px;
+    padding: 16px 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #17140f;
+    box-shadow: 6px 6px 0 #17140f;
+  }
+  .design-note strong {
+    display: block;
+    font-size: 16px;
+    font-weight: 900;
+    margin-bottom: 6px;
+  }
+
+  .browser {
+    width: 100%;
+    max-width: 1180px;
+    background: #fffdf9;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 3px solid #17140f;
+    box-shadow: 10px 10px 0 rgba(23,20,15,0.85);
+  }
+  .browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #17140f;
+    padding: 10px 14px;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #ff6b9d; }
+  .dot.y { background: #ffd23f; }
+  .dot.g { background: #06d6a0; }
+  .url-bar {
+    flex: 1;
+    background: #2b271f;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: #e8e0d0;
+    font-weight: 700;
+  }
+
+  .page { background: #fff2df; }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    background: #a78bfa;
+    border-bottom: 3px solid #17140f;
+  }
+  .site-name {
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    color: #17140f;
+  }
+  .cart {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 800;
+    background: #fffdf9;
+    border: 2.5px solid #17140f;
+    border-radius: 999px;
+    padding: 8px 16px 8px 14px;
+  }
+  .cart-badge {
+    background: #ff6b9d;
+    border: 2px solid #17140f;
+    color: #17140f;
+    font-weight: 900;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  .hero {
+    padding: 46px 40px 10px;
+    text-align: center;
+  }
+  .kicker {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: #06d6a0;
+    border: 2.5px solid #17140f;
+    border-radius: 999px;
+    padding: 5px 16px;
+    margin-bottom: 16px;
+    transform: rotate(-2deg);
+  }
+  h1.vendor-name {
+    font-size: 58px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 14px;
+  }
+  .vendor-desc {
+    font-size: 18px;
+    font-weight: 600;
+    color: #3d3728;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.4;
+  }
+
+  .pickup {
+    margin: 30px 40px 6px;
+    background: #ff6b9d;
+    border: 3px solid #17140f;
+    border-radius: 16px;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transform: rotate(-1deg);
+    box-shadow: 6px 6px 0 #17140f;
+  }
+  .pickup-icon {
+    width: 44px;
+    height: 44px;
+    background: #fffdf9;
+    border: 2.5px solid #17140f;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .pickup-text .label {
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 3px;
+  }
+  .pickup-text .detail {
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  .menu-heading {
+    padding: 44px 40px 6px;
+    text-align: center;
+  }
+  .menu-heading h2 {
+    font-size: 32px;
+    font-weight: 900;
+    display: inline-block;
+    position: relative;
+  }
+  .menu-heading .count {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #6b6252;
+    margin-top: 4px;
+  }
+
+  .products {
+    padding: 20px 34px 50px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 26px;
+  }
+  .product {
+    border: 3px solid #17140f;
+    border-radius: 18px;
+    background: #fffdf9;
+    box-shadow: 7px 7px 0 #17140f;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .product:nth-child(1) { transform: rotate(-2deg); }
+  .product:nth-child(2) { transform: rotate(1.5deg); }
+  .product:nth-child(3) { transform: rotate(-1deg); }
+
+  .thumb {
+    height: 130px;
+    border-bottom: 3px solid #17140f;
+    position: relative;
+  }
+  .thumb.loaf {
+    background:
+      repeating-linear-gradient(64deg, transparent 0 9px, rgba(0,0,0,0.14) 9px 11px),
+      linear-gradient(160deg, #ffb347, #ff6b9d 85%);
+  }
+  .thumb.rye {
+    background-image: radial-gradient(circle, rgba(23,20,15,0.55) 1.6px, transparent 2px);
+    background-size: 10px 10px;
+    background-color: #ffd23f;
+  }
+  .thumb.bun {
+    background: conic-gradient(from 15deg, #06d6a0, #17b285, #4de3bb, #0e9c76, #06d6a0);
+  }
+  .badge-sticker {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #17140f;
+    color: #fffdf9;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 9px;
+    border-radius: 999px;
+    transform: rotate(4deg);
+  }
+  .badge-sticker.out { background: #6b6252; }
+
+  .info { padding: 16px 18px 18px; flex: 1; display: flex; flex-direction: column; }
+  .p-name { font-size: 19px; font-weight: 900; margin-bottom: 5px; }
+  .p-desc { font-size: 13px; font-weight: 600; color: #55503f; margin-bottom: 14px; flex: 1; }
+  .p-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .p-price { font-size: 18px; font-weight: 900; }
+  .add-btn {
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    background: #17140f;
+    color: #fffdf9;
+    border: 2.5px solid #17140f;
+    border-radius: 999px;
+    padding: 9px 16px;
+    cursor: default;
+  }
+  .add-btn.disabled {
+    background: #cfcac0;
+    color: #6b6252;
+    border-color: #6b6252;
+  }
+  .product.soldout .thumb { filter: grayscale(0.85) brightness(0.9); }
+  .product.soldout { opacity: 0.85; }
+</style>
+
+<div class="design-note">
+  <strong>Direction: Bold Playful</strong>
+  A high-energy, neo-brutalist-meets-fun register — thick outlines, hard drop
+  shadows, tilted color-blocked cards, and sticker badges. In motion the cards
+  would wiggle into their tilt on load and the add-to-cart buttons would
+  squish and bounce on press.
+</div>
+
+<div class="browser">
+  <div class="browser-bar">
+    <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+    <div class="url-bar">localfood.app/vendors/corner-sourdough</div>
+  </div>
+  <div class="page">
+    <div class="site-header">
+      <div class="site-name">Local Food 🥖</div>
+      <div class="cart">🛒 Cart <span class="cart-badge">2</span></div>
+    </div>
+
+    <div class="hero">
+      <div class="kicker">✨ Weekend Bakery Drop</div>
+      <h1 class="vendor-name">Corner Sourdough</h1>
+      <p class="vendor-desc">Naturally leavened breads baked fresh every weekend.</p>
+    </div>
+
+    <div class="pickup">
+      <div class="pickup-icon">🕘</div>
+      <div class="pickup-text">
+        <div class="label">Next Pickup</div>
+        <div class="detail">Saturday, 9:00 AM – 12:00 PM · 123 Main St</div>
+      </div>
+    </div>
+
+    <div class="menu-heading">
+      <h2>The Menu 🍞</h2>
+      <span class="count">3 fresh-baked items</span>
+    </div>
+    <div class="products">
+      <div class="product">
+        <div class="thumb loaf"><span class="badge-sticker">Fresh!</span></div>
+        <div class="info">
+          <div class="p-name">Classic Sourdough Loaf</div>
+          <div class="p-desc">Crusty, tangy, 800g.</div>
+          <div class="p-row">
+            <div class="p-price">$9.00</div>
+            <button class="add-btn">Add +</button>
+          </div>
+        </div>
+      </div>
+      <div class="product">
+        <div class="thumb rye"><span class="badge-sticker">Fresh!</span></div>
+        <div class="info">
+          <div class="p-name">Seeded Rye</div>
+          <div class="p-desc">Caraway and sunflower seeds.</div>
+          <div class="p-row">
+            <div class="p-price">$11.00</div>
+            <button class="add-btn">Add +</button>
+          </div>
+        </div>
+      </div>
+      <div class="product soldout">
+        <div class="thumb bun"><span class="badge-sticker out">Sold Out</span></div>
+        <div class="info">
+          <div class="p-name">Cinnamon Morning Bun</div>
+          <div class="p-desc">Laminated dough, sold by the half dozen.</div>
+          <div class="p-row">
+            <div class="p-price">$15.00</div>
+            <button class="add-btn disabled">Sold out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

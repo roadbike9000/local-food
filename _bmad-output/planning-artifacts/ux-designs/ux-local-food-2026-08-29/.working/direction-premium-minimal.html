@@ -1,0 +1,300 @@
+<!--
+  DIRECTION: Premium Minimal
+  Quiet, luxury-goods register — thin-weight type at generous scale, wide
+  negative space, a single muted-gold hairline accent, monochrome product
+  art. Motion (implied, static here): sections would fade-and-rise in on
+  scroll, and the product art would carry a very subtle cursor-follow
+  parallax rather than any bounce or color shift.
+-->
+<title>Corner Sourdough — Premium Minimal</title>
+<style>
+  /*
+    PALETTE — Premium Minimal
+    --bg:        #f7f6f3   (page background)
+    --surface:   #fcfbf9   (row / card surface)
+    --ink:       #1f1e1c   (headlines)
+    --ink-soft:  #6f6a61   (secondary text)
+    --gold:      #a8874f   (single accent — rule, price, CTA text)
+    --hairline:  #e2ddd3   (dividers)
+    --mono-1:    #3a372f   (product art dark)
+    --mono-2:    #b8b2a4   (product art light)
+  */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e9e6de;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 300;
+    color: #1f1e1c;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .design-note {
+    max-width: 900px;
+    width: 100%;
+    background: #fcfbf9;
+    border: 1px solid #a8874f;
+    padding: 16px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #3a372f;
+    font-weight: 400;
+  }
+  .design-note strong {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #a8874f;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .browser {
+    width: 100%;
+    max-width: 1180px;
+    background: #fcfbf9;
+    overflow: hidden;
+    box-shadow: 0 40px 70px -25px rgba(31,30,28,0.3), 0 2px 6px rgba(31,30,28,0.08);
+  }
+  .browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #fcfbf9;
+    padding: 14px 20px;
+    border-bottom: 1px solid #e2ddd3;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #e2ddd3; }
+  .url-bar {
+    flex: 1;
+    background: #f7f6f3;
+    border: 1px solid #e2ddd3;
+    border-radius: 4px;
+    padding: 5px 12px;
+    font-size: 12px;
+    color: #6f6a61;
+    font-weight: 400;
+  }
+
+  .page { background: #f7f6f3; }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 28px 64px;
+  }
+  .site-name {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+  }
+  .cart {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6f6a61;
+    font-weight: 400;
+  }
+  .cart-badge {
+    color: #a8874f;
+    font-weight: 600;
+  }
+
+  .hero {
+    padding: 70px 64px 0;
+    max-width: 760px;
+  }
+  .kicker {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    color: #a8874f;
+    font-weight: 500;
+    margin-bottom: 22px;
+  }
+  h1.vendor-name {
+    font-size: 64px;
+    font-weight: 200;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+    margin-bottom: 22px;
+    color: #1f1e1c;
+  }
+  .vendor-desc {
+    font-size: 18px;
+    font-weight: 300;
+    color: #6f6a61;
+    line-height: 1.6;
+    max-width: 480px;
+  }
+
+  .gold-rule {
+    width: 48px;
+    height: 1px;
+    background: #a8874f;
+    margin: 34px 64px 0;
+  }
+
+  .pickup {
+    margin: 34px 64px 0;
+    padding: 26px 0 30px;
+    display: flex;
+    align-items: baseline;
+    gap: 40px;
+    border-bottom: 1px solid #e2ddd3;
+  }
+  .pickup .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.24em;
+    color: #a8874f;
+    font-weight: 500;
+    flex-shrink: 0;
+    width: 130px;
+  }
+  .pickup .detail {
+    font-size: 17px;
+    font-weight: 300;
+    color: #1f1e1c;
+  }
+
+  .menu-heading {
+    padding: 60px 64px 8px;
+  }
+  .menu-heading h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.28em;
+    font-weight: 500;
+    color: #1f1e1c;
+  }
+
+  .products {
+    padding: 8px 64px 70px;
+  }
+  .product {
+    display: grid;
+    grid-template-columns: 96px 1fr auto auto;
+    align-items: center;
+    gap: 34px;
+    padding: 34px 0;
+    border-bottom: 1px solid #e2ddd3;
+  }
+  .product:last-child { border-bottom: none; }
+  .thumb {
+    width: 80px;
+    height: 80px;
+    border-radius: 2px;
+    filter: grayscale(1);
+  }
+  .thumb.loaf {
+    background:
+      repeating-linear-gradient(64deg, transparent 0 8px, rgba(0,0,0,0.18) 8px 10px),
+      linear-gradient(160deg, #b8b2a4, #3a372f 85%);
+  }
+  .thumb.rye {
+    background-image: radial-gradient(circle, rgba(20,18,15,0.7) 1.3px, transparent 1.6px);
+    background-size: 8px 8px;
+    background-color: #7d7869;
+  }
+  .thumb.bun {
+    background: conic-gradient(from 20deg, #b8b2a4, #5a564a, #a19b8b, #3a372f, #b8b2a4);
+    border-radius: 50%;
+  }
+  .p-name { font-size: 19px; font-weight: 400; margin-bottom: 6px; }
+  .p-desc { font-size: 14px; font-weight: 300; color: #6f6a61; }
+  .p-price {
+    font-size: 17px;
+    font-weight: 400;
+    color: #a8874f;
+    justify-self: end;
+  }
+  .add-btn {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 500;
+    background: transparent;
+    color: #1f1e1c;
+    border: 1px solid #1f1e1c;
+    border-radius: 0;
+    padding: 12px 24px;
+    cursor: default;
+    white-space: nowrap;
+  }
+</style>
+
+<div class="design-note">
+  <strong>Direction: Premium Minimal</strong>
+  A quiet, luxury-goods register — thin-weight type at generous scale, wide
+  negative space, and a single muted-gold hairline accent against monochrome
+  product art. In motion, sections would fade-and-rise in on scroll with a
+  very subtle cursor-follow parallax on the product art rather than any
+  bounce or color shift.
+</div>
+
+<div class="browser">
+  <div class="browser-bar">
+    <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="url-bar">localfood.app/vendors/corner-sourdough</div>
+  </div>
+  <div class="page">
+    <div class="site-header">
+      <div class="site-name">Local Food</div>
+      <div class="cart">Cart — <span class="cart-badge">2</span></div>
+    </div>
+
+    <div class="hero">
+      <div class="kicker">Vendor · Weekend Bakery</div>
+      <h1 class="vendor-name">Corner Sourdough</h1>
+      <p class="vendor-desc">Naturally leavened breads baked fresh every weekend.</p>
+    </div>
+    <div class="gold-rule"></div>
+
+    <div class="pickup">
+      <div class="label">Next Pickup</div>
+      <div class="detail">Saturday, 9:00 AM – 12:00 PM · 123 Main St</div>
+    </div>
+
+    <div class="menu-heading"><h2>Menu</h2></div>
+    <div class="products">
+      <div class="product">
+        <div class="thumb loaf"></div>
+        <div>
+          <div class="p-name">Classic Sourdough Loaf</div>
+          <div class="p-desc">Crusty, tangy, 800g.</div>
+        </div>
+        <div class="p-price">$9.00</div>
+        <button class="add-btn">Add to cart</button>
+      </div>
+      <div class="product">
+        <div class="thumb rye"></div>
+        <div>
+          <div class="p-name">Seeded Rye</div>
+          <div class="p-desc">Caraway and sunflower seeds.</div>
+        </div>
+        <div class="p-price">$11.00</div>
+        <button class="add-btn">Add to cart</button>
+      </div>
+      <div class="product">
+        <div class="thumb bun"></div>
+        <div>
+          <div class="p-name">Cinnamon Morning Bun</div>
+          <div class="p-desc">Laminated dough, sold by the half dozen.</div>
+        </div>
+        <div class="p-price">$15.00</div>
+        <button class="add-btn">Add to cart</button>
+      </div>
+    </div>
+  </div>
+</div>
