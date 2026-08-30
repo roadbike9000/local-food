@@ -1,0 +1,382 @@
+<!--
+  DIRECTION: Bold Playful v2 (alt palette)
+  Same neo-brutalist-meets-fun energy as v1 — thick black outlines, hard
+  drop shadows, tilted color-blocked cards, sticker badges — with a
+  genuinely different color scheme: comic-primary red/blue/orange/lime on a
+  cool pale-blue ground, replacing the original pastel-neon pink/yellow/
+  teal/purple on warm cream. Motion (implied, static here): cards would
+  wiggle and settle into their tilt on load, and the add-to-cart buttons
+  would squish/bounce on press.
+-->
+<title>Corner Sourdough — Bold Playful v2</title>
+<style>
+  /*
+    PALETTE — Bold Playful v2 ("Comic Primary")
+    --bg:         #d8e8fb   (outer frame background — cool pale blue)
+    --page:       #eaf4ff   (page background — cool pale blue, lighter)
+    --ink:        #14110f   (outlines / primary text — unchanged, kept per brief)
+    --red:        #ff4d3d   (card — sourdough / pickup banner / cart badge)
+    --blue:       #2f6fed   (card — rye / accent dot)
+    --lime:       #b6ff3a   (card — cinnamon bun / kicker)
+    --orange:     #ff8c2e   (site header)
+    --card-white: #fffefb   (name/desc panels, browser chrome)
+    --sold-gray:  #cfcac0   (sold-out state)
+
+    v1 used a pastel-neon mix (pink #ff6b9d, yellow #ffd23f, teal #06d6a0,
+    purple #a78bfa) on a warm cream (#fff2df) ground. v2 swaps the entire hue
+    family for punchier comic-book primaries (red/blue/orange/lime — no
+    pink, no purple, no teal survives) on a cool pale-blue ground instead of
+    warm cream, while keeping the required black outlines and white card
+    surfaces untouched.
+
+    Spot-checked contrast (ink #14110f text unless noted):
+      ink on orange header    -> 8.10:1
+      ink on lime kicker      -> 15.54:1
+      ink on red pickup/badge -> 5.71:1
+      ink on pale-blue page   -> 16.91:1
+      ink on white cards      -> 18.64:1
+  */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #d8e8fb;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: #14110f;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .design-note {
+    max-width: 900px;
+    width: 100%;
+    background: #b6ff3a;
+    border: 3px solid #14110f;
+    border-radius: 14px;
+    padding: 16px 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #14110f;
+    box-shadow: 6px 6px 0 #14110f;
+  }
+  .design-note strong {
+    display: block;
+    font-size: 16px;
+    font-weight: 900;
+    margin-bottom: 6px;
+  }
+
+  .browser {
+    width: 100%;
+    max-width: 1180px;
+    background: #fffefb;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 3px solid #14110f;
+    box-shadow: 10px 10px 0 rgba(20,17,15,0.85);
+  }
+  .browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #14110f;
+    padding: 10px 14px;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #ff4d3d; }
+  .dot.y { background: #ff8c2e; }
+  .dot.g { background: #b6ff3a; }
+  .url-bar {
+    flex: 1;
+    background: #2b271f;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: #e8e0d0;
+    font-weight: 700;
+  }
+
+  .page { background: #eaf4ff; }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    background: #ff8c2e;
+    border-bottom: 3px solid #14110f;
+  }
+  .site-name {
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    color: #14110f;
+  }
+  .cart {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 800;
+    background: #fffefb;
+    border: 2.5px solid #14110f;
+    border-radius: 999px;
+    padding: 8px 16px 8px 14px;
+  }
+  .cart-badge {
+    background: #ff4d3d;
+    border: 2px solid #14110f;
+    color: #14110f;
+    font-weight: 900;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  .hero {
+    padding: 46px 40px 10px;
+    text-align: center;
+  }
+  .kicker {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: #b6ff3a;
+    border: 2.5px solid #14110f;
+    border-radius: 999px;
+    padding: 5px 16px;
+    margin-bottom: 16px;
+    transform: rotate(-2deg);
+  }
+  h1.vendor-name {
+    font-size: 58px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 14px;
+  }
+  .vendor-desc {
+    font-size: 18px;
+    font-weight: 600;
+    color: #3d3728;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.4;
+  }
+
+  .pickup {
+    margin: 30px 40px 6px;
+    background: #ff4d3d;
+    border: 3px solid #14110f;
+    border-radius: 16px;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transform: rotate(-1deg);
+    box-shadow: 6px 6px 0 #14110f;
+  }
+  .pickup-icon {
+    width: 44px;
+    height: 44px;
+    background: #fffefb;
+    border: 2.5px solid #14110f;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .pickup-text .label {
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 3px;
+  }
+  .pickup-text .detail {
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  .menu-heading {
+    padding: 44px 40px 6px;
+    text-align: center;
+  }
+  .menu-heading h2 {
+    font-size: 32px;
+    font-weight: 900;
+    display: inline-block;
+    position: relative;
+  }
+  .menu-heading .count {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #6b6252;
+    margin-top: 4px;
+  }
+
+  .products {
+    padding: 20px 34px 50px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 26px;
+  }
+  .product {
+    border: 3px solid #14110f;
+    border-radius: 18px;
+    background: #fffefb;
+    box-shadow: 7px 7px 0 #14110f;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .product:nth-child(1) { transform: rotate(-2deg); }
+  .product:nth-child(2) { transform: rotate(1.5deg); }
+  .product:nth-child(3) { transform: rotate(-1deg); }
+
+  .thumb {
+    height: 130px;
+    border-bottom: 3px solid #14110f;
+    position: relative;
+  }
+  .thumb.loaf {
+    background:
+      repeating-linear-gradient(64deg, transparent 0 9px, rgba(0,0,0,0.14) 9px 11px),
+      linear-gradient(160deg, #ff8c2e, #ff4d3d 85%);
+  }
+  .thumb.rye {
+    background-image: radial-gradient(circle, rgba(255,255,255,0.55) 1.6px, transparent 2px);
+    background-size: 10px 10px;
+    background-color: #2f6fed;
+  }
+  .thumb.bun {
+    background: conic-gradient(from 15deg, #b6ff3a, #8fd620, #d4ff7a, #79b810, #b6ff3a);
+  }
+  .badge-sticker {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #14110f;
+    color: #fffefb;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 9px;
+    border-radius: 999px;
+    transform: rotate(4deg);
+  }
+  .badge-sticker.out { background: #6b6252; }
+
+  .info { padding: 16px 18px 18px; flex: 1; display: flex; flex-direction: column; }
+  .p-name { font-size: 19px; font-weight: 900; margin-bottom: 5px; }
+  .p-desc { font-size: 13px; font-weight: 600; color: #55503f; margin-bottom: 14px; flex: 1; }
+  .p-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .p-price { font-size: 18px; font-weight: 900; }
+  .add-btn {
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    background: #14110f;
+    color: #fffefb;
+    border: 2.5px solid #14110f;
+    border-radius: 999px;
+    padding: 9px 16px;
+    cursor: default;
+  }
+  .add-btn.disabled {
+    background: #cfcac0;
+    color: #6b6252;
+    border-color: #6b6252;
+  }
+  .product.soldout .thumb { filter: grayscale(0.85) brightness(0.9); }
+  .product.soldout { opacity: 0.85; }
+</style>
+
+<div class="design-note">
+  <strong>Direction: Bold Playful v2 — alt palette</strong>
+  Same neo-brutalist energy as v1 — thick black outlines, hard drop shadows,
+  tilted color-blocked cards, sticker badges — but a genuinely different
+  color scheme: comic-primary red/blue/orange/lime (#ff4d3d / #2f6fed /
+  #ff8c2e / #b6ff3a) on a cool pale-blue ground, replacing v1's pastel-neon
+  pink/yellow/teal/purple on warm cream. No hue from the original palette
+  survives; black outlines and white card surfaces are kept per the brief.
+</div>
+
+<div class="browser">
+  <div class="browser-bar">
+    <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+    <div class="url-bar">localfood.app/vendors/corner-sourdough</div>
+  </div>
+  <div class="page">
+    <div class="site-header">
+      <div class="site-name">Local Food 🥖</div>
+      <div class="cart">🛒 Cart <span class="cart-badge">2</span></div>
+    </div>
+
+    <div class="hero">
+      <div class="kicker">✨ Weekend Bakery Drop</div>
+      <h1 class="vendor-name">Corner Sourdough</h1>
+      <p class="vendor-desc">Naturally leavened breads baked fresh every weekend.</p>
+    </div>
+
+    <div class="pickup">
+      <div class="pickup-icon">🕘</div>
+      <div class="pickup-text">
+        <div class="label">Next Pickup</div>
+        <div class="detail">Saturday, 9:00 AM – 12:00 PM · 123 Main St</div>
+      </div>
+    </div>
+
+    <div class="menu-heading">
+      <h2>The Menu 🍞</h2>
+      <span class="count">3 fresh-baked items</span>
+    </div>
+    <div class="products">
+      <div class="product">
+        <div class="thumb loaf"><span class="badge-sticker">Fresh!</span></div>
+        <div class="info">
+          <div class="p-name">Classic Sourdough Loaf</div>
+          <div class="p-desc">Crusty, tangy, 800g.</div>
+          <div class="p-row">
+            <div class="p-price">$9.00</div>
+            <button class="add-btn">Add +</button>
+          </div>
+        </div>
+      </div>
+      <div class="product">
+        <div class="thumb rye"><span class="badge-sticker">Fresh!</span></div>
+        <div class="info">
+          <div class="p-name">Seeded Rye</div>
+          <div class="p-desc">Caraway and sunflower seeds.</div>
+          <div class="p-row">
+            <div class="p-price">$11.00</div>
+            <button class="add-btn">Add +</button>
+          </div>
+        </div>
+      </div>
+      <div class="product soldout">
+        <div class="thumb bun"><span class="badge-sticker out">Sold Out</span></div>
+        <div class="info">
+          <div class="p-name">Cinnamon Morning Bun</div>
+          <div class="p-desc">Laminated dough, sold by the half dozen.</div>
+          <div class="p-row">
+            <div class="p-price">$15.00</div>
+            <button class="add-btn disabled">Sold out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

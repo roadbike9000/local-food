@@ -1,0 +1,259 @@
+<!--
+  DIRECTION: Artisanal Warm v3 — Checkout Success page
+  Extends the confirmed Artisanal Warm v3 storefront language to the order
+  confirmation screen. Gives the short celebratory message real presence via
+  a centered card, a hand-drawn checkmark badge (same inline-SVG technique as
+  the confirmed squiggle divider), and a scatter of small squiggle marks as a
+  tasteful, on-brand flourish — no confetti or emoji spam.
+-->
+<title>Order Confirmed — Artisanal Warm v3 (checkout success)</title>
+<style>
+  /*
+    PALETTE — Artisanal Warm v3 ("Terracotta & Olive") — confirmed direction
+    --cream:           #f7ecd8   (page background)
+    --cream-deep:      #ecdcc0   (texture stripe / outer frame)
+    --paper:           #fffdf6   (card / header surface)
+    --terracotta:      #a83f22   (primary brand / buttons / links)
+    --terracotta-deep: #7a2e19   (headings, hover/emphasis, price)
+    --olive:            #55622f  (secondary accent — kicker, "Food" wordmark)
+    --olive-deep:       #3d4722  (badge text on sage panels)
+    --sage-light:       #dde3c8  (badge "fresh"/"available" panel background)
+    --ink:              #2b2015  (primary text)
+    --ink-soft:         #5c4d3a  (secondary text/labels)
+    --line:             #ddc79f  (hairlines)
+    --sold-out-bg:      #e6dbc0
+  */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e6d3ad;
+    font-family: Georgia, "Times New Roman", serif;
+    color: #2b2015;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .design-note {
+    max-width: 900px;
+    width: 100%;
+    background: #fffdf6;
+    border: 2px dashed #a83f22;
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #2b2015;
+  }
+  .design-note strong {
+    display: block;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: #a83f22;
+    margin-bottom: 4px;
+  }
+
+  /* Browser chrome */
+  .browser {
+    width: 100%;
+    max-width: 1180px;
+    background: #fffdf6;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 30px 60px -20px rgba(43, 32, 21, 0.45), 0 2px 8px rgba(43,32,21,0.15);
+  }
+  .browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #ecdcc0;
+    padding: 10px 14px;
+    border-bottom: 1px solid #ddc79f;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .dot.r { background: #e0605a; }
+  .dot.y { background: #e3b04b; }
+  .dot.g { background: #6fa876; }
+  .url-bar {
+    flex: 1;
+    background: #fffdf6;
+    border: 1px solid #ddc79f;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    color: #5c4d3a;
+  }
+
+  .page {
+    background: #f7ecd8;
+    background-image: repeating-linear-gradient(135deg, transparent 0 40px, rgba(120,60,30,0.05) 40px 80px);
+    min-height: 560px;
+  }
+
+  /* Site header */
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 40px;
+    background: #fffdf6;
+    border-bottom: 3px solid #a83f22;
+  }
+  .site-name {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #7a2e19;
+  }
+  .site-name span { color: #55622f; }
+  .cart {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    color: #2b2015;
+    background: #f7ecd8;
+    border: 1px solid #ddc79f;
+    border-radius: 999px;
+    padding: 7px 16px 7px 12px;
+  }
+  .cart-badge {
+    background: #a83f22;
+    color: #fffdf6;
+    font-weight: 700;
+    border-radius: 999px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  /* Confirmation stage */
+  .confirm-stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 76px 40px 90px;
+  }
+
+  /* scattered hand-drawn squiggle flourishes, reusing the confirmed divider asset */
+  .flourish {
+    position: absolute;
+    width: 34px;
+    height: 18px;
+    background-repeat: no-repeat;
+    background-size: 34px 18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='18' viewBox='0 0 34 18'%3E%3Cpath d='M0 9 Q 8.5 0 17 9 T 34 9' stroke='%2355622f' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    opacity: 0.55;
+  }
+  .flourish.f1 { top: 62px; left: 18%; transform: rotate(-12deg) scale(1.3); }
+  .flourish.f2 { top: 118px; right: 16%; transform: rotate(18deg) scale(1.6); opacity: 0.4; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='18' viewBox='0 0 34 18'%3E%3Cpath d='M0 9 Q 8.5 0 17 9 T 34 9' stroke='%23a83f22' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); }
+  .flourish.f3 { bottom: 100px; left: 22%; transform: rotate(6deg) scale(1.1); opacity: 0.4; }
+  .flourish.f4 { bottom: 70px; right: 20%; transform: rotate(-16deg) scale(1.2); opacity: 0.45; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='18' viewBox='0 0 34 18'%3E%3Cpath d='M0 9 Q 8.5 0 17 9 T 34 9' stroke='%23a83f22' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); }
+
+  .confirm-card {
+    position: relative;
+    z-index: 1;
+    background: #fffdf6;
+    border: 1px solid #e9dbb9;
+    border-radius: 20px;
+    padding: 44px 56px 40px;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 40px -18px rgba(43,32,21,0.35);
+  }
+
+  .check-badge {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    margin: 0 auto 22px;
+    background: linear-gradient(150deg, #6b7a3c, #55622f 55%, #3d4722 100%);
+    box-shadow: 0 10px 20px -8px rgba(61,71,34,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .check-badge svg { width: 40px; height: 40px; }
+
+  h1.confirm-title {
+    font-size: 40px;
+    line-height: 1.1;
+    color: #7a2e19;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+  }
+  .confirm-body {
+    font-size: 17px;
+    font-style: italic;
+    color: #5c4d3a;
+    line-height: 1.55;
+    max-width: 360px;
+    margin: 0 auto 28px;
+  }
+
+  .back-btn {
+    display: inline-block;
+    font-family: -apple-system, sans-serif;
+    background: #a83f22;
+    color: #fffdf6;
+    border: none;
+    border-radius: 999px;
+    padding: 13px 30px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: default;
+    box-shadow: 0 8px 18px -8px rgba(122,46,25,0.55);
+  }
+</style>
+
+<div class="design-note">
+  <strong>Checkout Success — Artisanal Warm v3</strong>
+  Same confirmed palette, type, and pill-button shape as the locked vendor-page
+  direction. The confirmation gets real presence via a centered card with a
+  hand-drawn checkmark badge and a few scattered squiggle-divider flourishes
+  (the same SVG asset used elsewhere) at low opacity — a tasteful celebratory
+  touch, not confetti or emoji spam.
+</div>
+
+<div class="browser">
+  <div class="browser-bar">
+    <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+    <div class="url-bar">localfood.app/checkout/success</div>
+  </div>
+  <div class="page">
+    <div class="site-header">
+      <div class="site-name">Local <span>Food</span></div>
+      <div class="cart"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:1px" xmlns="http://www.w3.org/2000/svg"><path d="M4 8h12l-1.3 8.2a1 1 0 0 1-1 .8H6.3a1 1 0 0 1-1-.8L4 8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 8V6a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6.6 11.3l.6 3.6M13.4 11.3l-.6 3.6M10 11.3v3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg> Cart <span class="cart-badge">0</span></div>
+    </div>
+
+    <div class="confirm-stage">
+      <div class="flourish f1"></div>
+      <div class="flourish f2"></div>
+      <div class="flourish f3"></div>
+      <div class="flourish f4"></div>
+
+      <div class="confirm-card">
+        <div class="check-badge">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 21 L17 28 L30 13" stroke="#fffdf6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 class="confirm-title">Thank you!</h1>
+        <p class="confirm-body">Your order is confirmed. We'll text you when it's ready for pickup.</p>
+        <button class="back-btn">Back to vendors</button>
+      </div>
+    </div>
+  </div>
+</div>

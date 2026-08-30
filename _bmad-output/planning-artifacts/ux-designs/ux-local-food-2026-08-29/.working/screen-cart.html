@@ -1,0 +1,510 @@
+<!--
+  DIRECTION: Artisanal Warm v3 — Cart / Checkout page
+  Extends the confirmed Artisanal Warm v3 storefront language to the busiest
+  page in the app. Splits into a two-column layout — order items + total on
+  the left, contact + pickup-time + checkout action grouped in a dedicated
+  panel on the right — rather than one long stacked form, so the primary
+  action (Checkout) stays visually anchored near the details that gate it.
+-->
+<title>Your Cart — Artisanal Warm v3 (checkout)</title>
+<style>
+  /*
+    PALETTE — Artisanal Warm v3 ("Terracotta & Olive") — confirmed direction
+    --cream:           #f7ecd8   (page background)
+    --cream-deep:      #ecdcc0   (texture stripe / outer frame)
+    --paper:           #fffdf6   (card / header surface)
+    --terracotta:      #a83f22   (primary brand / buttons / links)
+    --terracotta-deep: #7a2e19   (headings, hover/emphasis, price)
+    --olive:            #55622f  (secondary accent — kicker, "Food" wordmark)
+    --olive-deep:       #3d4722  (badge text on sage panels)
+    --sage-light:       #dde3c8  (badge "fresh"/"available" panel background)
+    --ink:              #2b2015  (primary text)
+    --ink-soft:         #5c4d3a  (secondary text/labels)
+    --line:             #ddc79f  (hairlines)
+    --sold-out-bg:      #e6dbc0
+  */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e6d3ad;
+    font-family: Georgia, "Times New Roman", serif;
+    color: #2b2015;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .design-note {
+    max-width: 900px;
+    width: 100%;
+    background: #fffdf6;
+    border: 2px dashed #a83f22;
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #2b2015;
+  }
+  .design-note strong {
+    display: block;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: #a83f22;
+    margin-bottom: 4px;
+  }
+
+  /* Browser chrome */
+  .browser {
+    width: 100%;
+    max-width: 1180px;
+    background: #fffdf6;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 30px 60px -20px rgba(43, 32, 21, 0.45), 0 2px 8px rgba(43,32,21,0.15);
+  }
+  .browser-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #ecdcc0;
+    padding: 10px 14px;
+    border-bottom: 1px solid #ddc79f;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .dot.r { background: #e0605a; }
+  .dot.y { background: #e3b04b; }
+  .dot.g { background: #6fa876; }
+  .url-bar {
+    flex: 1;
+    background: #fffdf6;
+    border: 1px solid #ddc79f;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    color: #5c4d3a;
+  }
+
+  .page {
+    background: #f7ecd8;
+    background-image: repeating-linear-gradient(135deg, transparent 0 40px, rgba(120,60,30,0.05) 40px 80px);
+  }
+
+  /* Site header */
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 40px;
+    background: #fffdf6;
+    border-bottom: 3px solid #a83f22;
+  }
+  .site-name {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #7a2e19;
+  }
+  .site-name span { color: #55622f; }
+  .cart {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    color: #2b2015;
+    background: #f7ecd8;
+    border: 1px solid #ddc79f;
+    border-radius: 999px;
+    padding: 7px 16px 7px 12px;
+  }
+  .cart-badge {
+    background: #a83f22;
+    color: #fffdf6;
+    font-weight: 700;
+    border-radius: 999px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  .kicker {
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: #55622f;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  h1.page-title {
+    font-size: 38px;
+    line-height: 1.08;
+    color: #7a2e19;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    padding: 40px 40px 4px;
+  }
+
+  .squiggle {
+    height: 18px;
+    background-repeat: repeat-x;
+    background-size: 34px 18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='18' viewBox='0 0 34 18'%3E%3Cpath d='M0 9 Q 8.5 0 17 9 T 34 9' stroke='%2355622f' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    opacity: 0.8;
+  }
+
+  /* Two-column checkout layout */
+  .cart-layout {
+    padding: 14px 40px 48px;
+    display: grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  .cart-vendor-label {
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    color: #5c4d3a;
+    margin-bottom: 14px;
+  }
+  .cart-vendor-label strong { color: #2b2015; font-weight: 700; }
+
+  .cart-items {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .cart-item {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    background: #fffdf6;
+    border: 1px solid #e9dbb9;
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: 0 4px 14px -8px rgba(43,32,21,0.15);
+  }
+  .cart-item-thumb {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: radial-gradient(circle at 38% 32%, #e0b26a, #a83f22 70%, #7a2e19 100%);
+    box-shadow: inset 0 -6px 10px rgba(0,0,0,0.15);
+  }
+  .cart-item-info { flex: 1; min-width: 0; }
+  .cart-item-name {
+    font-size: 18px;
+    color: #2b2015;
+    margin-bottom: 3px;
+  }
+  .cart-item-unit {
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    color: #5c4d3a;
+  }
+
+  .qty-stepper {
+    display: flex;
+    align-items: center;
+    border: 1px solid #ddc79f;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #fffdf6;
+    flex-shrink: 0;
+  }
+  .qty-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f7ecd8;
+    color: #a83f22;
+    font-family: -apple-system, sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: default;
+  }
+  .qty-value {
+    min-width: 30px;
+    text-align: center;
+    font-family: -apple-system, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #2b2015;
+  }
+
+  .cart-item-total {
+    font-family: -apple-system, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #7a2e19;
+    min-width: 62px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .cart-total-row {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 2px dashed #ddc79f;
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+  .cart-total-label {
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #5c4d3a;
+    font-weight: 700;
+  }
+  .cart-total-value {
+    font-size: 30px;
+    color: #7a2e19;
+  }
+
+  /* Right column — contact + pickup + checkout panel */
+  .checkout-panel {
+    background: #fffdf6;
+    border: 1px solid #e9dbb9;
+    border-radius: 18px;
+    padding: 26px 24px;
+    box-shadow: 0 10px 24px -14px rgba(43,32,21,0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .panel-section-label {
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #55622f;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block;
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    color: #5c4d3a;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .field input {
+    width: 100%;
+    font-family: -apple-system, sans-serif;
+    font-size: 14px;
+    color: #2b2015;
+    background: #f7ecd8;
+    border: 1px solid #8a7550;
+    border-radius: 10px;
+    padding: 11px 14px;
+  }
+  .field input::placeholder { color: #78654c; }
+
+  .pickup-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pickup-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid #ddc79f;
+    border-radius: 14px;
+    padding: 13px 14px;
+    background: #fffdf6;
+  }
+  .pickup-option.selected {
+    border-color: #a83f22;
+    background: #fdf3ec;
+    box-shadow: 0 0 0 1px #a83f22 inset;
+  }
+  .pickup-option.full {
+    background: #e6dbc0;
+    border-color: #ddc79f;
+  }
+  .radio-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #a83f22;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .radio-dot.checked::after {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #a83f22;
+  }
+  .radio-dot.disabled {
+    /* No distinct disabled-radio ring color: #b9ab8c measured only 2.23:1 vs paper
+       and 1.65:1 vs this row's own background, both failing the 3:1 non-text
+       minimum. The ring is blended into the row background instead, so the
+       row background + "Full" badge (5.92:1) carry the unavailable state. */
+    border-color: #e6dbc0;
+  }
+  .pickup-option-text { flex: 1; }
+  .pickup-option-time {
+    font-family: -apple-system, sans-serif;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #2b2015;
+    margin-bottom: 2px;
+  }
+  .pickup-option.full .pickup-option-time { color: #5c4d3a; }
+  .pickup-option-loc {
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    color: #5c4d3a;
+  }
+  .badge {
+    font-family: -apple-system, sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .badge.out { background: #d8c9a3; color: #5c4d3a; }
+
+  .checkout-btn {
+    font-family: -apple-system, sans-serif;
+    width: 100%;
+    background: #a83f22;
+    color: #fffdf6;
+    border: none;
+    border-radius: 999px;
+    padding: 15px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: default;
+    box-shadow: 0 8px 18px -8px rgba(122,46,25,0.55);
+  }
+</style>
+
+<div class="design-note">
+  <strong>Cart / Checkout — Artisanal Warm v3</strong>
+  Same confirmed palette, type, and component shapes as the locked vendor-page
+  direction. This is the densest screen in the app, so it splits into two
+  columns: line items + total on the left, contact details / pickup-time
+  picker / checkout action grouped into one panel on the right, keeping the
+  primary action anchored beside the details that gate it.
+</div>
+
+<div class="browser">
+  <div class="browser-bar">
+    <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+    <div class="url-bar">localfood.app/cart</div>
+  </div>
+  <div class="page">
+    <div class="site-header">
+      <div class="site-name">Local <span>Food</span></div>
+      <div class="cart"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" style="vertical-align:-2px;margin-right:1px" xmlns="http://www.w3.org/2000/svg"><path d="M4 8h12l-1.3 8.2a1 1 0 0 1-1 .8H6.3a1 1 0 0 1-1-.8L4 8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 8V6a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6.6 11.3l.6 3.6M13.4 11.3l-.6 3.6M10 11.3v3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg> Cart <span class="cart-badge">3</span></div>
+    </div>
+
+    <h1 class="page-title">Your cart</h1>
+    <div class="squiggle" style="margin: 0 40px 4px; width: calc(100% - 80px);"></div>
+
+    <div class="cart-layout">
+      <div>
+        <div class="cart-vendor-label">Items from <strong>Corner Sourdough</strong></div>
+        <div class="cart-items">
+          <div class="cart-item">
+            <div class="cart-item-thumb"></div>
+            <div class="cart-item-info">
+              <div class="cart-item-name">Classic Sourdough Loaf</div>
+              <div class="cart-item-unit">$9.00 each</div>
+            </div>
+            <div class="qty-stepper">
+              <div class="qty-btn">−</div>
+              <div class="qty-value">2</div>
+              <div class="qty-btn">+</div>
+            </div>
+            <div class="cart-item-total">$18.00</div>
+          </div>
+
+          <div class="cart-item">
+            <div class="cart-item-thumb"></div>
+            <div class="cart-item-info">
+              <div class="cart-item-name">Seeded Rye</div>
+              <div class="cart-item-unit">$11.00 each</div>
+            </div>
+            <div class="qty-stepper">
+              <div class="qty-btn">−</div>
+              <div class="qty-value">1</div>
+              <div class="qty-btn">+</div>
+            </div>
+            <div class="cart-item-total">$11.00</div>
+          </div>
+        </div>
+
+        <div class="cart-total-row">
+          <span class="cart-total-label">Total</span>
+          <span class="cart-total-value">$29.00</span>
+        </div>
+      </div>
+
+      <div class="checkout-panel">
+        <div>
+          <div class="panel-section-label">Your Details</div>
+          <div class="field">
+            <label>Your name</label>
+            <input type="text" placeholder="e.g. Jamie Lee" />
+          </div>
+          <div class="field">
+            <label>Mobile number (for pickup texts)</label>
+            <input type="text" placeholder="(555) 123-4567" />
+          </div>
+        </div>
+
+        <div>
+          <div class="panel-section-label">Pickup Time</div>
+          <div class="pickup-options">
+            <div class="pickup-option selected">
+              <div class="radio-dot checked"></div>
+              <div class="pickup-option-text">
+                <div class="pickup-option-time">Saturday, 9:00 AM – 12:00 PM</div>
+                <div class="pickup-option-loc">123 Main St</div>
+              </div>
+            </div>
+            <div class="pickup-option full">
+              <div class="radio-dot disabled"></div>
+              <div class="pickup-option-text">
+                <div class="pickup-option-time">Saturday, 12:00 PM – 2:00 PM</div>
+                <div class="pickup-option-loc">123 Main St</div>
+              </div>
+              <span class="badge out">Full</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="checkout-btn">Checkout</button>
+      </div>
+    </div>
+  </div>
+</div>
