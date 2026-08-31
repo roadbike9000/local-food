@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useCart } from "./CartProvider";
 import { formatPrice } from "@/lib/utils";
 import { isInStock } from "@/lib/availability";
+import { ImagePlaceholderIcon } from "./Icons";
 
 // A small thumbnail for a compact row layout - no pixel-exact requirement,
 // just large enough to be recognizable next to the name/price text.
@@ -35,21 +36,7 @@ function ProductImagePlaceholder() {
       style={{ width: IMAGE_SIZE, height: IMAGE_SIZE }}
       className="flex flex-shrink-0 items-center justify-center rounded-md bg-stone-100 text-stone-400"
     >
-      <svg
-        viewBox="0 0 24 24"
-        width={24}
-        height={24}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <path d="M21 15l-5-5L5 21" />
-      </svg>
+      <ImagePlaceholderIcon width={24} height={24} />
     </div>
   );
 }

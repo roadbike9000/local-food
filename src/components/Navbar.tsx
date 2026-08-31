@@ -8,6 +8,11 @@ import { BasketIcon } from "./Icons";
 export function Navbar() {
   const { items } = useCart();
   const count = items.reduce((n, i) => n + i.quantity, 0);
+  const countLabel = count === 1 ? "1 item" : `${count} items`;
+  // Cap the visible badge digits so a 3+ digit count (unlikely with real
+  // stock ceilings, but not impossible) doesn't overflow the pill - the
+  // full count is still the accessible name via aria-label.
+  const badgeText = count > 99 ? "99+" : String(count);
 
   return (
     <header className="border-b border-stone-200 bg-white">
@@ -19,18 +24,25 @@ export function Navbar() {
         <div className="flex items-center gap-4 text-sm">
           <Link
             href="/cart"
-            aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`}
-            className="focus-ring flex items-center gap-2 rounded-full border border-line bg-cream py-[7px] pl-3 pr-4 text-body-ui text-ink"
+            aria-label={`Cart, ${countLabel}`}
+            className="focus-ring flex items-center gap-2 rounded-full border border-line bg-cream py-[7px] pl-3 pr-4 text-body-ui text-ink hover:border-terracotta"
           >
             <BasketIcon className="h-4 w-4" strokeWidth={1.6} aria-hidden="true" />
             Cart
             <span
               aria-hidden="true"
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-terracotta text-[11px] font-bold text-paper"
+              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-terracotta px-1 text-[11px] font-bold text-paper"
             >
-              {count}
+              {badgeText}
             </span>
           </Link>
+          {/* Screen-reader-only live region: announces cart-count changes
+              (e.g. clicking "Add" on a product page) without double-reading
+              the link's own aria-label on every render - empty at count 0
+              so mount doesn't announce anything. */}
+          <span aria-live="polite" className="sr-only">
+            {count > 0 ? `Cart, ${countLabel}` : ""}
+          </span>
 
           <SignedIn>
             <Link href="/dashboard" className="hover:text-brand">

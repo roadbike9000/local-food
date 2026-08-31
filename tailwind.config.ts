@@ -42,11 +42,11 @@ const config: Config = {
       // stack (ui-sans-serif, system-ui, ...) doesn't exactly match
       // DESIGN.md's documented sans list.
       fontFamily: {
-        serif: ["Georgia", "Times New Roman", "serif"],
+        serif: ["Georgia", '"Times New Roman"', "serif"],
         sans: [
           "-apple-system",
           "BlinkMacSystemFont",
-          "Segoe UI",
+          '"Segoe UI"',
           "Helvetica",
           "Arial",
           "sans-serif",
