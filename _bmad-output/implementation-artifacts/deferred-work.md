@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: create-story scoping of epic-8-storefront-visual-redesign (2026-08-30)
+
+- source_spec: `_bmad-output/planning-artifacts/epics.md#Epic 8: Storefront Visual Redesign`
+  summary: `DESIGN.md`'s vendor-card accent panel is category-differentiated (bakery vs. farm visual treatment, per the two seeded example vendors), but `Vendor` has no category/type field in the real data model — the mockups' distinction was hardcoded per specific vendor, not backed by real data.
+  evidence: Found while scoping Story 8.2 (homepage). Epic 8 is explicitly scoped visual-only, no schema/API changes — adding `Vendor.category` is out of scope for this epic.
+  **DECIDED 2026-08-30 (Jeff): ship Story 8.2 with one universal accent treatment (no per-vendor differentiation); defer a real `Vendor.category` field to a future epic.** Not implemented here — Story 8.2's ACs reflect the universal-treatment decision directly, nothing further to resolve until a future epic picks this up.
+
 ## Deferred from: code review of story-7-1-admin-sets-a-vendors-real-timezone (2026-08-28)
 
 - source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
