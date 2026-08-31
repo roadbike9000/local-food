@@ -68,7 +68,7 @@ test.describe("storefront and cart", () => {
     async ({ page }) => {
       const vendor = await getVendorBySlug("corner-sourdough");
       const soldOut = await createTestProduct(vendor.id, {
-        name: "Playwright Sold Out Product",
+        name: "Playwright Zero-Stock Product",
         stockQuantity: 0,
       });
 
@@ -81,7 +81,7 @@ test.describe("storefront and cart", () => {
         // Out-of-stock products must be visible (not hidden) per AC #1 —
         // the opposite of this test's pre-Story-1.3 premise.
         const productHeading = page.getByRole("heading", {
-          name: "Playwright Sold Out Product",
+          name: "Playwright Zero-Stock Product",
         });
         await expect(productHeading).toBeVisible();
 
@@ -91,8 +91,11 @@ test.describe("storefront and cart", () => {
         // badge column; the Add button is a sibling of that column, both
         // children of the outer card div (ProductCard.tsx's outer
         // flex container).
+        // ATDD red phase (Story 8.3, AC #2): badge copy changes to "Sold
+        // Out" to match DESIGN.md's approved copy — currently red, the
+        // badge still reads "Out of stock" until dev-story lands the change.
         const card = productHeading.locator("../..");
-        await expect(card.getByText(/out of stock/i)).toBeVisible();
+        await expect(card.getByText(/sold out/i)).toBeVisible();
         await expect(card.getByRole("button", { name: "Add" })).toBeDisabled();
       } finally {
         await deleteProduct(soldOut.id);
