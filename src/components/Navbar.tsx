@@ -19,7 +19,7 @@ export function Navbar() {
         <div className="flex items-center gap-4 text-sm">
           <Link
             href="/cart"
-            aria-label={`Cart, ${count} items`}
+            aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`}
             className="focus-ring flex items-center gap-2 rounded-full border border-line bg-cream py-[7px] pl-3 pr-4 text-body-ui text-ink"
           >
             <BasketIcon className="h-4 w-4" strokeWidth={1.6} aria-hidden="true" />

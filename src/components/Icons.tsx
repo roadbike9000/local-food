@@ -11,6 +11,8 @@ type IconProps = SVGProps<SVGSVGElement>;
 
 const baseProps = {
   viewBox: "0 0 24 24",
+  width: "1em",
+  height: "1em",
   fill: "none",
   stroke: "currentColor",
   strokeWidth: 1.5,
@@ -19,9 +21,20 @@ const baseProps = {
   "aria-hidden": "true" as const,
 };
 
+// Merges caller props over the shared icon defaults, dropping any caller
+// prop that's explicitly `undefined` (e.g. `stroke={maybeUndefined}`) so it
+// can't silently delete a default via object-spread's override-with-undefined
+// behavior.
+function mergeIconProps(props: IconProps) {
+  const overrides = Object.fromEntries(
+    Object.entries(props).filter(([, value]) => value !== undefined),
+  );
+  return { ...baseProps, ...overrides };
+}
+
 export function BasketIcon(props: IconProps) {
   return (
-    <svg {...baseProps} {...props}>
+    <svg {...mergeIconProps(props)}>
       <path d="M4 10h16l-1.5 9a1.5 1.5 0 0 1-1.5 1.3H7A1.5 1.5 0 0 1 5.5 19z" />
       <path d="M8 10 10 4M16 10 14 4M9.5 7h5" />
       <path d="M9 14v3M12 14v3M15 14v3" />
@@ -31,7 +44,7 @@ export function BasketIcon(props: IconProps) {
 
 export function ClockIcon(props: IconProps) {
   return (
-    <svg {...baseProps} {...props}>
+    <svg {...mergeIconProps(props)}>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M12 7.5V12l3.2 2" />
     </svg>
@@ -40,7 +53,7 @@ export function ClockIcon(props: IconProps) {
 
 export function WheatIcon(props: IconProps) {
   return (
-    <svg {...baseProps} {...props}>
+    <svg {...mergeIconProps(props)}>
       <path d="M12 21V6" />
       <path d="M12 8 9 6M12 8l3-2M12 11 9 9M12 11l3-2M12 14 9 12M12 14l3-2M12 17 9 15M12 17l3-2" />
     </svg>
@@ -49,7 +62,7 @@ export function WheatIcon(props: IconProps) {
 
 export function LeafIcon(props: IconProps) {
   return (
-    <svg {...baseProps} {...props}>
+    <svg {...mergeIconProps(props)}>
       <path d="M5 19c0-8 5-14 14-14 0 9-6 14-14 14z" />
       <path d="M6 18c3-4 7-7 12-11" />
     </svg>
@@ -58,7 +71,7 @@ export function LeafIcon(props: IconProps) {
 
 export function CheckmarkIcon(props: IconProps) {
   return (
-    <svg {...baseProps} {...props}>
+    <svg {...mergeIconProps(props)}>
       <path d="M5 12.5 10 17 19 7" />
     </svg>
   );
