@@ -79,18 +79,31 @@ const config: Config = {
         "button-label": ["13px", { fontWeight: "700", letterSpacing: "0.02em" }],
         "badge-label": ["10px", { fontWeight: "700", letterSpacing: "0.1em" }],
       },
-      // DESIGN.md's rounded scale. NOTE: these key names intentionally match
-      // Tailwind's own default borderRadius scale (sm/DEFAULT/md/lg/xl/full),
-      // per the story's own token-to-utility-class mapping convention — see
-      // this story's Completion Notes for the resulting site-wide corner-
-      // radius side effect on not-yet-restyled pages.
+      // DESIGN.md's rounded scale, namespaced under `storefront-*` so it
+      // extends Tailwind's default borderRadius scale instead of overriding
+      // it — EXPERIENCE.md#Foundation marks admin/dashboard pages out of
+      // scope for Epic 8, and those pages use the bare sm/md/lg/xl classes.
+      // `{rounded.full}` (DESIGN.md) needs no entry here: it's 9999px, same
+      // as Tailwind's own default `rounded-full`.
       borderRadius: {
-        sm: "10px",
-        DEFAULT: "14px",
-        md: "16px",
-        lg: "18px",
-        xl: "20px",
-        full: "9999px",
+        "storefront-sm": "10px",
+        storefront: "14px",
+        "storefront-md": "16px",
+        "storefront-lg": "18px",
+        "storefront-xl": "20px",
+      },
+      // DESIGN.md's Elevation & Depth scale: two shadow-tint families
+      // (neutral ink-tinted for paper surfaces, brand-tinted for colored
+      // elements) plus the circular-thumbnail inset shading.
+      boxShadow: {
+        row: "0 4px 14px -8px rgba(43,32,21,0.15)",
+        card: "0 10px 24px -14px rgba(43,32,21,0.25)",
+        hero: "0 16px 30px -14px rgba(43,32,21,0.4)",
+        confirm: "0 20px 40px -18px rgba(43,32,21,0.35)",
+        button: "0 6px 14px -6px rgba(122,46,25,0.5)",
+        "button-primary": "0 8px 18px -8px rgba(122,46,25,0.55)",
+        "badge-check": "0 10px 20px -8px rgba(61,71,34,0.55)",
+        thumb: "inset 0 -6px 10px rgba(0,0,0,0.15)",
       },
       spacing: {
         gutter: "40px",
