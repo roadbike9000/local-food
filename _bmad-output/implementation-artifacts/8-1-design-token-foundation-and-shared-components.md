@@ -4,7 +4,7 @@ baseline_commit: 4065a6396c5137bb4fd8c1f8ffb8916cd5c5c7c3
 
 # Story 8.1: Design-token foundation and shared components
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -67,6 +67,23 @@ so that the site feels cohesive and polished from the first thing I see on any p
   - [x] New or extended Playwright coverage in `tests/homepage.spec.ts` or a new `tests/navbar.spec.ts` (implementer's choice, matching this codebase's one-file-per-feature-area convention): the cart-pill link has the expected `aria-label` text (assert via `getByRole("link", { name: /Cart, \d+ items/ })`, not by CSS class), the icon is `aria-hidden` (assert the SVG has `aria-hidden="true"` or that it's excluded from the accessibility tree), and the link is keyboard-reachable (`Tab` reaches it, `Enter` navigates to `/cart` — a real behavior test, not just a visual snapshot).
   - [x] **Regression check, don't skip:** `tests/sms.spec.ts:26` and `tests/payment.spec.ts:41` locate the cart link via `page.getByRole("link", { name: "Cart" })`; `tests/homepage.spec.ts:14` via `page.getByRole("link", { name: /cart/i })`. Playwright's default (non-`exact`) name matching is substring-based, so all three should still match the new `aria-label="Cart, {count} items"` — but verify by actually running all three spec files after the Navbar change, don't just trust the substring-matching theory.
   - [x] No mocking — matches this codebase's established convention.
+
+### Review Findings
+
+**Code review round 2 (re-review of round-1 fixes, `2224c6c..HEAD`, 2026-08-31)**
+
+- [x] [Review][Patch] Stale "19 typography roles" comment in `tailwind.config.ts:55` — the round-1 fix corrected this count in the story markdown and Completion Notes but missed the inline comment above `fontSize`, which the round-1 Completion Notes claimed was "corrected... in two places" (actually three). [tailwind.config.ts:55]
+- [x] [Review][Patch] `boxShadow` scale omits the pickup banner's distinct shadow value and gives future stories no structured token block to cross-check names against — `DESIGN.md`'s `components.pickup-banner.shadow` (`0 12px 24px -10px rgba(122,46,25,0.5)`) is a third, distinct terracotta-tinted value not covered by `button`/`button-primary`, so AC #1's "full frontmatter token set" claim isn't literally true for shadows yet. [tailwind.config.ts]
+- [x] [Review][Patch] Focus-ring keyboard test asserts `outlineStyle`/`outlineWidth` but never `outlineColor` — AC #4 is specifically about a *terracotta* ring; a color regression would pass this "now covered" test untouched. [tests/homepage.spec.ts]
+- [x] [Review][Patch] `mergeIconProps()` (the round-1 fix for the `undefined`-prop-override bug and missing intrinsic icon size) has zero tests — both bugs it fixes are described only in prose in the round-1 Completion Notes. [src/components/Icons.tsx]
+- [x] [Review][Patch] Cart badge's "99+" overflow cap and 2+-digit resize (`min-w-5 px-1`) are untested — no test constructs a count above 9 or above 99 and asserts the visible badge text vs. the full `aria-label` count. [src/components/Navbar.tsx]
+- [x] [Review][Patch] Story's own File List still says `ProductCard.tsx` was modified for "placeholder icon strokeLinecap/strokeLinejoin only," but this round's low-severity fix replaced its whole inline `<svg>` with an import from the new `Icons.tsx` — a real, if functionally harmless, deviation from the story's own stated scope boundary for that file, now undocumented. [File List, below]
+- [x] [Review][Defer] `storefront-*` radius-token naming has no enforcement against a future story typing the far more natural `rounded-lg` instead of `rounded-storefront-lg` — compiles clean, lints clean, renders a plausible-but-wrong 8px radius instead of the canonical 18px, with nothing to catch it. [tailwind.config.ts] — deferred, no lint/type-level mechanism exists in this codebase to enforce a Tailwind token naming convention; flag for whoever plans 8.2's implementation approach.
+- [x] [Review][Defer] The new `aria-live="polite"` region and the cart link's own `aria-label` announce the identical sentence for the same state, with no debounce — rapid stepper clicks on `/cart` could queue an announcement per click, and neither behavior is demonstrated by a test, only asserted in a code comment. [src/components/Navbar.tsx] — deferred, real but low-severity accessibility polish; correct fix (debounce interval, or whether the live region is wanted at all given the link already announces on focus) needs a UX/a11y call, not a unilateral code change.
+- [x] [Review][Defer] `hover:border-terracotta` (this round's "lost hover state" fix) is a materially subtler visual cue than the `hover:text-brand` it replaced — a 1px border-color shift on a pill that already has a border, vs. the old full-text-color change. [src/components/Navbar.tsx] — deferred, subjective UX judgment call, not a functional defect; flag for Jeff/UX same as the `{colors.line}` contrast item already escalated in round 1.
+- [x] [Review][Defer] Cart badge stops being a true circle at 2+ digit counts, deviating from `DESIGN.md`'s `header-cart-pill.badge` spec (`shape: circle`, `size: 20px`). [src/components/Navbar.tsx] — deferred, pre-existing exposure (a 2-digit count already broke true-circle shape before this round's fix even existed) and this round's fix strictly improves it (grows gracefully via `min-w`/`px-1` instead of clipping); not a new regression.
+
+Dismissed as noise: new singular-count test's `locator("../..")` DOM-traversal pattern — matches `tests/storefront-cart.spec.ts`'s identical, pre-existing convention for the same purpose, not a new fragility introduced by this round.
 
 ## Dev Notes
 
@@ -147,12 +164,25 @@ Claude Sonnet 5 (claude-sonnet-5)
   - Unquoted multi-word font names: `tailwind.config.ts`'s new `fontFamily.serif`/`fontFamily.sans` arrays had `"Times New Roman"` and `"Segoe UI"` as bare array strings, which Tailwind joins unquoted into the CSS `font-family` value — valid per the CSS spec (unquoted multi-word idents are legal) but inconsistent with Tailwind's own default config, which wraps ambiguous multi-word names in literal quotes (`'"Segoe UI"'`). Quoted both for consistency.
   - Duplicate spacing values (`gutter`/`section-gap` both 40px): checked against `DESIGN.md#Layout & Spacing`'s own frontmatter — it defines both at 40px too, the same kind of intentional same-value/different-role duplicate the doc explicitly calls out for `card-title`/`headline-sm` in Typography. Left as-is; matches the source of truth.
   - Re-verified after all of the above: `npx tsc --noEmit` clean, `npm run lint` clean, `npx playwright test tests/homepage.spec.ts tests/sms.spec.ts tests/payment.spec.ts tests/storefront-cart.spec.ts` 24/25 passed (same lone pre-existing Story 8.3 red as before, unaffected).
+- **Code review round 2 (re-review of round-1 fixes), all 6 `patch` findings applied:**
+  - Fixed the stale "19 typography roles" comment in `tailwind.config.ts` — round 1's doc-count fix corrected the story markdown but missed this inline comment; now says 20.
+  - Added the missing `banner` key to `boxShadow` (`DESIGN.md`'s `components.pickup-banner.shadow`, `0 12px 24px -10px rgba(122,46,25,0.5)`) — a third, distinct terracotta-tinted value the round-1 scale had omitted — plus a role-mapping comment (`row`/`card`/etc. → which component each pairs with) so a later story can check a new shadow need against this list before inventing an arbitrary-value one.
+  - Added an `outlineColor` assertion (`"rgb(168, 63, 34)"`, `#a83f22`) to the focus-ring keyboard test — round 1's fix checked `outlineStyle`/`outlineWidth` but not color, so a wrong-color regression (AC #4 is specifically about a *terracotta* ring) would have passed silently.
+  - `mergeIconProps` had zero tests. Moved it (and its `iconBaseProps`/`IconProps`) out of `Icons.tsx` into a new `src/lib/icon-props.ts` — this codebase's Vitest config has no React/JSX transform, so a `.tsx` file with JSX can't be imported by a Vitest test even for a plain function inside it, same reason `src/lib/cart.ts` exists separately from `CartProvider.tsx`. Added `src/lib/icon-props.test.ts` covering both bugs it fixes: an explicit `undefined` override no longer clobbers a base default, and the `1em` intrinsic size default is present unless overridden.
+  - The badge's "99+" overflow cap and `count === 1` singular-label logic were inline in `Navbar.tsx` and untested beyond one Playwright case. Extracted `formatCartBadgeText`/`formatCartCountLabel` into `src/lib/cart.ts` (alongside the existing `clampQuantity`) and added `src/lib/cart.test.ts` cases covering both at their real boundaries (0, 1, 2, 99, 100, 1000).
+  - Corrected the story's own File List, which still said `ProductCard.tsx` was touched for "strokeLinecap/strokeLinejoin only" — round 1's low-severity pass had since replaced its inline `<svg>` with the shared `ImagePlaceholderIcon` import, a real scope-boundary deviation from the story's own Task 3/Dev Notes instruction that had gone undocumented.
+  - Re-verified: `npx tsc --noEmit` clean, `npm run lint` clean, `npx vitest run` 142/142 passed (up from 131 — the new `icon-props.test.ts`/extended `cart.test.ts` cases), `npx playwright test tests/homepage.spec.ts tests/sms.spec.ts tests/payment.spec.ts tests/storefront-cart.spec.ts` 24/25 passed, and a full `npx playwright test` run: 148/149 passed (same lone pre-existing Story 8.3 red, no new failures).
+  - 4 findings from this round were deferred, not patched — see this story's Review Findings section above and `deferred-work.md`'s "code review of story-8-1-design-token-foundation-and-shared-components, round 2" entry: `storefront-*` naming has no enforcement mechanism against a future typo; the new `aria-live` region duplicates the link's own `aria-label` with no debounce; `hover:border-terracotta` is a subjectively weaker cue than what it replaced; the cart badge stops being a true circle at 2+ digits (pre-existing exposure, improved not regressed by round 1).
 
 ### File List
 
 - `tailwind.config.ts` (modified — token layer)
 - `src/app/globals.css` (modified — focus-ring utility)
-- `src/components/Icons.tsx` (new — icon set)
-- `src/components/Navbar.tsx` (modified — header cart-pill)
-- `src/components/ProductCard.tsx` (modified — placeholder icon strokeLinecap/strokeLinejoin only)
-- `tests/homepage.spec.ts` (modified — 2 new test cases)
+- `src/components/Icons.tsx` (modified — icon set; round-1 `mergeIconProps` fix, round-1-low-severity `ImagePlaceholderIcon` addition; round-2 moved `mergeIconProps`/`iconBaseProps` out to `src/lib/icon-props.ts` since this file has JSX and this codebase's Vitest config has no React/JSX transform)
+- `src/lib/icon-props.ts` (new, round 2 — `mergeIconProps`/`iconBaseProps`/`IconProps`, extracted from `Icons.tsx` so `mergeIconProps` is unit-testable)
+- `src/lib/icon-props.test.ts` (new, round 2 — unit tests for `mergeIconProps`)
+- `src/components/Navbar.tsx` (modified — header cart-pill; round-1/2 fixes: singular wording, badge overflow cap, aria-live region, hover state)
+- `src/components/ProductCard.tsx` (modified — round-1 placeholder icon strokeLinecap/strokeLinejoin; round-1-low-severity: placeholder `<svg>` replaced with the shared `ImagePlaceholderIcon` from `Icons.tsx`, no longer strokeLinecap/strokeLinejoin only)
+- `src/lib/cart.ts` (modified, round 2 — added `formatCartCountLabel`/`formatCartBadgeText`, extracted from `Navbar.tsx` so they're unit-testable)
+- `src/lib/cart.test.ts` (modified, round 2 — tests for the two functions above)
+- `tests/homepage.spec.ts` (modified — 2 new test cases; round 2 added `outlineColor` assertion to the focus-ring test)

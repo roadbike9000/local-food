@@ -1,5 +1,5 @@
 # generated: 2026-08-17
-# last_updated: 2026-08-27 (Epic 6 retrospective done)
+# last_updated: 2026-08-31 (Story 8.1 done)
 # project: local-food
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-08-17
-last_updated: 2026-08-31 (Story 8.1 implementation complete, status review)
+last_updated: 2026-08-31 (Story 8.1 done)
 project: local-food
 project_key: NOKEY
 tracking_system: file-system
@@ -87,7 +87,7 @@ development_status:
   epic-7-retrospective: done
 
   epic-8: in-progress
-  8-1-design-token-foundation-and-shared-components: review
+  8-1-design-token-foundation-and-shared-components: done
   8-2-homepage-redesign: ready-for-dev
   8-3-vendor-page-redesign: ready-for-dev
   8-4-cart-and-checkout-redesign: ready-for-dev

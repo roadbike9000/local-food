@@ -295,3 +295,21 @@ Source: `scenarios from Jeff/Local Food Scnearios from Jeff.rtf` (4 scenarios), 
 - source_spec: `_bmad-output/implementation-artifacts/5-1-customer-selects-a-pickup-slot-at-checkout.md`
   summary: `Order.pickupSlot` relation has no explicit `onDelete`, defaults to Prisma's `SetNull` on this optional FK.
   evidence: `prisma/schema.prisma` — `pickupSlot PickupSlot? @relation(fields: [pickupSlotId], references: [id])` with no `onDelete` clause. Fully latent today: no route exists anywhere in this codebase to delete a `PickupSlot`, so the silent-blank-on-delete behavior can't currently trigger, and a delete raced against `POST /api/checkout`'s `findFirst` (unhandled Prisma `P2003`) is equally unreachable. Revisit if/when a pickup-slot-deletion route is ever added — at that point deleting a slot with existing paid orders would silently blank their pickup time unless this is addressed first.
+
+## Deferred from: code review of story-8-1-design-token-foundation-and-shared-components, round 2 (2026-08-31)
+
+- source_spec: `_bmad-output/implementation-artifacts/8-1-design-token-foundation-and-shared-components.md`
+  summary: `storefront-*` radius-token naming (this round's fix for the admin/dashboard collision) has no enforcement mechanism against a future story typing the more natural `rounded-lg` instead of `rounded-storefront-lg`.
+  evidence: Compiles clean, lints clean, renders a plausible-but-wrong 8px Tailwind-default radius instead of the canonical 18px, with nothing (no lint rule, no type-level guard) to catch it. Only a code comment in `tailwind.config.ts` carries the convention forward across 8.2–8.5. No enforcement mechanism exists anywhere else in this codebase for a Tailwind token-naming convention, so building one is a scope decision beyond this review round — flag for whoever plans 8.2's implementation approach.
+
+- source_spec: `_bmad-output/implementation-artifacts/8-1-design-token-foundation-and-shared-components.md`
+  summary: The cart-pill's new `aria-live="polite"` region and its own `aria-label` announce the identical sentence for the same state change, with no debounce.
+  evidence: `src/components/Navbar.tsx` — a screen-reader user clicking the cart-page quantity stepper repeatedly could get an announcement queued per click rather than just the settled value, and a user who adds an item then tabs to the cart link shortly after may hear "Cart, N item(s)" twice. Neither behavior is demonstrated by a test, only asserted in a code comment. Real but low-severity accessibility polish; the correct fix (a debounce interval, or whether the live region is wanted at all given the link already announces its label on focus) needs a UX/accessibility call, not a unilateral code change.
+
+- source_spec: `_bmad-output/implementation-artifacts/8-1-design-token-foundation-and-shared-components.md`
+  summary: `hover:border-terracotta` (this round's fix for the cart-pill's lost hover state) is a materially subtler visual cue than the `hover:text-brand` it replaced.
+  evidence: A 1px border-color shift on a pill that already has cream fill and a border, vs. the old full-text-color change on plain text. Not checked against any contrast/visibility bar. Subjective UX judgment call, not a functional defect — flag for Jeff/UX alongside the `{colors.line}` cart-pill-border contrast issue already escalated in round 1's Completion Notes.
+
+- source_spec: `_bmad-output/implementation-artifacts/8-1-design-token-foundation-and-shared-components.md`
+  summary: The cart-count badge stops being a true circle at 2+ digit counts, deviating from `DESIGN.md`'s `header-cart-pill.badge` spec (`shape: circle`, `size: 20px`).
+  evidence: `src/components/Navbar.tsx` — the badge grows via `min-w-5`/`px-1` once its text is 2+ characters (e.g. a legitimate double-digit cart count, or the "99+" overflow cap). Pre-existing exposure — a 2-digit count already broke true-circle shape before this round's fix even existed, since the original fixed `w-5 h-5` circle just clipped/squished the digits instead. This round's change strictly improves that (graceful growth vs. clipping), not a new regression, but the pill-vs-circle shape drift itself is still a literal deviation from the token spec worth a UX sign-off if a true circle is wanted at all counts.

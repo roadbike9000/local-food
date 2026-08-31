@@ -1,5 +1,3 @@
-import type { SVGProps } from "react";
-
 // Story 8.1 (Epic 8): DESIGN.md's icon-line component - hand-drawn-style
 // inline SVG line art, no icon library. Every icon shares the same stroke
 // treatment (currentColor, no fill, round caps/joins) so they read as one
@@ -7,30 +5,7 @@ import type { SVGProps } from "react";
 // `aria-hidden` defaults to true since every current use is decorative next
 // to visible text (e.g. the cart-pill's "Cart" label) - callers can still
 // override it via props if a future use needs otherwise.
-type IconProps = SVGProps<SVGSVGElement>;
-
-const baseProps = {
-  viewBox: "0 0 24 24",
-  width: "1em",
-  height: "1em",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.5,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": "true" as const,
-};
-
-// Merges caller props over the shared icon defaults, dropping any caller
-// prop that's explicitly `undefined` (e.g. `stroke={maybeUndefined}`) so it
-// can't silently delete a default via object-spread's override-with-undefined
-// behavior.
-function mergeIconProps(props: IconProps) {
-  const overrides = Object.fromEntries(
-    Object.entries(props).filter(([, value]) => value !== undefined),
-  );
-  return { ...baseProps, ...overrides };
-}
+import { mergeIconProps, type IconProps } from "@/lib/icon-props";
 
 export function BasketIcon(props: IconProps) {
   return (

@@ -52,14 +52,21 @@ test.describe("homepage", () => {
     await page.keyboard.press("Tab");
     await expect(cartLink).toBeFocused();
 
-    // AC #4's focus-ring: a visible terracotta outline on keyboard focus,
-    // not just a focused-but-unstyled element.
+    // AC #4's focus-ring: a visible *terracotta* outline on keyboard focus,
+    // not just any outline - color included, so a theme() lookup regression
+    // (wrong token, typo) doesn't slip past this assertion.
     const outline = await cartLink.evaluate((el) => {
       const style = getComputedStyle(el);
-      return { style: style.outlineStyle, width: style.outlineWidth };
+      return {
+        style: style.outlineStyle,
+        width: style.outlineWidth,
+        color: style.outlineColor,
+      };
     });
     expect(outline.style).toBe("solid");
     expect(outline.width).toBe("2px");
+    // #a83f22 (colors.terracotta in tailwind.config.ts)
+    expect(outline.color).toBe("rgb(168, 63, 34)");
 
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/cart/, { timeout: 15_000 });

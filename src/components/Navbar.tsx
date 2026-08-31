@@ -4,15 +4,13 @@ import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { useCart } from "./CartProvider";
 import { BasketIcon } from "./Icons";
+import { formatCartBadgeText, formatCartCountLabel } from "@/lib/cart";
 
 export function Navbar() {
   const { items } = useCart();
   const count = items.reduce((n, i) => n + i.quantity, 0);
-  const countLabel = count === 1 ? "1 item" : `${count} items`;
-  // Cap the visible badge digits so a 3+ digit count (unlikely with real
-  // stock ceilings, but not impossible) doesn't overflow the pill - the
-  // full count is still the accessible name via aria-label.
-  const badgeText = count > 99 ? "99+" : String(count);
+  const countLabel = formatCartCountLabel(count);
+  const badgeText = formatCartBadgeText(count);
 
   return (
     <header className="border-b border-stone-200 bg-white">

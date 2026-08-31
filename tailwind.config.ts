@@ -52,7 +52,7 @@ const config: Config = {
           "sans-serif",
         ],
       },
-      // DESIGN.md's 19 typography roles. Size/weight/line-height/tracking
+      // DESIGN.md's 20 typography roles. Size/weight/line-height/tracking
       // only - pair with `font-serif` or `font-sans` per DESIGN.md#Typography
       // (headings/titles/lede copy use font-serif, everything functional
       // uses font-sans), and Tailwind's built-in `italic` utility for the
@@ -94,7 +94,19 @@ const config: Config = {
       },
       // DESIGN.md's Elevation & Depth scale: two shadow-tint families
       // (neutral ink-tinted for paper surfaces, brand-tinted for colored
-      // elements) plus the circular-thumbnail inset shading.
+      // elements) plus the circular-thumbnail inset shading. Each key maps
+      // to one DESIGN.md#Elevation & Depth / #Components role - keep this
+      // mapping in sync if a later story needs a shadow this scale doesn't
+      // yet cover, rather than inventing an arbitrary-value shadow inline:
+      //   row            - list rows (product rows, cart items)
+      //   card           - vendor cards, the checkout panel
+      //   hero           - vendor-page hero photo
+      //   confirm        - checkout-success confirmation card
+      //   button         - standard pill buttons
+      //   button-primary - the one emphasis pill button per screen
+      //   banner         - the pickup banner (components.pickup-banner.shadow)
+      //   badge-check    - checkout-success's olive check-badge
+      //   thumb          - circular thumbnails (inset bottom-shading)
       boxShadow: {
         row: "0 4px 14px -8px rgba(43,32,21,0.15)",
         card: "0 10px 24px -14px rgba(43,32,21,0.25)",
@@ -102,6 +114,7 @@ const config: Config = {
         confirm: "0 20px 40px -18px rgba(43,32,21,0.35)",
         button: "0 6px 14px -6px rgba(122,46,25,0.5)",
         "button-primary": "0 8px 18px -8px rgba(122,46,25,0.55)",
+        banner: "0 12px 24px -10px rgba(122,46,25,0.5)",
         "badge-check": "0 10px 20px -8px rgba(61,71,34,0.55)",
         thumb: "inset 0 -6px 10px rgba(0,0,0,0.15)",
       },
