@@ -146,6 +146,7 @@ export default function CartPage() {
     <div className="max-w-lg">
       <h1 className="text-2xl font-bold">Your cart</h1>
 
+      {/* eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then */}
       <ul className="mt-4 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
         {items.map((i) => (
           <li key={i.productId} className="p-3">
@@ -156,6 +157,7 @@ export default function CartPage() {
                   disabled={i.quantity <= 1}
                   onClick={() => updateQuantity(i.productId, -1)}
                   type="button"
+                  // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
                   className="flex h-6 w-6 items-center justify-center rounded border border-stone-300 text-stone-600 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   −
@@ -172,6 +174,7 @@ export default function CartPage() {
                   disabled={i.quantity >= i.stockQuantity}
                   onClick={() => updateQuantity(i.productId, 1)}
                   type="button"
+                  // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
                   className="flex h-6 w-6 items-center justify-center rounded border border-stone-300 text-stone-600 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   +
@@ -211,6 +214,7 @@ export default function CartPage() {
           placeholder="Your name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
           className="w-full rounded-md border border-stone-300 px-3 py-2"
         />
         <input
@@ -218,6 +222,7 @@ export default function CartPage() {
           placeholder="Mobile number (for pickup texts)"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
           className="w-full rounded-md border border-stone-300 px-3 py-2"
         />
 
@@ -284,6 +289,7 @@ export default function CartPage() {
         <button
           onClick={handleCheckout}
           disabled={loading || !name || !phone || !selectedSlotId}
+          // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
           className="w-full rounded-md bg-brand px-4 py-2.5 font-medium text-white hover:bg-brand-dark disabled:opacity-50"
         >
           {loading ? "Redirecting…" : "Checkout"}

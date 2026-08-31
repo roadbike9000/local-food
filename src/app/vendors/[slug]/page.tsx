@@ -57,6 +57,7 @@ export default async function StorefrontPage({
       )}
 
       {vendor.pickupSlots.length > 0 && (
+        // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
         <div className="mt-4 rounded-md bg-orange-50 p-3 text-sm">
           <span className="font-medium">Next pickup: </span>
           {formatPickupWindow(

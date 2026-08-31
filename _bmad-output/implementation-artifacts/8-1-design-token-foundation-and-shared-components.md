@@ -85,6 +85,12 @@ so that the site feels cohesive and polished from the first thing I see on any p
 
 Dismissed as noise: new singular-count test's `locator("../..")` DOM-traversal pattern — matches `tests/storefront-cart.spec.ts`'s identical, pre-existing convention for the same purpose, not a new fragility introduced by this round.
 
+**All 4 deferred items above resolved 2026-08-31 (Jeff's calls):**
+- `storefront-*` naming: Jeff chose to add real lint enforcement. New `eslint-plugin-local-rules` dependency + a project-local `local-rules/storefront-radius-tokens` rule (`eslint-local-rules/index.js`) flags bare `rounded`/`rounded-sm`/`rounded-md`/`rounded-lg`/`rounded-xl` in storefront-facing files (`.eslintrc.json` overrides, scoped to `src/app/**/*.tsx` and `src/components/**/*.tsx`, excluding `admin`/`dashboard`). 11 pre-existing, not-yet-restyled call sites (`cart/page.tsx` ×6, `checkout/success/page.tsx`, `vendors/[slug]/page.tsx`, `ProductCard.tsx` ×4, `VendorCard.tsx`) grandfathered with `eslint-disable-next-line` + reason, so lint stays green today while the rule is armed against new mistakes.
+- `aria-live` debounce: added a 500ms debounce (`CART_ANNOUNCE_DEBOUNCE_MS`) so the live-region announcement waits for the count to settle before firing — the visible link/badge still update immediately. The "duplicate with aria-label" half of this finding was intentional, not a bug: the live region covers a user not currently focused on the cart link, the aria-label covers one who tabs to it later — both are the standard accessible pattern for this.
+- `hover:border-terracotta`: strengthened with `hover:bg-cream-deep` alongside the existing border-color change, so the hover cue is a fill shift plus a border shift, not border-only.
+- Badge circle-vs-pill at 2+ digits: Jeff confirmed the current pill-growth behavior (built in round 1) as final — stays circular for single digits, grows to a pill rather than clipping at 2+ digits/"99+". Accepted deviation from `DESIGN.md`'s literal fixed-circle spec, no further code change.
+
 ## Dev Notes
 
 **This is the foundation story for Epic 8 — stories 8.2 through 8.5 depend on the token layer and shared components this story builds, but this story itself depends on nothing else in the epic.** Keep its scope disciplined: token definitions + 3 shared components (cart-pill, icon set, focus-ring utility) proven on exactly one real element (the cart-pill). Do not use this story as a place to start restyling the homepage, vendor page, cart, or checkout-success pages — those are 8.2–8.5's job.

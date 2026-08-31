@@ -13,6 +13,7 @@ export default function CheckoutSuccessPage() {
       </p>
       <Link
         href="/"
+        // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
         className="mt-6 inline-block rounded-md bg-brand px-4 py-2 text-white hover:bg-brand-dark"
       >
         Back to vendors

@@ -34,6 +34,7 @@ function ProductImagePlaceholder() {
     <div
       data-testid="product-image-placeholder"
       style={{ width: IMAGE_SIZE, height: IMAGE_SIZE }}
+      // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
       className="flex flex-shrink-0 items-center justify-center rounded-md bg-stone-100 text-stone-400"
     >
       <ImagePlaceholderIcon width={24} height={24} />
@@ -57,6 +58,7 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
   }, [product.imageUrl]);
 
   return (
+    // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
     <div className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white p-4">
       {product.imageUrl && !imageFailed ? (
         <Image
@@ -69,6 +71,7 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
           data-testid="product-image"
           width={IMAGE_SIZE}
           height={IMAGE_SIZE}
+          // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
           className="flex-shrink-0 rounded-md object-cover"
           onError={() => setImageFailed(true)}
         />
@@ -104,6 +107,7 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
             stockQuantity: product.stockQuantity,
           });
         }}
+        // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
         className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
       >
         Add

@@ -17,6 +17,7 @@ export function VendorCard({
   return (
     <Link
       href={`/vendors/${slug}`}
+      // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
       className="block rounded-lg border border-stone-200 bg-white p-5 transition hover:border-brand hover:shadow-sm"
     >
       <h2 className="text-lg font-semibold">{name}</h2>
