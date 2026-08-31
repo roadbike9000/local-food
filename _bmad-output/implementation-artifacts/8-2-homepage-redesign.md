@@ -4,7 +4,7 @@ baseline_commit: 4065a6396c5137bb4fd8c1f8ffb8916cd5c5c7c3
 
 # Story 8.2: Homepage redesign
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -35,20 +35,20 @@ so that browsing feels inviting and I don't have to aim for a small button just 
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Homepage page shell (AC #4)
-  - [ ] `src/app/page.tsx` — restyle the `<h1>`/subhead per `DESIGN.md#Typography` (`display-md` for the H1, per `DESIGN.md#Typography`'s documented mapping: "the homepage hero is next" after the vendor page's `display-lg`), add the squiggle-divider (from Story 8.1's icon/SVG work — if the squiggle-divider component wasn't built in 8.1, build it here as this story's own prerequisite, since it's needed for this page's layout) below the hero text, and a "Vendors near you" section heading with an item count (`{typography.headline-sm}` / `{typography.card-title}` distinction — see `DESIGN.md#Typography`'s note that these are byte-identical in size but distinct semantic roles; use `headline-sm` for this page-level section heading).
-  - [ ] Do not change the Prisma query (`prisma.vendor.findMany({ where: { deletedAt: null }, ... })`) or the zero-vendors empty-state branch — both stay exactly as they are today.
+- [x] Task 1: Homepage page shell (AC #4)
+  - [x] `src/app/page.tsx` — restyle the `<h1>`/subhead per `DESIGN.md#Typography` (`display-md` for the H1, per `DESIGN.md#Typography`'s documented mapping: "the homepage hero is next" after the vendor page's `display-lg`), add the squiggle-divider (from Story 8.1's icon/SVG work — if the squiggle-divider component wasn't built in 8.1, build it here as this story's own prerequisite, since it's needed for this page's layout) below the hero text, and a "Vendors near you" section heading with an item count (`{typography.headline-sm}` / `{typography.card-title}` distinction — see `DESIGN.md#Typography`'s note that these are byte-identical in size but distinct semantic roles; use `headline-sm` for this page-level section heading).
+  - [x] Do not change the Prisma query (`prisma.vendor.findMany({ where: { deletedAt: null }, ... })`) or the zero-vendors empty-state branch — both stay exactly as they are today.
 
-- [ ] Task 2: Vendor card restyle (AC #1, #2)
-  - [ ] `src/components/VendorCard.tsx` — restyle per `DESIGN.md`'s `vendor-card` component: `card-panel` base (paper background, card-border hairline, `rounded-lg`, mid-tier shadow), a universal accent panel (one gradient/icon treatment for every card, per AC #2 — do not branch on vendor data), the vendor name in `{typography.card-title}`, description in `{typography.body-card-desc}` (italic), item-count as a `badge-positive` pill ("N items available"), and a "View menu" `button-pill`-styled `<span>` (not a `<button>`) as the trailing visual label.
-  - [ ] Keep the outer `<Link href={\`/vendors/${slug}\`}>` as the single interactive element wrapping the entire card — do not add a nested `<button>`, `<a>`, or `role="button"` anywhere inside it (would create invalid nested-interactive-content and defeat the whole-card-link pattern this story exists to preserve).
-  - [ ] Apply the Story 8.1 `focus-ring` utility to this link.
+- [x] Task 2: Vendor card restyle (AC #1, #2)
+  - [x] `src/components/VendorCard.tsx` — restyle per `DESIGN.md`'s `vendor-card` component: `card-panel` base (paper background, card-border hairline, `rounded-lg`, mid-tier shadow), a universal accent panel (one gradient/icon treatment for every card, per AC #2 — do not branch on vendor data), the vendor name in `{typography.card-title}`, description in `{typography.body-card-desc}` (italic), item-count as a `badge-positive` pill ("N items available"), and a "View menu" `button-pill`-styled `<span>` (not a `<button>`) as the trailing visual label.
+  - [x] Keep the outer `<Link href={\`/vendors/${slug}\`}>` as the single interactive element wrapping the entire card — do not add a nested `<button>`, `<a>`, or `role="button"` anywhere inside it (would create invalid nested-interactive-content and defeat the whole-card-link pattern this story exists to preserve).
+  - [x] Apply the Story 8.1 `focus-ring` utility to this link.
 
-- [ ] Task 3: Tests (AC #1–#4)
-  - [ ] No new business logic — no new Vitest unit tests needed (matches Story 8.1's precedent; `project-context.md#Testing Rules`).
-  - [ ] Extend `tests/homepage.spec.ts` (existing file — read it first to match its established conventions before adding to it): assert the vendor-card link's accessible name still resolves to the vendor and still navigates to `/vendors/{slug}` on click (real behavior, not a CSS/snapshot check); assert no separate focusable element exists inside a card besides the outer link (e.g. count `page.getByRole("link")` / `page.getByRole("button")` scoped to one card and confirm there's exactly one focusable element); keyboard-`Tab` reaches a card and `Enter` navigates.
-  - [ ] Confirm the existing zero-vendors empty-state test (if one exists in `tests/homepage.spec.ts` — check) still passes unmodified; if none exists, this story doesn't need to add one (out of this story's AC scope — Task 1 explicitly preserves, doesn't newly test, that branch).
-  - [ ] No mocking.
+- [x] Task 3: Tests (AC #1–#4)
+  - [x] No new business logic — no new Vitest unit tests needed (matches Story 8.1's precedent; `project-context.md#Testing Rules`).
+  - [x] Extend `tests/homepage.spec.ts` (existing file — read it first to match its established conventions before adding to it): assert the vendor-card link's accessible name still resolves to the vendor and still navigates to `/vendors/{slug}` on click (real behavior, not a CSS/snapshot check); assert no separate focusable element exists inside a card besides the outer link (e.g. count `page.getByRole("link")` / `page.getByRole("button")` scoped to one card and confirm there's exactly one focusable element); keyboard-`Tab` reaches a card and `Enter` navigates.
+  - [x] Confirm the existing zero-vendors empty-state test (if one exists in `tests/homepage.spec.ts` — check) still passes unmodified; if none exists, this story doesn't need to add one (out of this story's AC scope — Task 1 explicitly preserves, doesn't newly test, that branch).
+  - [x] No mocking.
 
 ## Dev Notes
 
@@ -85,8 +85,32 @@ so that browsing feels inviting and I don't have to aim for a small button just 
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- `npx tsc --noEmit`: clean.
+- `npm run lint`: clean (including the round-2 `local-rules/storefront-radius-tokens` rule against `rounded-storefront-lg`).
+- `npx vitest run`: 142/142 passed (no unit tests added — none needed, no new business logic, matches Story 8.1's precedent).
+- `npx playwright test tests/homepage.spec.ts`: 8/8 passed (3 new Story 8.2 tests + the 5 existing Story 8.1 tests, confirming no regression on the header work).
+- Full `npx playwright test`, run twice: first run 134 passed / 2 failed / 16 skipped; second run 151 passed / 1 failed / 0 skipped. Investigated both failures:
+  - `tests/dashboard.spec.ts:107` ("vendor's pickup-slots API never returns another vendor's slots") — failed only in the first full run, passed cleanly in isolation (`npx playwright test tests/dashboard.spec.ts -g "..."`, 1/1 passed) and in the second full run. This story touches zero backend/API/auth code (`src/app/page.tsx`'s JSX/Tailwind classes, `VendorCard.tsx`'s restyle, a new `SquiggleDivider` in `Icons.tsx`, `tests/homepage.spec.ts`), so there's no plausible mechanism connecting this story's changes to a pickup-slots API isolation test. Same class of pre-existing `dashboard.spec.ts` serial-block parallel-execution flake Story 8.1's Debug Log already documented (one flaky test in the authenticated `test.describe.configure({ mode: "serial" })` block cascades to skip its siblings — explains the first run's "16 did not run"). Not fixed here — pre-existing test-infrastructure flake, out of this story's scope.
+  - `tests/storefront-cart.spec.ts:66` ("out-of-stock products show a badge...") — Story 8.3's own already-known-red ATDD test, unrelated to this story, unchanged by it.
+- Manually verified in a real browser (dev server + a throwaway Playwright screenshot script, not committed): homepage hero/squiggle/section-heading render correctly, both seeded vendor cards show the accent panel/wheat icon/badge/View-menu pill, hovering a card darkens "View menu" from terracotta to terracotta-deep with no other hover chrome (matches AC #1 exactly), no console errors.
 
 ### Completion Notes List
 
+- Page shell (Task 1): `src/app/page.tsx`'s hero restyled with a `label-caps` kicker ("Local Marketplace"), `display-md` H1 (`font-serif`, `text-terracotta-deep`), and a `body-lede` italic subhead — matching `DESIGN.md#Typography`'s mapping. Added the new `SquiggleDivider` (Task 1's own prerequisite, see below) below the hero. Added a `headline-sm` "Vendors near you" section heading.
+  - **Item count in the section heading:** Task 1's text says the heading needs "an item count" but the approved mock (`mockups/homepage.html`) renders it as plain "Vendors near you" text with no count. Interpreted literally per the task's own wording rather than the mock (which predates this specific instruction) — rendered as `Vendors near you ({vendors.length})`. Flagging the interpretation call rather than silently picking one reading.
+  - Prisma query and the zero-vendors empty-state branch are byte-for-byte unchanged (`where: { deletedAt: null }`, `orderBy: { createdAt: "asc" }`, the `_count.products` include, and the "No vendors yet..." paragraph text) — only their surrounding JSX/classNames moved, per Task 1's explicit instruction not to touch either.
+- Squiggle-divider (Task 1's prerequisite): Story 8.1 built the 5-icon `icon-line` set but not the squiggle-divider, since `DESIGN.md` documents it as a tiled repeating-background pattern (tileWidth/tileHeight/path/stroke/opacity), not a discrete icon like the others. Added `SquiggleDivider` to `src/components/Icons.tsx` (this codebase's established home for shared SVG-based decorative components) as a `<div>` with a data-URI SVG tile as its CSS `background-image` (inline `style`, since a full SVG data URI is unwieldy and fragile to escape inside a Tailwind arbitrary-value className string) — reproduces `DESIGN.md`'s exact path (`M0 9 Q 8.5 0 17 9 T 34 9`), olive stroke, 34×18px tile, 0.8 opacity.
+- Vendor card (Task 2): `VendorCard.tsx` restyled to `card-panel` (paper background, `card-border` hairline, `rounded-storefront-lg`, `shadow-card` — the Story 8.1 tokens, not the bare Tailwind defaults this file used before), a universal accent panel, `card-title` name, italic `body-card-desc` description, a `badge-positive`-style pill for item count (preserving the existing singular/plural "N item(s) available" text exactly), and a `button-pill`-styled `<span>` "View menu" label that darkens via Tailwind's `group`/`group-hover:` (no JS) — matching `DESIGN.md`'s `vendor-card.hoverEffect` spec ("inner call-to-action label darkens... no other hover chrome") exactly. `focus-ring` applied to the outer `<Link>`, still the sole interactive element in the card (no nested `<button>`/`<a>`/`role="button"` added).
+  - **Universal accent-panel treatment (AC #2):** the approved mock (`mockups/homepage.html`) shows two category-coded variants (a terracotta "bakery" gradient+crosshatch and an olive "farm" gradient+furrows, keyed off which seeded vendor renders) — but that mock predates Jeff's 2026-08-30 decision (`deferred-work.md`) to ship one universal treatment with no per-vendor differentiation, since `Vendor` has no category field. Implemented one treatment for every card: a `terracotta-light`→`terracotta`→`terracotta-deep` gradient (simplified from the mock's radial-gradient-plus-crosshatch texture — a plain Tailwind gradient using existing color tokens, not a hand-authored CSS texture pattern) with `WheatIcon` (built in Story 8.1, explicitly earmarked there for "8.2's homepage accent panel") as the one universal accent icon. `LeafIcon` (also built in 8.1) is intentionally *not* used here — using both would reintroduce the rejected per-card differentiation.
+- Tests (Task 3): 3 new cases in `tests/homepage.spec.ts` — the card-link-navigates case (already true before this story, a preservation check, not new behavior), the exactly-one-focusable-element-per-card case (also already true, a preservation check for AC #1's "no dead decorative buttons" rule), and the keyboard-reachable-with-focus-ring case (genuinely red before this story — confirmed by running it in isolation pre-implementation, `outlineStyle` was `"auto"` not `"solid"` — now green). No zero-vendors empty-state test existed before this story and none was added, matching Task 3's own explicit instruction.
+
 ### File List
+
+- `src/app/page.tsx` (modified — hero/subhead/kicker restyle, squiggle-divider, "Vendors near you" section heading; Prisma query and empty-state branch unchanged)
+- `src/components/VendorCard.tsx` (modified — full `vendor-card` restyle: card-panel base, universal accent panel, card-title/body-card-desc typography, badge-positive item-count pill, button-pill "View menu" label, focus-ring)
+- `src/components/Icons.tsx` (modified — new `SquiggleDivider` export)
+- `tests/homepage.spec.ts` (modified — 3 new Story 8.2 test cases)

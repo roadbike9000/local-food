@@ -5,6 +5,9 @@ import {
   deleteProduct,
 } from "./helpers/db";
 
+// Requires seeded data (npm run db:seed) - the homepage's vendor grid is
+// empty otherwise, and these tests need at least one real card to inspect.
+
 // Smoke test: the homepage loads and shows the marketplace heading + nav.
 test.describe("homepage", () => {
   test("loads and shows the heading", async ({ page }) => {
@@ -100,5 +103,67 @@ test.describe("homepage", () => {
     } finally {
       await deleteProduct(product.id);
     }
+  });
+
+  // Story 8.2 (vendor-card restyle): the whole card must stay one real
+  // link with the vendor's name in its accessible name, and clicking
+  // anywhere on it navigates - not just a "View menu" sub-element.
+  test("vendor card is a real link to the vendor's storefront (Story 8.2)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    await page.goto("/");
+
+    const cardLink = page.getByRole("link", { name: new RegExp(vendor.name, "i") });
+    await expect(cardLink).toBeVisible();
+    await expect(cardLink).toHaveAttribute("href", `/vendors/${vendor.slug}`);
+
+    await cardLink.click();
+    await expect(page).toHaveURL(new RegExp(`/vendors/${vendor.slug}`));
+  });
+
+  // AC #1's "no dead decorative buttons" rule: the card's "View menu" text
+  // is presentational only - the whole-card <Link> must be the *only*
+  // focusable element inside the card, not a second nested interactive one.
+  test("a vendor card has exactly one focusable element inside it (Story 8.2)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    await page.goto("/");
+
+    const cardLink = page.getByRole("link", { name: new RegExp(vendor.name, "i") });
+    await expect(cardLink.getByRole("link")).toHaveCount(0);
+    await expect(cardLink.getByRole("button")).toHaveCount(0);
+  });
+
+  // AC #3: every vendor card is keyboard-reachable and shows the Story
+  // 8.1 focus-ring (terracotta outline), matching the cart-pill's own
+  // focus-ring test in this file.
+  test("a vendor card is keyboard-reachable with a visible focus-ring (Story 8.2)", async ({
+    page,
+  }) => {
+    const vendor = await getVendorBySlug("corner-sourdough");
+    await page.goto("/");
+
+    const cardLink = page.getByRole("link", { name: new RegExp(vendor.name, "i") });
+    await cardLink.focus();
+    await expect(cardLink).toBeFocused();
+
+    const outline = await cardLink.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return {
+        style: style.outlineStyle,
+        width: style.outlineWidth,
+        color: style.outlineColor,
+      };
+    });
+    expect(outline.style).toBe("solid");
+    expect(outline.width).toBe("2px");
+    expect(outline.color).toBe("rgb(168, 63, 34)");
+
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(new RegExp(`/vendors/${vendor.slug}`), {
+      timeout: 15_000,
+    });
   });
 });

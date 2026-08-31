@@ -65,3 +65,23 @@ export function ImagePlaceholderIcon(props: IconProps) {
     </svg>
   );
 }
+
+// DESIGN.md's squiggle-divider component (Story 8.2's own prerequisite,
+// not built in 8.1): a single repeating inline-SVG wave, tiled 34x18px,
+// olive stroke, 0.8 opacity. Unlike the icon-line set above this isn't a
+// discrete icon - it's a horizontal tiled pattern - so it's a background-
+// image data URI on a fixed-height strip rather than one <svg> element.
+// Purely decorative (aria-hidden) on every current use (a section divider
+// on the homepage; later stories may reuse it as a scattered flourish).
+const SQUIGGLE_TILE_SVG =
+  'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'34\' height=\'18\' viewBox=\'0 0 34 18\'%3E%3Cpath d=\'M0 9 Q 8.5 0 17 9 T 34 9\' stroke=\'%2355622f\' stroke-width=\'2\' fill=\'none\' stroke-linecap=\'round\'/%3E%3C/svg%3E")';
+
+export function SquiggleDivider(props: { className?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`h-[18px] w-full bg-repeat-x opacity-80 ${props.className ?? ""}`}
+      style={{ backgroundImage: SQUIGGLE_TILE_SVG, backgroundSize: "34px 18px" }}
+    />
+  );
+}
