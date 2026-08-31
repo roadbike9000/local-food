@@ -26,4 +26,25 @@ test.describe("homepage", () => {
       page.getByRole("link", { name: /^cart, \d+ items?$/i }),
     ).toBeVisible();
   });
+
+  test("cart-pill icon is decorative and the link is keyboard-reachable (Story 8.1)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const cartLink = page.getByRole("link", { name: /^cart, \d+ items?$/i });
+
+    // The basket icon must not be exposed to the accessibility tree - the
+    // link's own aria-label already carries the accessible name.
+    await expect(cartLink.locator("svg[aria-hidden='true']")).toHaveCount(1);
+
+    // Real keyboard activation, not just a visual snapshot: Tab from the
+    // page's first focusable element (the "Local Food" logo link, which
+    // renders immediately before the cart link in Navbar.tsx) reaches the
+    // cart link, and Enter navigates.
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await expect(cartLink).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/cart/, { timeout: 15_000 });
+  });
 });

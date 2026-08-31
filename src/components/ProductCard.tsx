@@ -42,6 +42,8 @@ function ProductImagePlaceholder() {
         fill="none"
         stroke="currentColor"
         strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
         aria-hidden="true"
       >
         <rect x="3" y="3" width="18" height="18" rx="2" />

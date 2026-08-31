@@ -4,7 +4,7 @@ baseline_commit: 4065a6396c5137bb4fd8c1f8ffb8916cd5c5c7c3
 
 # Story 8.1: Design-token foundation and shared components
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -41,32 +41,32 @@ so that the site feels cohesive and polished from the first thing I see on any p
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Extend the Tailwind token layer (AC #1, #5)
-  - [ ] `tailwind.config.ts` — add `DESIGN.md`'s full color palette to `theme.extend.colors` (17 tokens: `cream`, `cream-deep`, `paper`, `card-border`, `line`, `field-border`, `terracotta` family, `olive` family, `sage-light`, `selected-wash`, `sold-out-bg`, `disabled-outline`, `placeholder-text`, `ink`, `ink-soft`) — keep the existing `brand` key too (still referenced by untouched pages until Epic 8's later stories migrate them; don't delete it in this story).
-  - [ ] Add `theme.extend.fontFamily` for the Georgia display stack and confirm the system-sans stack is Tailwind's existing default `font-sans` (don't duplicate it as a new token if Tailwind's built-in stack already matches `DESIGN.md`'s sans list — check `tailwind.config.ts`'s current defaults first).
-  - [ ] Add `theme.extend.borderRadius` (`DESIGN.md.rounded`: `sm`/`DEFAULT`/`md`/`lg`/`xl`/`full`) and `theme.extend.spacing` (`DESIGN.md.spacing`: `gutter`/`section-gap`/`divider-gap`/`list-gap`/`grid-gap`/`panel-gap`/`tight`) as named keys, not just relying on Tailwind's default numeric scale.
-  - [ ] Typography sizes/weights/line-heights (`DESIGN.md.typography`, 19 roles) don't map cleanly onto Tailwind's `fontSize` theme key (each role bundles size+weight+lineHeight+letterSpacing together) — implementer's choice: either extend `fontSize` with `[size, {lineHeight, letterSpacing}]` tuples per role, or keep these as documented reference values applied via Tailwind arbitrary-value utilities (`text-[52px]`) at each use site in stories 8.2–8.5. Don't force a heavier abstraction (e.g. a custom typography plugin) than this small token set needs.
-  - [ ] Do NOT introduce `sold-out-bg`'s drifted mock value (`#d8c9a3`, seen in the cart mock) — only the canonical `#e6dbc0`. Do NOT carry forward the vendor-page/cart spacing drift (18px/28px) — only the canonical 16px/24px scale.
+- [x] Task 1: Extend the Tailwind token layer (AC #1, #5)
+  - [x] `tailwind.config.ts` — add `DESIGN.md`'s full color palette to `theme.extend.colors` (17 tokens: `cream`, `cream-deep`, `paper`, `card-border`, `line`, `field-border`, `terracotta` family, `olive` family, `sage-light`, `selected-wash`, `sold-out-bg`, `disabled-outline`, `placeholder-text`, `ink`, `ink-soft`) — keep the existing `brand` key too (still referenced by untouched pages until Epic 8's later stories migrate them; don't delete it in this story).
+  - [x] Add `theme.extend.fontFamily` for the Georgia display stack and confirm the system-sans stack is Tailwind's existing default `font-sans` (don't duplicate it as a new token if Tailwind's built-in stack already matches `DESIGN.md`'s sans list — check `tailwind.config.ts`'s current defaults first).
+  - [x] Add `theme.extend.borderRadius` (`DESIGN.md.rounded`: `sm`/`DEFAULT`/`md`/`lg`/`xl`/`full`) and `theme.extend.spacing` (`DESIGN.md.spacing`: `gutter`/`section-gap`/`divider-gap`/`list-gap`/`grid-gap`/`panel-gap`/`tight`) as named keys, not just relying on Tailwind's default numeric scale.
+  - [x] Typography sizes/weights/line-heights (`DESIGN.md.typography`, 19 roles) don't map cleanly onto Tailwind's `fontSize` theme key (each role bundles size+weight+lineHeight+letterSpacing together) — implementer's choice: either extend `fontSize` with `[size, {lineHeight, letterSpacing}]` tuples per role, or keep these as documented reference values applied via Tailwind arbitrary-value utilities (`text-[52px]`) at each use site in stories 8.2–8.5. Don't force a heavier abstraction (e.g. a custom typography plugin) than this small token set needs.
+  - [x] Do NOT introduce `sold-out-bg`'s drifted mock value (`#d8c9a3`, seen in the cart mock) — only the canonical `#e6dbc0`. Do NOT carry forward the vendor-page/cart spacing drift (18px/28px) — only the canonical 16px/24px scale.
 
-- [ ] Task 2: Header cart-pill (AC #2, #4)
-  - [ ] `src/components/Navbar.tsx` — replace the current bare "Cart" text + conditional count `<span>` with `DESIGN.md`'s `header-cart-pill`: cream-fill pill (`rounded-full`), basket icon (built in Task 3), "Cart" text, and a count badge that's always rendered (matching the approved mocks, which render `<span class="cart-badge">0</span>` even at zero — this differs from the current app's hide-when-zero behavior; a minor, deliberately-simplifying visual change, not a functional one).
-  - [ ] Add `aria-label={\`Cart, ${count} items\`}` to the `<Link href="/cart">`. Add `aria-hidden="true"` to the basket icon.
-  - [ ] Apply the `focus-ring` utility (Task 4) to this link.
+- [x] Task 2: Header cart-pill (AC #2, #4)
+  - [x] `src/components/Navbar.tsx` — replace the current bare "Cart" text + conditional count `<span>` with `DESIGN.md`'s `header-cart-pill`: cream-fill pill (`rounded-full`), basket icon (built in Task 3), "Cart" text, and a count badge that's always rendered (matching the approved mocks, which render `<span class="cart-badge">0</span>` even at zero — this differs from the current app's hide-when-zero behavior; a minor, deliberately-simplifying visual change, not a functional one).
+  - [x] Add `aria-label={\`Cart, ${count} items\`}` to the `<Link href="/cart">`. Add `aria-hidden="true"` to the basket icon.
+  - [x] Apply the `focus-ring` utility (Task 4) to this link.
 
-- [ ] Task 3: Hand-drawn inline-SVG icon set (AC #3)
-  - [ ] New file, e.g. `src/components/icons/` (implementer's choice of exact location/naming, matching this codebase's existing `src/components/` flat structure) — basket, clock, wheat, leaf, checkmark icons as small React components, each an inline `<svg>` with `stroke="currentColor"`, `fill="none"`, `strokeWidth` in the 1.3–1.6px range, `strokeLinecap="round"`, `strokeLinejoin="round"` (per `DESIGN.md`'s `icon-line` token). The squiggle-divider (also inline SVG, `DESIGN.md`'s `squiggle-divider` token) is a separate, later-story concern (used in 8.3/8.5) — don't build it in this story unless trivial to include alongside.
-  - [ ] `src/components/ProductCard.tsx`'s `ProductImagePlaceholder()` — add `strokeLinecap="round"` and `strokeLinejoin="round"` to its existing `<svg>` (currently has neither, defaulting to butt/miter joins) so it matches `icon-line`'s spec exactly. Its `stroke="currentColor"`, `strokeWidth={1.5}`, and `aria-hidden="true"` already comply — don't touch those.
-  - [ ] Confirm zero emoji characters remain anywhere in the codebase (`grep -rP '[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]' src/` or equivalent) — the current codebase has none, but this is the story that establishes the "never emoji" rule going forward; a quick confirmation grep costs nothing and pins the baseline.
+- [x] Task 3: Hand-drawn inline-SVG icon set (AC #3)
+  - [x] New file, e.g. `src/components/icons/` (implementer's choice of exact location/naming, matching this codebase's existing `src/components/` flat structure) — basket, clock, wheat, leaf, checkmark icons as small React components, each an inline `<svg>` with `stroke="currentColor"`, `fill="none"`, `strokeWidth` in the 1.3–1.6px range, `strokeLinecap="round"`, `strokeLinejoin="round"` (per `DESIGN.md`'s `icon-line` token). The squiggle-divider (also inline SVG, `DESIGN.md`'s `squiggle-divider` token) is a separate, later-story concern (used in 8.3/8.5) — don't build it in this story unless trivial to include alongside.
+  - [x] `src/components/ProductCard.tsx`'s `ProductImagePlaceholder()` — add `strokeLinecap="round"` and `strokeLinejoin="round"` to its existing `<svg>` (currently has neither, defaulting to butt/miter joins) so it matches `icon-line`'s spec exactly. Its `stroke="currentColor"`, `strokeWidth={1.5}`, and `aria-hidden="true"` already comply — don't touch those.
+  - [x] Confirm zero emoji characters remain anywhere in the codebase (`grep -rP '[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]' src/` or equivalent) — the current codebase has none, but this is the story that establishes the "never emoji" rule going forward; a quick confirmation grep costs nothing and pins the baseline.
 
-- [ ] Task 4: Focus-ring utility (AC #4)
-  - [ ] A reusable `focus-ring` Tailwind utility class (or a small shared className constant, implementer's choice) — terracotta outline (2px solid, ~2px offset per `DESIGN.md`'s `focus-ring` component token), applied via `focus-visible:` (not bare `focus:`, to avoid a visible ring on mouse click — matches modern browser-default `:focus-visible` semantics and avoids the classic "ugly ring on every click" complaint without losing keyboard accessibility).
-  - [ ] Apply it to the header cart-pill link (Task 2) as this story's one proof-of-use. Do not apply it retroactively to every existing interactive element in the app — that's each later story's own job as it touches its own elements.
+- [x] Task 4: Focus-ring utility (AC #4)
+  - [x] A reusable `focus-ring` Tailwind utility class (or a small shared className constant, implementer's choice) — terracotta outline (2px solid, ~2px offset per `DESIGN.md`'s `focus-ring` component token), applied via `focus-visible:` (not bare `focus:`, to avoid a visible ring on mouse click — matches modern browser-default `:focus-visible` semantics and avoids the classic "ugly ring on every click" complaint without losing keyboard accessibility).
+  - [x] Apply it to the header cart-pill link (Task 2) as this story's one proof-of-use. Do not apply it retroactively to every existing interactive element in the app — that's each later story's own job as it touches its own elements.
 
-- [ ] Task 5: Tests (AC #1–#5)
-  - [ ] This story has no new business logic (no pure functions, no Prisma/API changes) — no new Vitest unit tests are needed; this codebase's testing convention reserves Vitest for pure functions/helpers only (`project-context.md#Testing Rules`).
-  - [ ] New or extended Playwright coverage in `tests/homepage.spec.ts` or a new `tests/navbar.spec.ts` (implementer's choice, matching this codebase's one-file-per-feature-area convention): the cart-pill link has the expected `aria-label` text (assert via `getByRole("link", { name: /Cart, \d+ items/ })`, not by CSS class), the icon is `aria-hidden` (assert the SVG has `aria-hidden="true"` or that it's excluded from the accessibility tree), and the link is keyboard-reachable (`Tab` reaches it, `Enter` navigates to `/cart` — a real behavior test, not just a visual snapshot).
-  - [ ] **Regression check, don't skip:** `tests/sms.spec.ts:26` and `tests/payment.spec.ts:41` locate the cart link via `page.getByRole("link", { name: "Cart" })`; `tests/homepage.spec.ts:14` via `page.getByRole("link", { name: /cart/i })`. Playwright's default (non-`exact`) name matching is substring-based, so all three should still match the new `aria-label="Cart, {count} items"` — but verify by actually running all three spec files after the Navbar change, don't just trust the substring-matching theory.
-  - [ ] No mocking — matches this codebase's established convention.
+- [x] Task 5: Tests (AC #1–#5)
+  - [x] This story has no new business logic (no pure functions, no Prisma/API changes) — no new Vitest unit tests are needed; this codebase's testing convention reserves Vitest for pure functions/helpers only (`project-context.md#Testing Rules`).
+  - [x] New or extended Playwright coverage in `tests/homepage.spec.ts` or a new `tests/navbar.spec.ts` (implementer's choice, matching this codebase's one-file-per-feature-area convention): the cart-pill link has the expected `aria-label` text (assert via `getByRole("link", { name: /Cart, \d+ items/ })`, not by CSS class), the icon is `aria-hidden` (assert the SVG has `aria-hidden="true"` or that it's excluded from the accessibility tree), and the link is keyboard-reachable (`Tab` reaches it, `Enter` navigates to `/cart` — a real behavior test, not just a visual snapshot).
+  - [x] **Regression check, don't skip:** `tests/sms.spec.ts:26` and `tests/payment.spec.ts:41` locate the cart link via `page.getByRole("link", { name: "Cart" })`; `tests/homepage.spec.ts:14` via `page.getByRole("link", { name: /cart/i })`. Playwright's default (non-`exact`) name matching is substring-based, so all three should still match the new `aria-label="Cart, {count} items"` — but verify by actually running all three spec files after the Navbar change, don't just trust the substring-matching theory.
+  - [x] No mocking — matches this codebase's established convention.
 
 ## Dev Notes
 
@@ -110,8 +110,33 @@ so that the site feels cohesive and polished from the first thing I see on any p
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- `npx tsc --noEmit`: clean.
+- `npm run lint`: clean.
+- `npx vitest run`: 131/131 passed (no unit tests added — none needed, no new business logic).
+- `npx playwright test tests/homepage.spec.ts tests/sms.spec.ts tests/payment.spec.ts`: 7/7 passed (regression check named in Task 5, plus the 2 new Story 8.1 tests).
+- Full `npx playwright test` (147 tests, run twice): 128 passed both times, 2 failed both times, 17 skipped both times (`tests/dashboard.spec.ts`'s authenticated block runs `test.describe.configure({ mode: "serial" })` — one flaky test in it cascades to skip its serial siblings). Investigated both failures:
+  - `tests/dashboard.spec.ts:94` ("vendor's product API never returns another vendor's products") — passes cleanly in isolation (`npx playwright test tests/dashboard.spec.ts -g "..."`, 1/1 passed). Pre-existing parallel-execution flake unrelated to this story: this story touches zero backend/API/auth code (Tailwind config, `Navbar.tsx` JSX, `ProductCard.tsx`'s decorative SVG attributes, a new icon-components file, `globals.css`), so there's no plausible mechanism connecting this story's changes to vendor-product-API isolation. Not fixed as part of this story — out of scope, and fixing a pre-existing test-infrastructure flake wasn't asked for.
+  - `tests/storefront-cart.spec.ts:66` ("out-of-stock products show a badge...") — this is Story 8.3's own ATDD red-phase test (badge copy "Out of stock" → "Sold Out"), already known-red and explicitly scoped to Story 8.3, not this story. Correctly still red; will flip when 8.3 ships.
 
 ### Completion Notes List
 
+- Token layer (Task 1): all 19 colors, 19 typography roles (as `fontSize` tuples pairing with new `font-serif`/`font-sans` families), 6 `borderRadius` keys, and 7 named `spacing` keys added to `tailwind.config.ts`, matching `DESIGN.md`'s frontmatter values exactly (not the two flagged mock-drift values). The existing `brand` color key was left untouched, per the story's own instruction.
+  - **Flagged, not silently absorbed:** `DESIGN.md`'s `rounded` token names (`sm`/`DEFAULT`/`md`/`lg`/`xl`/`full`) are literally Tailwind's own default `borderRadius` scale key names. Extending `theme.extend.borderRadius` with these exact names overrides those keys **globally**, not just for Epic 8 surfaces. A grep before implementing found 35 existing `rounded-md` and 9 existing `rounded-lg` usages across the codebase, including admin/dashboard pages explicitly out of Epic 8's scope (`src/app/admin/inventory/page.tsx`, `src/app/dashboard/*`, `src/components/admin/*`, `src/components/dashboard/*`). Implemented as instructed (matching `DESIGN.md`'s literal token names, preserving the `{rounded.X}` → `rounded-X` mapping convention 8.2–8.5 will rely on) rather than inventing non-standard key names to dodge the collision — but this means those out-of-scope pages will pick up the new corner-radius values (10/14/16/18/20px vs. Tailwind's prior 2/4/6/8/12px defaults) as a side effect of this story, purely cosmetic, no functional/test impact (confirmed: full regression suite passes at the same rate before/after). If Jeff doesn't want that, it's a one-line revert (rename the new keys) — flagging here rather than deciding unilaterally.
+  - `fontFamily.sans` was redefined (not left as Tailwind's built-in default) because Tailwind's default sans stack doesn't exactly match `DESIGN.md`'s documented list (`-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif` vs. Tailwind's `ui-sans-serif, system-ui, ...`) — confirmed via direct comparison before choosing to override, per Task 1's own instruction to check first. No existing `font-sans`/`font-serif` usage anywhere in the codebase, so this had zero blast radius.
+- Header cart-pill (Task 2): `Navbar.tsx`'s cart link now has `aria-label="Cart, {count} items"`, a `focus-ring` (Task 4), the new `BasketIcon` (`aria-hidden="true"`), and a count badge that always renders (including "0") — the deliberate badge-at-zero change the story's Dev Notes flagged. Did not read oddly in the isolated Playwright run; no reason found to revert to conditional rendering.
+- Icon set (Task 3): new `src/components/Icons.tsx` (one file, matching this codebase's flat `src/components/` convention — no barrel-file precedent existed to match) exports `BasketIcon`, `ClockIcon`, `WheatIcon`, `LeafIcon`, `CheckmarkIcon`, all sharing one `baseProps` object (`stroke="currentColor"`, `fill="none"`, `strokeWidth={1.5}`, round caps/joins, `aria-hidden="true"` by default, overridable via props spread). Only `BasketIcon` is consumed this story (by the cart-pill); the other four are built now per AC #3's "reusable set" requirement but wired up by later stories (clock → 8.3's pickup-banner, wheat/leaf → 8.2's homepage accent panel, checkmark → 8.5's confirmation card). `ProductCard.tsx`'s existing placeholder icon gained `strokeLinecap="round"`/`strokeLinejoin="round"` only — nothing else in that file touched. Emoji baseline confirmed at zero via the story's own suggested grep.
+- Focus-ring utility (Task 4): `.focus-ring:focus-visible` added to `globals.css`'s `@layer utilities` (terracotta outline, 2px solid, 2px offset, via `theme("colors.terracotta")`) rather than a bare Tailwind `focus-visible:` utility chain at each call site — a single reusable class name is simpler for 8.2–8.5 to apply consistently. Proven on exactly the one element this story specifies (the cart-pill link); not retrofitted elsewhere.
+- Tests (Task 5): `tests/homepage.spec.ts` extended with 2 new cases (the `aria-label` assertion, already proven true-red during the ATDD pass and now green; a new icon-`aria-hidden` + keyboard-Tab-then-Enter case covering the two Task 5 sub-requirements ATDD hadn't scaffolded). All 3 named regression tests (`tests/sms.spec.ts:26`, `tests/payment.spec.ts:41`, `tests/homepage.spec.ts:14`) verified passing by actually running them, not assumed from the substring-matching theory.
+
 ### File List
+
+- `tailwind.config.ts` (modified — token layer)
+- `src/app/globals.css` (modified — focus-ring utility)
+- `src/components/Icons.tsx` (new — icon set)
+- `src/components/Navbar.tsx` (modified — header cart-pill)
+- `src/components/ProductCard.tsx` (modified — placeholder icon strokeLinecap/strokeLinejoin only)
+- `tests/homepage.spec.ts` (modified — 2 new test cases)

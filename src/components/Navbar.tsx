@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { useCart } from "./CartProvider";
+import { BasketIcon } from "./Icons";
 
 export function Navbar() {
   const { items } = useCart();
@@ -16,13 +17,19 @@ export function Navbar() {
         </Link>
 
         <div className="flex items-center gap-4 text-sm">
-          <Link href="/cart" className="relative hover:text-brand">
+          <Link
+            href="/cart"
+            aria-label={`Cart, ${count} items`}
+            className="focus-ring flex items-center gap-2 rounded-full border border-line bg-cream py-[7px] pl-3 pr-4 text-body-ui text-ink"
+          >
+            <BasketIcon className="h-4 w-4" strokeWidth={1.6} aria-hidden="true" />
             Cart
-            {count > 0 && (
-              <span className="absolute -right-4 -top-2 rounded-full bg-brand px-1.5 text-xs text-white">
-                {count}
-              </span>
-            )}
+            <span
+              aria-hidden="true"
+              className="flex h-5 w-5 items-center justify-center rounded-full bg-terracotta text-[11px] font-bold text-paper"
+            >
+              {count}
+            </span>
           </Link>
 
           <SignedIn>
