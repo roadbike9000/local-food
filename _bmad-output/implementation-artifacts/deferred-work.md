@@ -1,5 +1,53 @@
 # Deferred Work
 
+## Deferred from: /code-review opus, full branch diff on epic-8-ux-storefront-redesign-2026-08-30 (2026-08-31)
+
+Source: `/code-review opus` ran against the whole branch diff (not just Story 8.2's own commit) — findings span Story 7.1/dashboard work too, since the branch carries that history. Two directly actionable items from this run (an eslint rule gap and a hardcoded homepage spacing value) were fixed inline, commit `0589091`. A separate, higher-confidence item (`EditVendorTimezoneControl`'s confirm-cancel state desync) was fixed inline, commit `072515f`. The rest are logged here, undecided.
+
+- source_spec: `src/app/cart/page.tsx`, checkout flow
+  summary: After a checkout `400` "slot full" response, the cart page's client-side `available`/selectable state for that pickup slot doesn't get invalidated — the slot stays shown as selectable, so a customer's retry hits the identical `400` again with no path to recovery short of a full page reload.
+  evidence: Code review finding (not yet independently reproduced with a live race). Real UX dead-end if confirmed: the error is surfaced, but the state that caused it isn't corrected, so "try again" doesn't actually change anything.
+
+- source_spec: `src/app/api/checkout/route.ts`, `src/app/api/pickup-slots/route.ts`, `src/app/dashboard/pickups/page.tsx`
+  summary: "Is this pickup slot full" capacity-check logic is implemented independently 2-3 times across these files, with divergent definitions — `dashboard/pickups/page.tsx`'s version doesn't filter by order status at all, so it counts `CANCELLED` orders toward capacity (a slot with cancelled-and-replaced orders can show as full on the dashboard when checkout would still accept it).
+  evidence: Code review finding, cross-file tracer pass. No single shared helper exists for "is this slot full" — worth consolidating into one function once someone's touching this area for another reason, since the divergence is a live correctness bug (dashboard) not just duplication.
+
+- source_spec: `src/components/admin/EditVendorTimezoneControl.tsx`
+  summary: Separate from the confirm-cancel desync fixed in `072515f` — a lower-confidence race between `window.confirm()` and the `<select>`'s `onBlur` handler (`onBlur={() => !submitting && setEditing(false)}`) was flagged: `confirm()` blocks the JS thread, but the browser may fire `blur` on the select as focus moves to the native dialog, and the ordering of blur-vs-confirm-resolution across browsers isn't guaranteed, which could close the edit UI out from under an in-flight confirm.
+  evidence: Code review finding, not reproduced live — flagged as lower-confidence than the desync bug (which was confirmed and fixed).
+
+- source_spec: `src/components/dashboard/AddSlotForm.tsx`
+  summary: A generic error message on slot-creation failure may mask a specific, more useful case — a corrupted/invalid `Vendor.timezone` value causing the date computation itself to fail, which would be worth a distinct error message from "something else went wrong."
+  evidence: Code review finding, lower confidence — not confirmed against a live corrupted-timezone repro.
+
+- source_spec: admin vendor PATCH route (`src/app/api/admin/vendors/[id]/route.ts`)
+  summary: Does a `findUnique` immediately before its `update` call (redundant — the update's own result/error already tells you whether the row existed), and has two awaits that could run concurrently via `Promise.all` instead of sequentially.
+  evidence: Code review finding, efficiency category — small, no correctness impact.
+
+- source_spec: pickup-slot list rendering (dashboard and/or storefront)
+  summary: `Intl.DateTimeFormat` gets constructed fresh per pickup slot inside a list render, rather than once and reused — real but minor overhead for typical list sizes.
+  evidence: Code review finding, efficiency category.
+
+- source_spec: `src/lib/timezone.ts`
+  summary: Timezone-parts extraction logic is duplicated rather than factored into one shared helper.
+  evidence: Code review finding, reuse category.
+
+- source_spec: 3 admin components (unspecified in the finding — likely `EditVendorTimezoneControl.tsx`, `AddVendorForm.tsx`, and a third admin form/list component)
+  summary: Fetch/error-handling boilerplate (the `fetch` → `!res.ok` → status-specific message → generic fallback pattern seen in `EditVendorTimezoneControl.tsx`) is duplicated across roughly 3 admin components rather than shared.
+  evidence: Code review finding, reuse category. Not yet mapped to exact file list beyond `EditVendorTimezoneControl.tsx`.
+
+- source_spec: 2 admin forms (likely `AddVendorForm.tsx` and `EditVendorTimezoneControl.tsx`, both consumers of `SELECTABLE_TIME_ZONES`)
+  summary: The `<select>` timezone option list (mapping `timeZones` to `<option>` elements) is duplicated markup across two admin forms rather than a shared subcomponent.
+  evidence: Code review finding, reuse category.
+
+- source_spec: `src/app/cart/page.tsx`
+  summary: The "Full" badge markup (the `rounded-full bg-red-50 ...` span, appearing at both line 249 and line 279 in the current file) is duplicated rather than extracted into a small shared component.
+  evidence: Code review finding, reuse category. Confirmed by inspection — both spans are near-identical JSX.
+
+- source_spec: `tailwind.config.ts`
+  summary: Most of the new Story 8.1/8.2 design-token scale (`boxShadow`/`spacing` custom tokens, `rounded-storefront-*`) has few or zero consumers so far outside the components those stories directly touched — flagged as a scope observation, not a defect. `mt-divider-gap` (fixed in `0589091`) was one confirmed real gap; there may be other hardcoded arbitrary values elsewhere in the storefront that should be using these tokens instead.
+  evidence: Code review finding, altitude/consistency category. Worth a dedicated sweep (grep for `\[\d+px\]`-style arbitrary values in storefront-facing files) rather than fixing opportunistically as each one is noticed.
+
 ## Deferred from: create-story scoping of epic-8-storefront-visual-redesign (2026-08-30)
 
 - source_spec: `_bmad-output/planning-artifacts/epics.md#Epic 8: Storefront Visual Redesign`
