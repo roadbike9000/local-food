@@ -14,7 +14,10 @@
 // closes that gap for the files it's scoped to (see .eslintrc.json's
 // overrides) - `rounded-full` is exempt since it's identical in both
 // scales (9999px), so there's no wrong-value risk from using it bare.
-const BARE_RADIUS_PATTERN = /(?:^|\s)(rounded(?:-(?:sm|md|lg|xl))?)(?=\s|$)/g;
+// Matches a bare radius utility preceded by start/whitespace/colon, so it also
+// catches variant-prefixed classes like `hover:rounded-lg` or `sm:rounded-md`
+// (the colon, not just whitespace, can precede the utility name).
+const BARE_RADIUS_PATTERN = /(?:^|[\s:])(rounded(?:-(?:sm|md|lg|xl))?)(?=\s|$)/g;
 
 function checkClassString(context, node, text) {
   if (typeof text !== "string") return;
@@ -30,6 +33,53 @@ function checkClassString(context, node, text) {
         `storefront-prefixed class if you want the design-token radius, or add an ` +
         `eslint-disable-next-line comment if Tailwind's own default radius is genuinely intended.`,
     });
+  }
+}
+
+// Walks the expression tree of a className value so classes inside
+// ternaries/`&&` fallbacks and clsx()-style calls get checked too, not just
+// a plain string or a plain template literal.
+function checkExpression(context, expr) {
+  if (!expr) return;
+  switch (expr.type) {
+    case "Literal":
+      checkClassString(context, expr, expr.value);
+      break;
+    case "TemplateLiteral":
+      for (const quasi of expr.quasis) {
+        checkClassString(context, quasi, quasi.value.raw);
+      }
+      break;
+    case "ConditionalExpression":
+      checkExpression(context, expr.consequent);
+      checkExpression(context, expr.alternate);
+      break;
+    case "LogicalExpression":
+      checkExpression(context, expr.left);
+      checkExpression(context, expr.right);
+      break;
+    case "CallExpression":
+      for (const arg of expr.arguments) {
+        checkExpression(context, arg);
+      }
+      break;
+    case "ArrayExpression":
+      for (const element of expr.elements) {
+        checkExpression(context, element);
+      }
+      break;
+    case "ObjectExpression":
+      for (const property of expr.properties) {
+        if (property.type !== "Property") continue;
+        if (property.key.type === "Literal") {
+          checkClassString(context, property.key, property.key.value);
+        } else if (property.key.type === "Identifier" && !property.computed) {
+          checkClassString(context, property.key, property.key.name);
+        }
+      }
+      break;
+    default:
+      break;
   }
 }
 
@@ -60,13 +110,8 @@ module.exports = {
             return;
           }
 
-          if (
-            value.type === "JSXExpressionContainer" &&
-            value.expression.type === "TemplateLiteral"
-          ) {
-            for (const quasi of value.expression.quasis) {
-              checkClassString(context, quasi, quasi.value.raw);
-            }
+          if (value.type === "JSXExpressionContainer") {
+            checkExpression(context, value.expression);
           }
         },
       };

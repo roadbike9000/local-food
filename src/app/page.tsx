@@ -26,7 +26,7 @@ export default async function HomePage() {
         Order from independent bakers, farmers, and makers for pickup.
       </p>
 
-      <SquiggleDivider className="mt-[30px]" />
+      <SquiggleDivider className="mt-divider-gap" />
 
       {vendors.length === 0 ? (
         <p className="mt-8 text-stone-500">
