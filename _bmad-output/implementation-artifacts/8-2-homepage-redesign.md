@@ -4,7 +4,7 @@ baseline_commit: 4065a6396c5137bb4fd8c1f8ffb8916cd5c5c7c3
 
 # Story 8.2: Homepage redesign
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -49,6 +49,15 @@ so that browsing feels inviting and I don't have to aim for a small button just 
   - [x] Extend `tests/homepage.spec.ts` (existing file — read it first to match its established conventions before adding to it): assert the vendor-card link's accessible name still resolves to the vendor and still navigates to `/vendors/{slug}` on click (real behavior, not a CSS/snapshot check); assert no separate focusable element exists inside a card besides the outer link (e.g. count `page.getByRole("link")` / `page.getByRole("button")` scoped to one card and confirm there's exactly one focusable element); keyboard-`Tab` reaches a card and `Enter` navigates.
   - [x] Confirm the existing zero-vendors empty-state test (if one exists in `tests/homepage.spec.ts` — check) still passes unmodified; if none exists, this story doesn't need to add one (out of this story's AC scope — Task 1 explicitly preserves, doesn't newly test, that branch).
   - [x] No mocking.
+
+### Review Findings
+
+**Code review (`/code-review opus`, full branch diff, 2026-08-31)** — ran against the whole branch, not just this story's own commit; findings below are the subset scoped to this story. The rest (cart 400-race stale slot state, duplicated/divergent pickup-slot capacity-check logic, several lower-confidence Story 7.1 items) are out of this story's file scope and logged in `deferred-work.md` instead.
+
+- [x] [Review][Patch] `src/app/page.tsx`'s squiggle-divider used a hardcoded `mt-[30px]` arbitrary value instead of the `divider-gap` (30px) spacing token Story 8.1 already defined in `tailwind.config.ts` for exactly this. [src/app/page.tsx]
+- [x] [Review][Patch] `eslint-local-rules/index.js`'s `storefront-radius-tokens` rule (built in Story 8.1 round 2) had two gaps that reopened the exact "plausible-but-wrong radius, nothing to catch it" bug the rule exists to close: it didn't match variant-prefixed classes (`hover:rounded-lg`, `sm:rounded-md` — anchored on whitespace, not `:`), and it didn't walk ternary/`clsx()`-style `className` expressions, only plain strings and template literals. Not a defect in this story's own diff, but caught while reviewing it and fixed in the same pass since it's the shared guardrail 8.3-8.5 will also rely on. [eslint-local-rules/index.js]
+
+Both verified: `npx eslint` clean on the full `src/app`/`src/components` tree, plus a dedicated `RuleTester` regression covering variant-prefixed classes, ternaries, `clsx()` calls, and confirming no false positive on `rounded-storefront-lg`/`rounded-full`/`border-rounded-lg`.
 
 ## Dev Notes
 
@@ -110,7 +119,8 @@ Claude Sonnet 5 (claude-sonnet-5)
 
 ### File List
 
-- `src/app/page.tsx` (modified — hero/subhead/kicker restyle, squiggle-divider, "Vendors near you" section heading; Prisma query and empty-state branch unchanged)
+- `src/app/page.tsx` (modified — hero/subhead/kicker restyle, squiggle-divider, "Vendors near you" section heading; Prisma query and empty-state branch unchanged; review round: `mt-[30px]` → `mt-divider-gap` token)
 - `src/components/VendorCard.tsx` (modified — full `vendor-card` restyle: card-panel base, universal accent panel, card-title/body-card-desc typography, badge-positive item-count pill, button-pill "View menu" label, focus-ring)
 - `src/components/Icons.tsx` (modified — new `SquiggleDivider` export)
 - `tests/homepage.spec.ts` (modified — 3 new Story 8.2 test cases)
+- `eslint-local-rules/index.js` (modified, review round — `storefront-radius-tokens` rule: variant-prefix + non-literal-expression coverage, caught during this story's review, out of this story's own scope but fixed in the same pass)
