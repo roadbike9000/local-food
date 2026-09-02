@@ -15,9 +15,22 @@
  * which may no longer match what a customer's SMS confirmation said.
  * DeactivateVendorButton's confirm() is the precedent for a real,
  * consequential action in this same admin table.
+ *
+ * The actual PATCH is debounced (code review finding): a native <select>
+ * fires `change` on every keyboard arrow-key step even before the admin
+ * settles on a value, which without debouncing meant a burst of writes
+ * (and, worse, a burst of confirm() dialogs) for a single intended
+ * selection. Debouncing changes nothing about the success-path UX - the
+ * displayed value still updates immediately on each keystroke/click, and
+ * the control still auto-saves with no separate Save button - it just
+ * waits for keyboard input to settle before actually committing, so a
+ * rapid burst collapses into the one write (and one confirm(), if
+ * applicable) the admin actually intended.
  */
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+
+const COMMIT_DELAY_MS = 400;
 
 type EditVendorTimezoneControlProps = {
   vendorId: string;
@@ -51,8 +64,20 @@ export function EditVendorTimezoneControl({
   // touching it - React has nothing to re-render and the DOM is left
   // showing the cancelled option instead of the real current one.
   const [selectKey, setSelectKey] = useState(0);
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The value to revert to if the eventual commit fails or is declined -
+  // captured once when a new burst of changes starts, not re-captured on
+  // every reschedule, so a multi-step keyboard burst still reverts to the
+  // value from *before the burst*, not to some intermediate step within it.
+  const revertValue = useRef(currentTimezone);
 
-  async function handleChange(value: string) {
+  useEffect(() => {
+    return () => {
+      if (commitTimer.current) clearTimeout(commitTimer.current);
+    };
+  }, []);
+
+  async function commit(value: string) {
     if (
       hasPickupSlots &&
       !window.confirm(
@@ -60,11 +85,10 @@ export function EditVendorTimezoneControl({
       )
     ) {
       setSelectKey((key) => key + 1);
+      setTimezone(revertValue.current);
       return;
     }
 
-    const previous = timezone;
-    setTimezone(value);
     setSubmitting(true);
     setError(null);
 
@@ -76,7 +100,7 @@ export function EditVendorTimezoneControl({
       });
 
       if (!res.ok) {
-        setTimezone(previous);
+        setTimezone(revertValue.current);
         if (res.status === 401) {
           setError("Your session expired. Sign in again.");
           return;
@@ -89,11 +113,24 @@ export function EditVendorTimezoneControl({
       setEditing(false);
       router.refresh();
     } catch {
-      setTimezone(previous);
+      setTimezone(revertValue.current);
       setError("Network error. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleChange(value: string) {
+    if (commitTimer.current) {
+      clearTimeout(commitTimer.current);
+    } else {
+      revertValue.current = timezone;
+    }
+    setTimezone(value);
+    commitTimer.current = setTimeout(() => {
+      commitTimer.current = null;
+      void commit(value);
+    }, COMMIT_DELAY_MS);
   }
 
   if (!editing) {
@@ -124,7 +161,7 @@ export function EditVendorTimezoneControl({
         value={timezone}
         disabled={submitting}
         onChange={(e) => handleChange(e.target.value)}
-        onBlur={() => !submitting && setEditing(false)}
+        onBlur={() => !submitting && !commitTimer.current && setEditing(false)}
         autoFocus
         className="rounded-md border border-stone-300 px-2 py-1 text-xs disabled:opacity-50"
       >
