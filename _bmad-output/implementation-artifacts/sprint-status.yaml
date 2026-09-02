@@ -264,4 +264,5 @@ action_items:
   - epic: 8
     action: "Open and merge a PR for epic-8-ux-storefront-redesign-2026-08-30 (21 commits ahead of origin/main) - the epic's 5 stories are done and reviewed, but the implementation itself isn't on main yet"
     owner: "Jeff"
-    status: open
+    status: done
+    note: "2026-09-02: PR #17 merged to main (e3f7786)."
