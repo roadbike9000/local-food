@@ -136,164 +136,219 @@ export default function CartPage() {
   if (items.length === 0) {
     return (
       <div>
-        <h1 className="text-2xl font-bold">Your cart</h1>
-        <p className="mt-4 text-stone-600">Your cart is empty.</p>
+        <h1 className="font-serif text-display-xs text-terracotta-deep">
+          Your cart
+        </h1>
+        <p className="mt-4 font-sans text-body-ui text-ink-soft">
+          Your cart is empty.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-bold">Your cart</h1>
+    <div>
+      <h1 className="font-serif text-display-xs text-terracotta-deep">
+        Your cart
+      </h1>
 
-      {/* eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then */}
-      <ul className="mt-4 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
-        {items.map((i) => (
-          <li key={i.productId} className="p-3">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <button
-                  aria-label={`Decrease quantity of ${i.name}`}
-                  disabled={i.quantity <= 1}
-                  onClick={() => updateQuantity(i.productId, -1)}
-                  type="button"
-                  // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
-                  className="flex h-6 w-6 items-center justify-center rounded border border-stone-300 text-stone-600 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  −
-                </button>
-                <span
-                  aria-label={`Quantity of ${i.name}`}
-                  aria-live="polite"
-                  className="w-4 text-center"
-                >
-                  {i.quantity}
-                </span>
-                <button
-                  aria-label={`Increase quantity of ${i.name}`}
-                  disabled={i.quantity >= i.stockQuantity}
-                  onClick={() => updateQuantity(i.productId, 1)}
-                  type="button"
-                  // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
-                  className="flex h-6 w-6 items-center justify-center rounded border border-stone-300 text-stone-600 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  +
-                </button>
-                <span className="ml-1">{i.name}</span>
-              </span>
-              <span className="flex items-center gap-3">
-                {formatPrice(i.priceCents * i.quantity)}
-                <button
-                  onClick={() => removeItem(i.productId)}
-                  className="text-xs text-stone-400 hover:text-red-600"
-                >
-                  remove
-                </button>
-              </span>
+      <div className="mt-section-gap grid grid-cols-[1.55fr_1fr] items-start gap-grid-gap">
+        <div>
+          <ul className="flex flex-col gap-list-gap">
+            {items.map((i) => (
+              <li
+                key={i.productId}
+                className="rounded-storefront-md border border-card-border bg-paper p-[18px] shadow-row"
+              >
+                <div className="flex items-center justify-between gap-panel-gap">
+                  <span className="flex flex-1 items-center gap-3">
+                    <span className="flex items-center overflow-hidden rounded-full border border-field-border bg-paper">
+                      <button
+                        aria-label={`Decrease quantity of ${i.name}`}
+                        disabled={i.quantity <= 1}
+                        onClick={() => updateQuantity(i.productId, -1)}
+                        type="button"
+                        className="focus-ring flex h-[30px] w-[30px] items-center justify-center bg-cream font-sans font-bold text-terracotta disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        −
+                      </button>
+                      <span
+                        aria-label={`Quantity of ${i.name}`}
+                        aria-live="polite"
+                        className="min-w-[30px] text-center font-sans text-ui-sm font-bold text-ink"
+                      >
+                        {i.quantity}
+                      </span>
+                      <button
+                        aria-label={`Increase quantity of ${i.name}`}
+                        disabled={i.quantity >= i.stockQuantity}
+                        onClick={() => updateQuantity(i.productId, 1)}
+                        type="button"
+                        className="focus-ring flex h-[30px] w-[30px] items-center justify-center bg-cream font-sans font-bold text-terracotta disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </span>
+                    <span className="font-serif text-item-title text-ink">
+                      {i.name}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <span className="font-sans text-price text-terracotta-deep">
+                      {formatPrice(i.priceCents * i.quantity)}
+                    </span>
+                    <button
+                      onClick={() => removeItem(i.productId)}
+                      className="focus-ring font-sans text-ui-sm text-ink-soft hover:text-terracotta-deep"
+                    >
+                      remove
+                    </button>
+                  </span>
+                </div>
+                {i.stockQuantity <= 0 && (
+                  <p
+                    role="alert"
+                    aria-live="polite"
+                    className="mt-1 font-sans text-ui-sm text-red-600"
+                  >
+                    No longer available — remove to continue.
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          <div
+            data-testid="cart-total"
+            className="mt-panel-gap flex items-baseline justify-end gap-3 border-t-2 border-dashed border-line pt-[18px]"
+          >
+            <span className="font-sans text-label-caps-tight uppercase text-ink-soft">
+              Total
+            </span>
+            <span className="font-serif text-total-display text-terracotta-deep">
+              {formatPrice(totalCents)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-panel-gap rounded-storefront-lg border border-card-border bg-paper p-[26px_24px] shadow-card">
+          <div>
+            <p className="mb-tight text-label-caps-tight font-sans uppercase text-olive">
+              Your Details
+            </p>
+            <div className="flex flex-col gap-tight">
+              <input
+                type="text"
+                placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="focus-ring w-full rounded-storefront-sm border border-field-border bg-cream px-[14px] py-[11px] font-sans text-body-ui text-ink placeholder:text-placeholder-text"
+              />
+              <input
+                type="tel"
+                placeholder="Mobile number (for pickup texts)"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="focus-ring w-full rounded-storefront-sm border border-field-border bg-cream px-[14px] py-[11px] font-sans text-body-ui text-ink placeholder:text-placeholder-text"
+              />
             </div>
-            {i.stockQuantity <= 0 && (
-              <p className="mt-1 text-xs text-red-600">
-                No longer available — remove to continue.
+          </div>
+
+          <div>
+            <p className="mb-tight text-label-caps-tight font-sans uppercase text-olive">
+              Pickup Time
+            </p>
+
+            {!slotsLoaded && (
+              <p className="font-sans text-body-ui text-ink-soft">
+                Loading pickup times…
               </p>
             )}
-          </li>
-        ))}
-      </ul>
 
-      <div
-        data-testid="cart-total"
-        className="mt-3 flex justify-between text-lg font-semibold"
-      >
-        <span>Total</span>
-        <span>{formatPrice(totalCents)}</span>
-      </div>
-
-      <div className="mt-6 space-y-3">
-        <input
-          type="text"
-          placeholder="Your name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
-          className="w-full rounded-md border border-stone-300 px-3 py-2"
-        />
-        <input
-          type="tel"
-          placeholder="Mobile number (for pickup texts)"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
-          className="w-full rounded-md border border-stone-300 px-3 py-2"
-        />
-
-        {!slotsLoaded && (
-          <p className="text-sm text-stone-600">Loading pickup times…</p>
-        )}
-
-        {slotsLoaded && slotsError && (
-          <p className="text-sm text-red-600">
-            Could not load pickup times. Try refreshing the page.
-          </p>
-        )}
-
-        {slotsLoaded && !slotsError && slots.length === 0 && (
-          <p className="text-sm text-stone-600">No pickup times available.</p>
-        )}
-
-        {slotsLoaded && !slotsError && slots.length === 1 && (
-          <p className="text-sm text-stone-700">
-            <span className="font-medium">Pickup: </span>
-            {formatPickupWindow(new Date(slots[0].startsAt), new Date(slots[0].endsAt), vendorTimezone)}
-            {slots[0].location ? ` · ${slots[0].location}` : ""}
-            {!slots[0].available && (
-              <span className="ml-2 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                Full
-              </span>
-            )}
-          </p>
-        )}
-
-        {slotsLoaded && !slotsError && slots.length >= 2 && (
-          <fieldset className="space-y-1">
-            <legend className="text-sm font-medium text-stone-700">
-              Pickup time
-            </legend>
-            {slots.map((slot) => (
-              <label
-                key={slot.id}
-                className={`flex items-center gap-2 text-sm ${
-                  slot.available ? "text-stone-700" : "text-stone-400"
-                }`}
+            {slotsLoaded && slotsError && (
+              <p
+                role="alert"
+                aria-live="polite"
+                className="font-sans text-body-ui text-red-600"
               >
-                <input
-                  type="radio"
-                  name="pickupSlot"
-                  value={slot.id}
-                  checked={selectedSlotId === slot.id}
-                  disabled={!slot.available}
-                  onChange={() => setSelectedSlotId(slot.id)}
-                />
-                {formatPickupWindow(new Date(slot.startsAt), new Date(slot.endsAt), vendorTimezone)}
-                {slot.location ? ` · ${slot.location}` : ""}
-                {!slot.available && (
-                  <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                Could not load pickup times. Try refreshing the page.
+              </p>
+            )}
+
+            {slotsLoaded && !slotsError && slots.length === 0 && (
+              <p className="font-sans text-body-ui text-ink-soft">
+                No pickup times available.
+              </p>
+            )}
+
+            {slotsLoaded && !slotsError && slots.length === 1 && (
+              <p className="font-sans text-body-ui text-ink">
+                <span className="font-semibold">Pickup: </span>
+                {formatPickupWindow(new Date(slots[0].startsAt), new Date(slots[0].endsAt), vendorTimezone)}
+                {slots[0].location ? ` · ${slots[0].location}` : ""}
+                {!slots[0].available && (
+                  <span className="ml-2 inline-block rounded-full bg-sold-out-bg px-2.5 py-[3px] font-sans text-badge-label uppercase text-ink-soft">
                     Full
                   </span>
                 )}
-              </label>
-            ))}
-          </fieldset>
-        )}
+              </p>
+            )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          onClick={handleCheckout}
-          disabled={loading || !name || !phone || !selectedSlotId}
-          // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
-          className="w-full rounded-md bg-brand px-4 py-2.5 font-medium text-white hover:bg-brand-dark disabled:opacity-50"
-        >
-          {loading ? "Redirecting…" : "Checkout"}
-        </button>
+            {slotsLoaded && !slotsError && slots.length >= 2 && (
+              <fieldset className="flex flex-col gap-2.5">
+                <legend className="sr-only">Pickup time</legend>
+                {slots.map((slot) => (
+                  <label
+                    key={slot.id}
+                    className={`flex items-center gap-3 rounded-storefront border px-[14px] py-[13px] font-sans text-ui-sm ${
+                      selectedSlotId === slot.id
+                        ? "border-terracotta bg-selected-wash ring-1 ring-inset ring-terracotta"
+                        : slot.available
+                          ? "border-line bg-paper text-ink"
+                          : "border-line bg-sold-out-bg text-ink-soft"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="pickupSlot"
+                      value={slot.id}
+                      checked={selectedSlotId === slot.id}
+                      disabled={!slot.available}
+                      onChange={() => setSelectedSlotId(slot.id)}
+                      className="focus-ring h-[18px] w-[18px] flex-shrink-0 accent-terracotta"
+                    />
+                    <span className="flex-1">
+                      {formatPickupWindow(new Date(slot.startsAt), new Date(slot.endsAt), vendorTimezone)}
+                      {slot.location ? ` · ${slot.location}` : ""}
+                    </span>
+                    {!slot.available && (
+                      <span className="rounded-full bg-sold-out-bg px-2.5 py-[3px] font-sans text-badge-label uppercase text-ink-soft">
+                        Full
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </fieldset>
+            )}
+          </div>
+
+          {error && (
+            <p
+              role="alert"
+              aria-live="polite"
+              className="font-sans text-body-ui text-red-600"
+            >
+              {error}
+            </p>
+          )}
+          <button
+            onClick={handleCheckout}
+            disabled={loading || !name || !phone || !selectedSlotId}
+            className="focus-ring w-full rounded-full bg-terracotta px-[26px] py-[14px] font-sans text-[15px] font-bold tracking-[0.02em] text-paper shadow-button-primary hover:bg-terracotta-deep disabled:cursor-not-allowed disabled:bg-sold-out-bg disabled:text-ink-soft disabled:shadow-none"
+          >
+            {loading ? "Redirecting…" : "Checkout"}
+          </button>
+        </div>
       </div>
     </div>
   );
