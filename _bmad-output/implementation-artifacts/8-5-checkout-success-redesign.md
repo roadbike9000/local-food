@@ -4,7 +4,7 @@ baseline_commit: 4065a6396c5137bb4fd8c1f8ffb8916cd5c5c7c3
 
 # Story 8.5: Checkout-success redesign
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -97,3 +97,10 @@ Claude Sonnet 5 (claude-sonnet-5)
 
 - `src/app/checkout/success/page.tsx` (modified — full restyle: confirm-card, check-badge, squiggle flourish, button-pill-primary link)
 - `src/components/Icons.tsx` (modified — new `SquiggleFlourish` export, reusing `SquiggleDivider`'s existing tile asset)
+
+### Review Findings
+
+`/code-review opus`, single finder pass against Story 8.5's diff (`HEAD~1...HEAD`). Small, purely-presentational diff, no correctness/crash bugs. 2 findings:
+
+- [x] [Review][Patch] Outer confirm-stage container used symmetric `py-[76px]` instead of the approved mock's asymmetric `padding: 76px 40px 90px` (`mockups/checkout-success.html:145`), undershooting bottom padding by 14px — the one literal value silently dropped where every other mock value was matched exactly. Fixed: `p-[76px_40px_90px]`, same shorthand-arbitrary style already used on the confirm-card itself.
+- [x] [Review][Defer] "Back to vendors" link's `button-pill-primary` className string duplicates `cart/page.tsx`'s Checkout button verbatim — already logged in `deferred-work.md`'s Story 8.4 review entry as a predicted forward risk for this exact page; added a confirmation note there rather than a new entry. Not fixed here (token/component promotion is a deliberate follow-up decision, not a drive-by).

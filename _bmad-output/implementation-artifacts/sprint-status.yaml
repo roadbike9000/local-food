@@ -1,5 +1,5 @@
 # generated: 2026-08-17
-# last_updated: 2026-09-02 (Story 8.5 in review)
+# last_updated: 2026-09-02 (Story 8.5 done, review fixes applied)
 # project: local-food
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-08-17
-last_updated: 2026-09-02 (Story 8.5 in review)
+last_updated: 2026-09-02 (Story 8.5 done, review fixes applied)
 project: local-food
 project_key: NOKEY
 tracking_system: file-system
@@ -91,7 +91,7 @@ development_status:
   8-2-homepage-redesign: done
   8-3-vendor-page-redesign: done
   8-4-cart-and-checkout-redesign: done
-  8-5-checkout-success-redesign: review
+  8-5-checkout-success-redesign: done
 
 action_items:
   - epic: 1

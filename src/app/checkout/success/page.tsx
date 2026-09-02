@@ -8,7 +8,7 @@ import { CheckmarkIcon, SquiggleFlourish } from "@/components/Icons";
 // webhook has processed yet.
 export default function CheckoutSuccessPage() {
   return (
-    <div className="relative flex items-center justify-center px-gutter py-[76px]">
+    <div className="relative flex items-center justify-center p-[76px_40px_90px]">
       {/* Low-opacity scattered squiggle flourish (DESIGN.md#Components) -
           same asset as the section-divider, four rotated/scaled/dimmed
           instances behind the card. Static, never animated (EXPERIENCE.md
