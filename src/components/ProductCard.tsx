@@ -12,6 +12,11 @@ import { ImagePlaceholderIcon } from "./Icons";
 // this story's restyle).
 const IMAGE_SIZE = 84;
 
+// Shared so the real-image and placeholder-image dimming stay in sync by
+// construction (Story 8.3 review: previously hand-duplicated, one copy per
+// branch, with no single place to update the look).
+const OUT_OF_STOCK_FILTER = "opacity-60 grayscale-[70%] brightness-[85%]";
+
 type ProductCardProps = {
   vendorId: string;
   vendorSlug: string;
@@ -36,7 +41,7 @@ function ProductImagePlaceholder({ dimmed }: { dimmed: boolean }) {
       data-testid="product-image-placeholder"
       style={{ width: IMAGE_SIZE, height: IMAGE_SIZE }}
       className={`flex flex-shrink-0 items-center justify-center rounded-full bg-cream-deep text-ink-soft shadow-thumb ${
-        dimmed ? "opacity-60 grayscale-[70%] brightness-[85%]" : ""
+        dimmed ? OUT_OF_STOCK_FILTER : ""
       }`}
     >
       <ImagePlaceholderIcon width={28} height={28} />
@@ -60,7 +65,7 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
   }, [product.imageUrl]);
 
   return (
-    <div className="flex items-center gap-panel-gap rounded-storefront-md border border-card-border bg-paper px-[22px] py-[18px] shadow-row">
+    <div className="flex items-center gap-panel-gap rounded-storefront-md border border-card-border bg-paper px-panel-gap py-[18px] shadow-row">
       {product.imageUrl && !imageFailed ? (
         <Image
           src={product.imageUrl}
@@ -73,7 +78,7 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
           width={IMAGE_SIZE}
           height={IMAGE_SIZE}
           className={`flex-shrink-0 rounded-full object-cover shadow-thumb ${
-            inStock ? "" : "opacity-60 grayscale-[70%] brightness-[85%]"
+            inStock ? "" : OUT_OF_STOCK_FILTER
           }`}
           onError={() => setImageFailed(true)}
         />

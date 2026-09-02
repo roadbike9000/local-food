@@ -1,10 +1,12 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ProductCard } from "@/components/ProductCard";
 import { SquiggleDivider, ClockIcon } from "@/components/Icons";
 import { formatPickupWindow } from "@/lib/utils";
 import { assertVendorActive, VendorDeactivatedError } from "@/lib/vendor";
-import { CLOUDINARY_URL_PREFIX } from "@/app/api/products/schema";
+import { isInStock } from "@/lib/availability";
+import { getValidProductImageUrl } from "@/lib/product-image";
 
 // Story 8.3: no per-vendor tagline/photo field exists in the data model
 // (Vendor has no imageUrl or category, matching Story 8.2's same-shaped
@@ -63,8 +65,11 @@ export default async function StorefrontPage({
   // this visual-only epic's scope, per this story's Dev Notes). Falls back
   // to a gradient placeholder (same treatment VendorCard.tsx uses for its
   // accent panel) when no product has one, e.g. a freshly-onboarded vendor.
-  const heroImageUrl = vendor.products.find((p) =>
-    p.imageUrl?.startsWith(CLOUDINARY_URL_PREFIX),
+  // Restricted to in-stock products (Story 8.3 review finding) - otherwise
+  // a sold-out product's photo could headline the hero in full color while
+  // its own menu row renders dimmed/grayscale as unavailable, right below.
+  const heroImageUrl = vendor.products.find(
+    (p) => isInStock(p) && getValidProductImageUrl(p.imageUrl),
   )?.imageUrl;
 
   return (
@@ -78,15 +83,19 @@ export default async function StorefrontPage({
         </p>
       )}
 
-      <div
-        className={`relative mt-6 h-[260px] overflow-hidden rounded-storefront-lg shadow-hero ${
-          heroImageUrl
-            ? "bg-cover bg-center"
-            : "bg-gradient-to-br from-terracotta-light via-terracotta to-terracotta-deep"
-        }`}
-        style={heroImageUrl ? { backgroundImage: `url(${heroImageUrl})` } : undefined}
-      >
-        <span className="absolute bottom-4 left-[22px] rounded-storefront-sm bg-terracotta-deep px-2.5 py-1 text-label-caps-tight font-sans uppercase text-paper">
+      <div className="relative mt-6 h-[260px] overflow-hidden rounded-storefront-lg shadow-hero">
+        {heroImageUrl ? (
+          <Image
+            src={heroImageUrl}
+            alt=""
+            fill
+            sizes="(min-width: 768px) 700px, 100vw"
+            className="object-cover"
+          />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-terracotta-light via-terracotta to-terracotta-deep" />
+        )}
+        <span className="absolute bottom-4 left-panel-gap rounded-storefront-sm bg-terracotta-deep px-2.5 py-1 text-label-caps-tight font-sans uppercase text-paper">
           {HERO_CAPTION}
         </span>
       </div>
@@ -131,16 +140,9 @@ export default async function StorefrontPage({
               description: p.description,
               priceCents: p.priceCents,
               stockQuantity: p.stockQuantity,
-              // Re-validated here, not trusted from the DB as-is — imageUrl
-              // has no DB-level constraint (Zod-only, at CreateProductSchema),
-              // and next/image throws a hard render error for a host outside
-              // next.config.mjs's remotePatterns, which would crash this
-              // whole page rather than degrade one card (Story 4.2 review
-              // finding). Anything that doesn't match this app's own
-              // Cloudinary cloud is treated the same as no image.
-              imageUrl: p.imageUrl?.startsWith(CLOUDINARY_URL_PREFIX)
-                ? p.imageUrl
-                : null,
+              // Re-validated here, not trusted from the DB as-is - see
+              // getValidProductImageUrl's own doc comment.
+              imageUrl: getValidProductImageUrl(p.imageUrl),
             }}
           />
         ))}

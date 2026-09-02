@@ -4,7 +4,7 @@ baseline_commit: 4065a6396c5137bb4fd8c1f8ffb8916cd5c5c7c3
 
 # Story 8.3: Vendor page redesign
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -60,6 +60,21 @@ so that the page feels like a real bakery's own menu, not a generic template.
   - [x] Run the full `tests/storefront-cart.spec.ts` file after this story's changes — it hits `/vendors/corner-sourdough` in 11 places; every heading-role and "Add"-button-role assertion in that file must still pass. Don't assume; run it.
   - [x] No new Vitest unit tests — no new business logic (`project-context.md#Testing Rules`).
   - [x] No mocking.
+
+### Review Findings
+
+**Code review (`/code-review opus`, Story 8.3 diff `e2150fc..HEAD`, 2026-09-02)** — 10 finder agents ran against this diff. The orchestrator's consolidation pass never returned (forked execution, confirmed dead via `ListAgents` showing nothing running); findings below were manually triaged and cross-referenced from the 10 finders' raw reports rather than an automated consolidated report.
+
+- [x] [Review][Patch] **CSS injection via the hero-banner background image** — `page.tsx`'s `heroImageUrl` (a DB-derived product `imageUrl`) was interpolated unescaped into an inline `style={{ backgroundImage: \`url(${heroImageUrl})\` }}`. Zod's `z.string().url()` + Cloudinary-prefix check don't reject `)`/`;` in a URL path; a vendor able to hand-craft an `imageUrl` (bypassing the upload widget, a boundary the schema's own comment already flags as bypassable) could inject arbitrary CSS declarations that render live in every visitor's DOM. Confirmed independently by 2 finder agents (empirically verified React SSR doesn't escape `)`/`;`/`:` in style-attribute values). Fixed by switching the hero to `next/image` (`fill` + `sizes`) instead of a raw CSS background — removes the injection sink entirely rather than escaping around it. [src/app/vendors/[slug]/page.tsx]
+- [x] [Review][Patch] **Hero image ignored stock status** — `heroImageUrl` was chosen by `imageUrl` validity alone, no `isInStock` check. A sold-out product's photo could headline the 260px hero in full color under "Fresh from this vendor, ready for pickup" while that same product's own menu row rendered dimmed/grayscale with a Sold Out badge directly below. Confirmed independently by 2 finder agents with the same concrete scenario. Fixed by adding an `isInStock` check to the hero-image `.find()` predicate. [src/app/vendors/[slug]/page.tsx]
+- [x] [Review][Patch] Cloudinary-URL-validation predicate (`imageUrl?.startsWith(CLOUDINARY_URL_PREFIX)`) was hand-duplicated at 2 call sites in `page.tsx` (hero selection, per-product `ProductCard` prop). Flagged by 3 finder agents. Extracted to `src/lib/product-image.ts`'s `getValidProductImageUrl()`, used at both sites. [src/app/vendors/[slug]/page.tsx, src/lib/product-image.ts (new)]
+- [x] [Review][Patch] Out-of-stock dimming Tailwind string (`"opacity-60 grayscale-[70%] brightness-[85%]"`) duplicated verbatim twice in `ProductCard.tsx`. Flagged by 4 finder agents. Hoisted to a shared `OUT_OF_STOCK_FILTER` constant. [src/components/ProductCard.tsx]
+- [x] [Review][Patch] Two spots hardcoded `22px` via arbitrary-value classes (`left-[22px]`, `px-[22px]`) despite `tailwind.config.ts` already defining `spacing.panel-gap = 22px`, used correctly elsewhere in the same className strings. Changed both to `left-panel-gap`/`px-panel-gap`. [src/app/vendors/[slug]/page.tsx, src/components/ProductCard.tsx]
+- [x] [Review][Patch] `tests/storefront-cart.spec.ts`'s ATDD comment claimed the Sold Out badge test was still red, but the copy change had already landed in the same commit. Corrected the comment to past tense. [tests/storefront-cart.spec.ts]
+- [x] [Review][Defer] `IMAGE_SIZE` 64→84 crosses a `next/image` srcset bucket gap (no bucket between 128 and 256 in this repo's default `imageSizes`), pushing the 2x descriptor to ~2.3x the pixel area an ideal bucket would need. [src/components/ProductCard.tsx] — deferred to `deferred-work.md`: closing it needs a `next.config.mjs`-level `imageSizes` change (sitewide blast radius), not a component-level fix; a suggested `sizes="84px"` prop was checked and found insufficient on its own.
+- [x] [Review][Defer] `caption-plate`/`pickup-banner` are inlined as raw Tailwind class strings in `page.tsx` rather than extracted as shared components, despite `DESIGN.md` naming both and Story 8.1 setting a same-shaped extraction precedent (`SquiggleDivider`, `.focus-ring`). [src/app/vendors/[slug]/page.tsx] — deferred to `deferred-work.md`, flagged for Story 8.4's own scoping (it reuses the same pickup visual language per `DESIGN.md`) since extracting now with only one consumer would be premature.
+
+All patches verified: `npx tsc --noEmit` clean, `npm run lint` clean (full `src/app`/`src/components`/`src/lib`/`tests` tree), `npx vitest run` 142/142, `npx playwright test tests/storefront-cart.spec.ts` 16/16, full `npx playwright test` run twice (1 different, unrelated test failed each run — `sms.spec.ts`'s contact-field test, then `dashboard.spec.ts`'s pickup-slots-isolation test — both pass cleanly in isolation, matching this project's already-documented pre-existing parallel-execution flake class, neither touching any file this diff changed).
 
 ## Dev Notes
 
@@ -121,5 +136,7 @@ Claude Sonnet 5 (claude-sonnet-5)
 
 ### File List
 
-- `src/app/vendors/[slug]/page.tsx` (modified — vendor-name/description typography, hero-photo section with caption-plate, pickup-banner restyle, squiggle-divider, "Menu" heading typography, deactivated-vendor branch typography)
-- `src/components/ProductCard.tsx` (modified — circular-thumb restyle at 84px, card-row container styling, "Sold Out" badge copy/styling, focus-ring on the Add button)
+- `src/app/vendors/[slug]/page.tsx` (modified — vendor-name/description typography, hero-photo section with caption-plate, pickup-banner restyle, squiggle-divider, "Menu" heading typography, deactivated-vendor branch typography; review round: hero switched from inline-style CSS background to `next/image`, `isInStock` gate on hero selection, `getValidProductImageUrl()` reuse, `left-panel-gap` token)
+- `src/components/ProductCard.tsx` (modified — circular-thumb restyle at 84px, card-row container styling, "Sold Out" badge copy/styling, focus-ring on the Add button; review round: shared `OUT_OF_STOCK_FILTER` constant, `px-panel-gap` token)
+- `src/lib/product-image.ts` (new, review round — `getValidProductImageUrl()`, extracted from 2 hand-duplicated call sites in `page.tsx`)
+- `tests/storefront-cart.spec.ts` (modified, review round — corrected a stale ATDD comment; no assertion changes)
