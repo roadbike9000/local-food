@@ -7,9 +7,10 @@ import { formatPrice } from "@/lib/utils";
 import { isInStock } from "@/lib/availability";
 import { ImagePlaceholderIcon } from "./Icons";
 
-// A small thumbnail for a compact row layout - no pixel-exact requirement,
-// just large enough to be recognizable next to the name/price text.
-const IMAGE_SIZE = 64;
+// DESIGN.md's circular-thumb component: true circle, 84px on the vendor
+// page - this component's only current consumer (confirmed by grep before
+// this story's restyle).
+const IMAGE_SIZE = 84;
 
 type ProductCardProps = {
   vendorId: string;
@@ -29,15 +30,16 @@ type ProductCardProps = {
 // icon library or /public asset exists in this codebase; a data-testid is
 // used since no ARIA role identifies "an image placeholder" (same narrow
 // exception src/app/cart/page.tsx's "cart-total" uses).
-function ProductImagePlaceholder() {
+function ProductImagePlaceholder({ dimmed }: { dimmed: boolean }) {
   return (
     <div
       data-testid="product-image-placeholder"
       style={{ width: IMAGE_SIZE, height: IMAGE_SIZE }}
-      // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
-      className="flex flex-shrink-0 items-center justify-center rounded-md bg-stone-100 text-stone-400"
+      className={`flex flex-shrink-0 items-center justify-center rounded-full bg-cream-deep text-ink-soft shadow-thumb ${
+        dimmed ? "opacity-60 grayscale-[70%] brightness-[85%]" : ""
+      }`}
     >
-      <ImagePlaceholderIcon width={24} height={24} />
+      <ImagePlaceholderIcon width={28} height={28} />
     </div>
   );
 }
@@ -58,8 +60,7 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
   }, [product.imageUrl]);
 
   return (
-    // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
-    <div className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white p-4">
+    <div className="flex items-center gap-panel-gap rounded-storefront-md border border-card-border bg-paper px-[22px] py-[18px] shadow-row">
       {product.imageUrl && !imageFailed ? (
         <Image
           src={product.imageUrl}
@@ -71,27 +72,30 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
           data-testid="product-image"
           width={IMAGE_SIZE}
           height={IMAGE_SIZE}
-          // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
-          className="flex-shrink-0 rounded-md object-cover"
+          className={`flex-shrink-0 rounded-full object-cover shadow-thumb ${
+            inStock ? "" : "opacity-60 grayscale-[70%] brightness-[85%]"
+          }`}
           onError={() => setImageFailed(true)}
         />
       ) : (
-        <ProductImagePlaceholder />
+        <ProductImagePlaceholder dimmed={!inStock} />
       )}
       <div className="flex-1">
-        <h3 className="font-medium">{product.name}</h3>
+        <h3 className="font-serif text-item-title-lg text-ink">{product.name}</h3>
         {product.description && (
-          <p className="text-sm text-stone-600">{product.description}</p>
+          <p className="mt-1 font-sans text-body-ui text-ink-soft">
+            {product.description}
+          </p>
         )}
-        <p className="mt-1 text-sm font-semibold text-brand">
+        <p className="mt-2.5 font-sans text-price text-terracotta-deep">
           {formatPrice(product.priceCents)}
         </p>
         {!inStock && (
           <span
             id={outOfStockId}
-            className="mt-1 inline-block rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
+            className="mt-1 inline-block rounded-full bg-sold-out-bg px-2.5 py-[3px] font-sans text-badge-label uppercase text-ink-soft"
           >
-            Out of stock
+            Sold Out
           </span>
         )}
       </div>
@@ -107,8 +111,7 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
             stockQuantity: product.stockQuantity,
           });
         }}
-        // eslint-disable-next-line local-rules/storefront-radius-tokens -- not yet restyled by Epic 8, Tailwind default intentional until then
-        className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+        className="focus-ring flex-shrink-0 rounded-full bg-terracotta px-5 py-2.5 font-sans text-button-label text-paper shadow-button hover:bg-terracotta-deep aria-disabled:cursor-not-allowed aria-disabled:bg-sold-out-bg aria-disabled:text-ink-soft aria-disabled:shadow-none"
       >
         Add
       </button>
