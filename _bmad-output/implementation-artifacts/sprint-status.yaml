@@ -1,5 +1,5 @@
 # generated: 2026-08-17
-# last_updated: 2026-09-02 (Story 8.5 done, review fixes applied)
+# last_updated: 2026-09-02 (Epic 8 retrospective complete, epic-8 done)
 # project: local-food
 # project_key: NOKEY
 # tracking_system: file-system
@@ -41,7 +41,7 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-08-17
-last_updated: 2026-09-02 (Story 8.5 done, review fixes applied)
+last_updated: 2026-09-02 (Epic 8 retrospective complete, epic-8 done)
 project: local-food
 project_key: NOKEY
 tracking_system: file-system
@@ -86,12 +86,13 @@ development_status:
   7-1-admin-sets-a-vendors-real-timezone: done
   epic-7-retrospective: done
 
-  epic-8: in-progress
+  epic-8: done
   8-1-design-token-foundation-and-shared-components: done
   8-2-homepage-redesign: done
   8-3-vendor-page-redesign: done
   8-4-cart-and-checkout-redesign: done
   8-5-checkout-success-redesign: done
+  epic-8-retrospective: done
 
 action_items:
   - epic: 1
@@ -242,4 +243,25 @@ action_items:
   - epic: 7
     action: "Before importing any constant from a route's schema.ts into a \"use client\" component, check whether it reads process.env - carried, still unexercised (4th epic running)"
     owner: "Dev"
+    status: done
+    note: "2026-09-02 (Epic 8 retro): held under its first real test. Story 8.3 added product-image.ts (imports CLOUDINARY_URL_PREFIX, which reads process.env.CLOUDINARY_CLOUD_NAME, not NEXT_PUBLIC_-prefixed) - confirmed consumed only server-side (vendors/[slug]/page.tsx), passed as an already-resolved prop into \"use client\" ProductCard.tsx, which imports nothing from schema.ts directly."
+  - epic: 8
+    action: "Decide whether to promote button-pill-primary's hand-typed padding/font values into a real Tailwind token/shared component - now 2 confirmed duplicated consumers (cart/page.tsx Checkout button, checkout/success/page.tsx Back-to-vendors link)"
+    owner: "Jeff"
+    status: open
+  - epic: 8
+    action: "Close the 3 deferred ATDD gaps in cart/page.tsx's role=\"alert\" paths (checkout error, pickup-fetch-failure, sold-out-in-cart) - implementation is correct, only test coverage is missing"
+    owner: "Dev"
+    status: open
+  - epic: 8
+    action: "Decide the mobile-breakpoint policy for cart's grid-cols-[1.55fr_1fr] layout - does UX-DR12's desktop-primary mean zero mobile breakpoint, or just no touch-specific interaction patterns"
+    owner: "Jeff"
+    status: open
+  - epic: 8
+    action: "For any future story involving timezone/offset/DST-adjacent logic, require test coverage that sweeps a range of times across a transition - carried from Epic 6/7's retros, still unexercised (3rd epic running)"
+    owner: "Dev"
+    status: open
+  - epic: 8
+    action: "Open and merge a PR for epic-8-ux-storefront-redesign-2026-08-30 (21 commits ahead of origin/main) - the epic's 5 stories are done and reviewed, but the implementation itself isn't on main yet"
+    owner: "Jeff"
     status: open
