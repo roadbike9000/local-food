@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampQuantity } from "./cart";
+import { clampQuantity, formatCartBadgeText, formatCartCountLabel } from "./cart";
 
 // clampQuantity is the single shared floor/ceiling enforcement used by both
 // CartProvider's addItem repeat-click increment and the cart stepper's
@@ -35,5 +35,45 @@ describe("clampQuantity", () => {
     expect(clampQuantity(1, 0)).toBe(1);
     expect(clampQuantity(5, 0)).toBe(1);
     expect(clampQuantity(1, -3)).toBe(1);
+  });
+});
+
+// Story 8.1's cart-pill aria-label (review round 1 finding: no singular
+// branch shipped once already - "Cart, 1 items" - so the count === 1 case
+// is pinned directly here, not just through the Playwright test that
+// exercises it via a real cart).
+describe("formatCartCountLabel", () => {
+  it("uses singular wording for exactly 1", () => {
+    expect(formatCartCountLabel(1)).toBe("1 item");
+  });
+
+  it("uses plural wording for 0", () => {
+    expect(formatCartCountLabel(0)).toBe("0 items");
+  });
+
+  it("uses plural wording for counts above 1", () => {
+    expect(formatCartCountLabel(2)).toBe("2 items");
+    expect(formatCartCountLabel(12)).toBe("12 items");
+  });
+});
+
+// The cart-pill badge's visible digits (review round 2 finding: the "99+"
+// overflow cap and 2+-digit resize were untested). aria-label always keeps
+// the exact count via formatCartCountLabel above - this only caps what the
+// small circular badge displays.
+describe("formatCartBadgeText", () => {
+  it("shows the exact count for single and double digits", () => {
+    expect(formatCartBadgeText(0)).toBe("0");
+    expect(formatCartBadgeText(9)).toBe("9");
+    expect(formatCartBadgeText(42)).toBe("42");
+  });
+
+  it("shows the exact count at the 99 boundary", () => {
+    expect(formatCartBadgeText(99)).toBe("99");
+  });
+
+  it("caps at '99+' once the count exceeds 99", () => {
+    expect(formatCartBadgeText(100)).toBe("99+");
+    expect(formatCartBadgeText(1000)).toBe("99+");
   });
 });

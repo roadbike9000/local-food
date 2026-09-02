@@ -1,5 +1,96 @@
 # Deferred Work
 
+## Deferred from: /code-review opus, Story 8.4 diff (dcdccff..HEAD) on epic-8-ux-storefront-redesign-2026-08-30 (2026-09-02)
+
+Source: `/code-review opus`, 10 finder agents against Story 8.4's cart-and-checkout-redesign diff. Fixed inline (commit follows this entry): `role="alert"` + explicit `aria-live="polite"` on all 3 dynamic messages (the explicit polite value overrides role="alert"'s implicit assertive live-region, silently downgrading screen-reader announcement priority — removed the redundant `aria-live`, `role="alert"` alone is correct), the pickup-time `<fieldset>`'s visible label being disconnected from it (a new `aria-labelledby` link added between the fieldset and the "Pickup Time" heading `<p>`), and the "Full"/"Sold Out" status-badge markup duplicated 3 times across `cart/page.tsx` and `ProductCard.tsx` (extracted to `src/components/NegativeBadge.tsx`). The items below were not fixed — logged here instead.
+
+- source_spec: `src/app/cart/page.tsx:155` (`grid-cols-[1.55fr_1fr]`)
+  summary: The new two-column cart layout has no responsive breakpoint — it applies at every viewport width, including mobile, unlike this codebase's own established pattern (`src/app/page.tsx`'s `sm:grid-cols-2`).
+  evidence: Code review finding (multiple angles). Genuinely ambiguous rather than a clear-cut bug: `DESIGN.md#Layout & Spacing` documents the `1.55fr 1fr` split as this page's deliberate one-off layout departure with no breakpoint mentioned, and the epic is explicitly scoped "desktop-primary" (`epics.md`'s UX-DR12, `EXPERIENCE.md#Foundation`) — a separate finder agent (altitude check) confirmed the split itself matches the documented spec exactly. Not fixed here since adding a breakpoint `DESIGN.md` doesn't specify would be a unilateral deviation from the approved mock, not an unambiguous correctness fix — needs a decision (does "desktop-primary" mean "no mobile breakpoint at all," or just "no touch-specific interaction patterns," per UX-DR12's own two clauses reading differently) rather than a reflexive patch.
+
+- source_spec: `src/app/cart/page.tsx` (Checkout button, `button-pill-primary`), and `card-row` padding
+  summary: `DESIGN.md`'s named `button-pill-primary`/`card-row` component specs (padding, font-size/tracking) are hand-typed as arbitrary Tailwind values in this story rather than promoted into the token layer the way `button-label`/`borderRadius`/`boxShadow` already were — and the cart item row's padding (`p-[18px]`, both axes arbitrary) has already drifted from `ProductCard.tsx`'s sibling `card-row` usage (`px-panel-gap py-[18px]`, horizontal axis token-backed).
+  evidence: Code review finding (altitude check). Real forward risk: Story 8.5 (checkout-success, next up) reuses `button-pill-primary` for its own "Back to vendors" button per `DESIGN.md` and will either re-derive the same arbitrary padding/font values independently or need a retroactive token. Not fixed here — promoting a component spec into the token layer is a small but real API-surface decision (new `fontSize`/`spacing` keys) better made deliberately than as a drive-by in a review-response pass.
+  **CONFIRMED 2026-09-02:** `/code-review opus` on Story 8.5's diff flagged exactly this — `checkout/success/page.tsx`'s "Back to vendors" link now duplicates `cart/page.tsx`'s Checkout button className string verbatim. Still not fixed; token/component promotion remains a deliberate follow-up, not a drive-by. Two known consumers now (cart, checkout-success) — worth prioritizing before a third appears.
+
+- source_spec: `src/app/cart/page.tsx:262-332` (pickup-time state branches), `:303-309` (slot label className)
+  summary: Two simplification opportunities, both flagged by the review but not applied: (a) 5 sibling conditionals for pickup-time state (`!slotsLoaded`, `slotsLoaded && slotsError`, `slots.length === 0/1/>=2`) each re-derive the same guard-chain prefix rather than computing one discriminant once; (b) the slot `<label>`'s 3-way className ternary (selected/available/full) is a nested ternary inline in JSX rather than a small named helper.
+  evidence: Code review finding (simplification angle). Both are real readability improvements, not bugs — no failure scenario, correct behavior either way. Not applied here since neither was cross-confirmed by a second independent agent the way the badge/stepper duplication findings were, and reshaping this page's conditional structure carries more regression surface (this is the most heavily-tested page in the app) than the value justifies in a review-response pass.
+
+## Deferred from: ATDD scoping of story-8-4-cart-and-checkout-redesign (2026-08-31)
+
+- source_spec: `_bmad-output/test-artifacts/atdd-checklist-8-4-cart-and-checkout-redesign.md`, `src/app/cart/page.tsx`
+  summary: Story 8.4's 3 new `role="alert"`/`aria-live="polite"` additions (checkout error, pickup-times-fetch-failure, sold-out-in-cart warning) have no executed red-phase or regression test — ATDD assessed all 3 and found none cleanly triggerable via pure UI interaction without either new fixture plumbing or violating this project's no-mocking convention, and deferred rather than force-authoring a fragile test.
+  evidence: ATDD checklist, Step 1: (a) checkout error's only reachable branch (`!selectedSlotId`) sits behind the Checkout button's own `disabled` state — a defense-in-depth guard, not reachable through normal UI interaction; the only other trigger needs a live Stripe-adjacent failure or DB-state manipulation mid-flow. (b) pickup-fetch-failure needs a simulated network/fetch failure — not reachable without route-level mocking. (c) sold-out-in-cart warning's closest precedent (`tests/storefront-cart.spec.ts`'s stock-drop test, ~line 106) mutates `stockQuantity` mid-session via Prisma but targets a *different* message (checkout-time insufficient-stock error, not this cart-page in-place warning) — would need its own dedicated fixture flow. The implementation itself (Story 8.4, Task 4) is done and correct per the story's own exact spec; only the test coverage is the gap. Not decided — the ATDD checklist names 3 concrete paths to close this (temporarily relax the disabled-button guard in a dedicated test-only fixture for the checkout-error case; a project-approved mocking exception or a fixture-forced malformed pickup-slot record for the fetch-failure case; extending the existing Prisma stock-drop pattern to reach the cart-page in-place warning specifically for the sold-out case) but explicitly left the call to a future dev-story/reviewer pass rather than deciding unilaterally.
+
+## Deferred from: /code-review opus, Story 8.3 diff (e2150fc..HEAD) on epic-8-ux-storefront-redesign-2026-08-30 (2026-09-02)
+
+Source: `/code-review opus`, 10 finder agents against Story 8.3's vendor-page-redesign diff. The orchestrator's own consolidation pass never returned (forked execution died silently, confirmed via `ListAgents` showing nothing running) — findings below were manually triaged and cross-referenced from the 10 finder agents' raw reports. Fixed inline (commit follows this entry): a CSS-injection bug in the new hero-banner background-image (unescaped `imageUrl` interpolated into an inline `style` `url()` — fixed by switching the hero to `next/image` instead of a raw CSS background, which removes the injection sink entirely rather than escaping around it), the hero image ignoring stock status (a sold-out product's photo could headline the hero in full color while its own menu row showed dimmed/grayscale — fixed by adding an `isInStock` check to the hero-image selection), the Cloudinary-URL-validation predicate hand-duplicated at 2 call sites in `page.tsx` (extracted to `src/lib/product-image.ts`'s `getValidProductImageUrl()`), the out-of-stock dimming Tailwind string duplicated twice in `ProductCard.tsx` (hoisted to a shared `OUT_OF_STOCK_FILTER` constant), 2 spots hardcoding `22px` instead of the existing `panel-gap` token, and a stale ATDD comment in `tests/storefront-cart.spec.ts` claiming a test was still red after it had already gone green. The 2 items below were not fixed — logged here instead.
+
+- source_spec: `src/components/ProductCard.tsx:13` (`IMAGE_SIZE`)
+  summary: Bumping `IMAGE_SIZE` from 64 to 84 (Story 8.3's `circular-thumb` restyle) crosses a `next/image` srcset bucket gap in this repo's default `imageSizes` config (`[16,32,48,64,96,128,256,384]`, no override in `next.config.mjs`). With no `sizes` prop and a fixed (non-`fill`) `width`, `next/image`'s x-descriptor path requests the nearest bucket ≥ `width*2` (168) for the 2x variant — the nearest bucket above 168 is 256, roughly 2.3x the pixel area an ideal ~168px bucket would need.
+  evidence: Code review finding (Angle H, efficiency), confirmed via direct trace of `next/image`'s `getWidths` bucket-selection logic. One finder agent's suggested fix (add a `sizes="84px"` prop) was checked and found insufficient on its own — `sizes` changes which selection path `next/image` uses, but the underlying bucket gap (128→256, nothing between) is a `next.config.mjs`-level config problem, not a component-props one; actually closing it needs either a custom `images.imageSizes` entry (sitewide blast radius, worth a deliberate choice) or accepting the gap. Not fixed here — disproportionate scope for a review-response pass; worth a deliberate decision if this component's real-world image-heavy usage grows.
+
+- source_spec: `src/app/vendors/[slug]/page.tsx` (hero `caption-plate`), pickup-banner block
+  summary: `caption-plate` and `pickup-banner` (including its icon roundel) are inlined as raw Tailwind class strings directly in `page.tsx`, even though `DESIGN.md` names both as first-class components (`components.caption-plate`, `components.pickup-banner`) and Story 8.1 already set a precedent of extracting equivalently-named `DESIGN.md` components into shared pieces (`SquiggleDivider`/`ClockIcon` in `Icons.tsx`, `.focus-ring` in `globals.css`).
+  evidence: Code review finding (Angles I and F, independently). Real forward risk: Story 8.4 (cart/checkout redesign, next up) reuses the same pickup-related visual language per `DESIGN.md` — as currently structured, 8.4 either hand-duplicates this ~20-line block or someone has to retroactively extract it mid-8.4, churning a diff that isn't supposed to be touching this file. Not fixed here — extracting a shared component now, with only one real consumer, would be premature; flagging for 8.4's own scoping to decide whether extraction happens then instead.
+  **MOOT 2026-09-02 (epic-8 retro):** Predicted risk didn't materialize — `cart/page.tsx`'s pickup-time UI is a form (fieldset of radio pickup-option rows), not a banner, so it never became a second consumer of `caption-plate`/`pickup-banner`. Both remain single-consumer, still un-extracted, still fine as inline JSX by the same "premature with one consumer" logic. No action needed unless a real second consumer appears.
+
+## Deferred from: /code-review opus, full branch diff on epic-8-ux-storefront-redesign-2026-08-30 (2026-08-31)
+
+Source: `/code-review opus` ran against the whole branch diff (not just Story 8.2's own commit) — findings span Story 7.1/dashboard work too, since the branch carries that history. Two directly actionable items from this run (an eslint rule gap and a hardcoded homepage spacing value) were fixed inline, commit `0589091`. A separate, higher-confidence item (`EditVendorTimezoneControl`'s confirm-cancel state desync) was fixed inline, commit `072515f`. The rest are logged here, undecided.
+
+- source_spec: `src/app/cart/page.tsx`, checkout flow
+  summary: After a checkout `400` "slot full" response, the cart page's client-side `available`/selectable state for that pickup slot doesn't get invalidated — the slot stays shown as selectable, so a customer's retry hits the identical `400` again with no path to recovery short of a full page reload.
+  evidence: Code review finding (not yet independently reproduced with a live race). Real UX dead-end if confirmed: the error is surfaced, but the state that caused it isn't corrected, so "try again" doesn't actually change anything.
+
+- source_spec: `src/app/api/checkout/route.ts`, `src/app/api/pickup-slots/route.ts`, `src/app/dashboard/pickups/page.tsx`
+  summary: "Is this pickup slot full" capacity-check logic is implemented independently 2-3 times across these files, with divergent definitions — `dashboard/pickups/page.tsx`'s version doesn't filter by order status at all, so it counts `CANCELLED` orders toward capacity (a slot with cancelled-and-replaced orders can show as full on the dashboard when checkout would still accept it).
+  evidence: Code review finding, cross-file tracer pass. No single shared helper exists for "is this slot full" — worth consolidating into one function once someone's touching this area for another reason, since the divergence is a live correctness bug (dashboard) not just duplication.
+
+- source_spec: `src/components/admin/EditVendorTimezoneControl.tsx`
+  summary: Separate from the confirm-cancel desync fixed in `072515f` — a lower-confidence race between `window.confirm()` and the `<select>`'s `onBlur` handler (`onBlur={() => !submitting && setEditing(false)}`) was flagged: `confirm()` blocks the JS thread, but the browser may fire `blur` on the select as focus moves to the native dialog, and the ordering of blur-vs-confirm-resolution across browsers isn't guaranteed, which could close the edit UI out from under an in-flight confirm.
+  evidence: Code review finding, not reproduced live — flagged as lower-confidence than the desync bug (which was confirmed and fixed).
+
+- source_spec: `src/components/dashboard/AddSlotForm.tsx`
+  summary: A generic error message on slot-creation failure may mask a specific, more useful case — a corrupted/invalid `Vendor.timezone` value causing the date computation itself to fail, which would be worth a distinct error message from "something else went wrong."
+  evidence: Code review finding, lower confidence — not confirmed against a live corrupted-timezone repro.
+
+- source_spec: admin vendor PATCH route (`src/app/api/admin/vendors/[id]/route.ts`)
+  summary: Does a `findUnique` immediately before its `update` call (redundant — the update's own result/error already tells you whether the row existed), and has two awaits that could run concurrently via `Promise.all` instead of sequentially.
+  evidence: Code review finding, efficiency category — small, no correctness impact.
+
+- source_spec: pickup-slot list rendering (dashboard and/or storefront)
+  summary: `Intl.DateTimeFormat` gets constructed fresh per pickup slot inside a list render, rather than once and reused — real but minor overhead for typical list sizes.
+  evidence: Code review finding, efficiency category.
+
+- source_spec: `src/lib/timezone.ts`
+  summary: Timezone-parts extraction logic is duplicated rather than factored into one shared helper.
+  evidence: Code review finding, reuse category.
+
+- source_spec: 3 admin components (unspecified in the finding — likely `EditVendorTimezoneControl.tsx`, `AddVendorForm.tsx`, and a third admin form/list component)
+  summary: Fetch/error-handling boilerplate (the `fetch` → `!res.ok` → status-specific message → generic fallback pattern seen in `EditVendorTimezoneControl.tsx`) is duplicated across roughly 3 admin components rather than shared.
+  evidence: Code review finding, reuse category. Not yet mapped to exact file list beyond `EditVendorTimezoneControl.tsx`.
+
+- source_spec: 2 admin forms (likely `AddVendorForm.tsx` and `EditVendorTimezoneControl.tsx`, both consumers of `SELECTABLE_TIME_ZONES`)
+  summary: The `<select>` timezone option list (mapping `timeZones` to `<option>` elements) is duplicated markup across two admin forms rather than a shared subcomponent.
+  evidence: Code review finding, reuse category.
+
+- source_spec: `src/app/cart/page.tsx`
+  summary: The "Full" badge markup (the `rounded-full bg-red-50 ...` span, appearing at both line 249 and line 279 in the current file) is duplicated rather than extracted into a small shared component.
+  evidence: Code review finding, reuse category. Confirmed by inspection — both spans are near-identical JSX.
+
+- source_spec: `tailwind.config.ts`
+  summary: Most of the new Story 8.1/8.2 design-token scale (`boxShadow`/`spacing` custom tokens, `rounded-storefront-*`) has few or zero consumers so far outside the components those stories directly touched — flagged as a scope observation, not a defect. `mt-divider-gap` (fixed in `0589091`) was one confirmed real gap; there may be other hardcoded arbitrary values elsewhere in the storefront that should be using these tokens instead.
+  evidence: Code review finding, altitude/consistency category. Worth a dedicated sweep (grep for `\[\d+px\]`-style arbitrary values in storefront-facing files) rather than fixing opportunistically as each one is noticed.
+
+## Deferred from: create-story scoping of epic-8-storefront-visual-redesign (2026-08-30)
+
+- source_spec: `_bmad-output/planning-artifacts/epics.md#Epic 8: Storefront Visual Redesign`
+  summary: `DESIGN.md`'s vendor-card accent panel is category-differentiated (bakery vs. farm visual treatment, per the two seeded example vendors), but `Vendor` has no category/type field in the real data model — the mockups' distinction was hardcoded per specific vendor, not backed by real data.
+  evidence: Found while scoping Story 8.2 (homepage). Epic 8 is explicitly scoped visual-only, no schema/API changes — adding `Vendor.category` is out of scope for this epic.
+  **DECIDED 2026-08-30 (Jeff): ship Story 8.2 with one universal accent treatment (no per-vendor differentiation); defer a real `Vendor.category` field to a future epic.** Not implemented here — Story 8.2's ACs reflect the universal-treatment decision directly, nothing further to resolve until a future epic picks this up.
+
 ## Deferred from: code review of story-7-1-admin-sets-a-vendors-real-timezone (2026-08-28)
 
 - source_spec: `_bmad-output/implementation-artifacts/7-1-admin-sets-a-vendors-real-timezone.md`
@@ -290,3 +381,25 @@ Source: `scenarios from Jeff/Local Food Scnearios from Jeff.rtf` (4 scenarios), 
 - source_spec: `_bmad-output/implementation-artifacts/5-1-customer-selects-a-pickup-slot-at-checkout.md`
   summary: `Order.pickupSlot` relation has no explicit `onDelete`, defaults to Prisma's `SetNull` on this optional FK.
   evidence: `prisma/schema.prisma` — `pickupSlot PickupSlot? @relation(fields: [pickupSlotId], references: [id])` with no `onDelete` clause. Fully latent today: no route exists anywhere in this codebase to delete a `PickupSlot`, so the silent-blank-on-delete behavior can't currently trigger, and a delete raced against `POST /api/checkout`'s `findFirst` (unhandled Prisma `P2003`) is equally unreachable. Revisit if/when a pickup-slot-deletion route is ever added — at that point deleting a slot with existing paid orders would silently blank their pickup time unless this is addressed first.
+
+## Deferred from: code review of story-8-1-design-token-foundation-and-shared-components, round 2 (2026-08-31)
+
+- source_spec: `_bmad-output/implementation-artifacts/8-1-design-token-foundation-and-shared-components.md`
+  summary: `storefront-*` radius-token naming (this round's fix for the admin/dashboard collision) has no enforcement mechanism against a future story typing the more natural `rounded-lg` instead of `rounded-storefront-lg`.
+  evidence: Compiles clean, lints clean, renders a plausible-but-wrong 8px Tailwind-default radius instead of the canonical 18px, with nothing (no lint rule, no type-level guard) to catch it. Only a code comment in `tailwind.config.ts` carries the convention forward across 8.2–8.5. No enforcement mechanism exists anywhere else in this codebase for a Tailwind token-naming convention, so building one is a scope decision beyond this review round — flag for whoever plans 8.2's implementation approach.
+  **DECIDED 2026-08-31 (Jeff): add real lint enforcement, new dependency approved.** **RESOLVED 2026-08-31:** Added `eslint-plugin-local-rules` (devDependency) and a project-local `local-rules/storefront-radius-tokens` rule (`eslint-local-rules/index.js`) flagging bare `rounded`/`rounded-sm`/`rounded-md`/`rounded-lg`/`rounded-xl` class strings. Scoped via `.eslintrc.json` overrides to `src/app/**/*.tsx` and `src/components/**/*.tsx`, excluding `admin`/`dashboard` (out of Epic 8 scope per `EXPERIENCE.md#Foundation`). 11 pre-existing call sites not yet restyled by 8.2–8.5 (`cart/page.tsx` ×6, `checkout/success/page.tsx`, `vendors/[slug]/page.tsx`, `ProductCard.tsx` ×4, `VendorCard.tsx`) grandfathered with `eslint-disable-next-line` + a one-line reason each, so `npm run lint` stays green today while the rule catches any *new* mistyped bare radius class going forward. Verified: rule fires on a scratch violation, `npm run lint` clean on the real codebase, full regression clean (tsc, 142/142 unit, 148/149 e2e — same lone pre-existing Story 8.3 red).
+
+- source_spec: `_bmad-output/implementation-artifacts/8-1-design-token-foundation-and-shared-components.md`
+  summary: The cart-pill's new `aria-live="polite"` region and its own `aria-label` announce the identical sentence for the same state change, with no debounce.
+  evidence: `src/components/Navbar.tsx` — a screen-reader user clicking the cart-page quantity stepper repeatedly could get an announcement queued per click rather than just the settled value, and a user who adds an item then tabs to the cart link shortly after may hear "Cart, N item(s)" twice. Neither behavior is demonstrated by a test, only asserted in a code comment. Real but low-severity accessibility polish; the correct fix (a debounce interval, or whether the live region is wanted at all given the link already announces its label on focus) needs a UX/accessibility call, not a unilateral code change.
+  **RESOLVED 2026-08-31:** Added a 500ms debounce (`CART_ANNOUNCE_DEBOUNCE_MS`, `src/components/Navbar.tsx`) — the visible link/badge still update immediately (real-time feedback), only the screen-reader announcement waits for the count to settle, so a burst of stepper clicks reads as one announcement instead of N. The "duplicate with aria-label" half of the original finding was reconsidered, not fixed: it's the standard accessible pattern (live region covers a user not currently focused on the link; aria-label covers one who tabs to it later), not a bug to remove.
+
+- source_spec: `_bmad-output/implementation-artifacts/8-1-design-token-foundation-and-shared-components.md`
+  summary: `hover:border-terracotta` (this round's fix for the cart-pill's lost hover state) is a materially subtler visual cue than the `hover:text-brand` it replaced.
+  evidence: A 1px border-color shift on a pill that already has cream fill and a border, vs. the old full-text-color change on plain text. Not checked against any contrast/visibility bar. Subjective UX judgment call, not a functional defect — flag for Jeff/UX alongside the `{colors.line}` cart-pill-border contrast issue already escalated in round 1's Completion Notes.
+  **RESOLVED 2026-08-31:** Added `hover:bg-cream-deep` alongside the existing `hover:border-terracotta` (`src/components/Navbar.tsx`) — the hover cue is now a fill shift plus a border shift, not border-only.
+
+- source_spec: `_bmad-output/implementation-artifacts/8-1-design-token-foundation-and-shared-components.md`
+  summary: The cart-count badge stops being a true circle at 2+ digit counts, deviating from `DESIGN.md`'s `header-cart-pill.badge` spec (`shape: circle`, `size: 20px`).
+  evidence: `src/components/Navbar.tsx` — the badge grows via `min-w-5`/`px-1` once its text is 2+ characters (e.g. a legitimate double-digit cart count, or the "99+" overflow cap). Pre-existing exposure — a 2-digit count already broke true-circle shape before this round's fix even existed, since the original fixed `w-5 h-5` circle just clipped/squished the digits instead. This round's change strictly improves that (graceful growth vs. clipping), not a new regression, but the pill-vs-circle shape drift itself is still a literal deviation from the token spec worth a UX sign-off if a true circle is wanted at all counts.
+  **DECIDED 2026-08-31 (Jeff): keep the pill-growth behavior as final** — legible at any realistic count, an accepted deviation from `DESIGN.md`'s literal fixed-circle spec. No further code change.

@@ -1,8 +1,10 @@
 ---
-stepsCompleted: [1, 2, "3-epic1", "3-epic2", "3-epic3", 4]
+stepsCompleted: [1, 2, "3-epic1", "3-epic2", "3-epic3", 4, "3-epic8-done"]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-local-food-2026-08-10/prd.md
   - _bmad-output/planning-artifacts/architecture/architecture-local-food-2026-08-10/ARCHITECTURE-SPINE.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-local-food-2026-08-29/DESIGN.md
+  - _bmad-output/planning-artifacts/ux-designs/ux-local-food-2026-08-29/EXPERIENCE.md
 ---
 
 # local-food - Epic Breakdown
@@ -34,6 +36,8 @@ FR14: Vendor can upload a photo for a product; customers see it on the storefron
 FR15: Customer selects a pickup slot during checkout; the resulting Order is linked to that slot.
 FR16: A vendor cannot create a pickup slot whose start time has already passed.
 FR17: A pickup slot's `startsAt`/`endsAt` are interpreted relative to that vendor's own configured timezone, not the timezone of whoever's browser is creating the slot.
+FR18: A vendor's real IANA timezone can be set by an admin (not permanently pinned to the schema default).
+FR19: The customer-facing storefront presents a cohesive, polished visual design credible for a production/client demo, replacing the current plain styling — realized via UX-DR1–13 (see UX Design Requirements).
 
 ### NonFunctional Requirements
 
@@ -55,10 +59,24 @@ NFR4: No new external dependency is introduced — Admin auth reuses Clerk, stoc
 - `Order.pickupSlotId` already exists in the schema (nullable) but is never set — `POST /api/checkout` has no reference to `PickupSlot` at all today. Epic 5 wires checkout to capture and validate a slot selection; no schema migration needed for Story 5.1.
 - Epic 4 and Epic 5 are both standalone — no dependency on Epics 1-3 or on each other.
 - `Vendor` has no timezone field today — `AddSlotForm.tsx` interprets its `datetime-local` input using whoever's browser submits the form, with nothing stored about which timezone that was. Epic 6 adds `Vendor.timezone` (new, backfilled column) and threads it through slot creation. No date library (`date-fns`/`luxon`/`dayjs`) exists in this codebase today — Epic 6 either adds one or does the UTC-offset conversion manually; a decision for that story, not decided here.
+- Epic 8 is a visual-only reskin of the 4 customer-facing storefront surfaces (`src/app/page.tsx`, `src/app/vendors/[slug]/page.tsx`, `src/app/cart/page.tsx`, `src/app/checkout/success/page.tsx`) plus their component tree (`VendorCard.tsx`, `ProductCard.tsx`, `Navbar.tsx`). No new npm dependency — `DESIGN.md` explicitly chose system Georgia over a webfont/Google Fonts load to avoid one. Tailwind utility classes remain the styling mechanism (no CSS modules/styled-components, per this codebase's existing convention) — new tokens map onto Tailwind's `theme.extend`/arbitrary-value utilities, not a new styling system. No schema/API changes — cart logic, checkout flow, and pickup-slot availability behavior are explicitly unchanged (per `EXPERIENCE.md` Foundation). Vendor dashboard and admin panel are out of scope. Standalone — no dependency on Epics 1-7.
 
 ### UX Design Requirements
 
-None — no UX design contract exists for this feature set.
+Sourced from the finalized `bmad-ux` spine pair (`_bmad-output/planning-artifacts/ux-designs/ux-local-food-2026-08-29/DESIGN.md` + `EXPERIENCE.md`, status: final) — the "Artisanal Warm" direction (Terracotta & Olive palette), approved by Jeff after reviewing 4 rendered directions, 2 repaint variants, and a real-photography pass. Covers the 4 customer-facing storefront surfaces only (homepage, vendor page, cart/checkout, checkout-success) — vendor dashboard and admin panel are out of scope.
+
+UX-DR1: Implement the Artisanal Warm design token system (Terracotta & Olive color palette, Georgia/system-sans typography scale, rounded/spacing/shadow scales — `DESIGN.md` frontmatter) — replaces the app's current single-color Tailwind config (`brand` only, no typography/spacing scale).
+UX-DR2: Header cart-pill redesign (`{components.header-cart-pill}`) — icon + live count badge, plus **new** `aria-label="Cart, {count} items"` on the link and `aria-hidden="true"` on its icon; `src/components/Navbar.tsx`'s cart link has no accessible name today.
+UX-DR3: `VendorCard.tsx` (homepage directory) — whole-card-link pattern (`wholeCardLink: true`), category accent panel + accent-icon, "View menu" visual label (not a second interactive element).
+UX-DR4: Vendor page (`src/app/vendors/[slug]/page.tsx`) — hero photo with `{components.caption-plate}`, `{components.pickup-banner}`, `{components.squiggle-divider}`, product rows with `{components.circular-thumb}`.
+UX-DR5: Cart/checkout page (`src/app/cart/page.tsx`) — 2-column layout (`1.55fr 1fr`: items+total left, contact/pickup-time/checkout right), restyled quantity stepper (`{colors.field-border}`), pickup-option rows (selected/full visual states), input fields (`{colors.field-border}`, `{colors.placeholder-text}`).
+UX-DR6: Checkout-success page (`src/app/checkout/success/page.tsx`) — `{components.confirm-card}`, `{components.check-badge}`, low-opacity squiggle flourish (never confetti).
+UX-DR7: Replace all icon usage — including `ProductCard.tsx`'s no-image fallback — with the hand-drawn inline-SVG icon set (`{components.icon-line}`: basket, clock, wheat, leaf, checkmark). Explicit no-emoji requirement (Jeff rejected emoji glyphs during discovery).
+UX-DR8: Consolidate shadow/radius/spacing values onto the `DESIGN.md` scale; resolve 2 documented mock-drift spots (a near-duplicate `sold-out-bg` hex, and a couple pixels of spacing drift) by standardizing on the canonical token, not the drifted mock value.
+UX-DR9: System-wide visible focus ring (`{components.focus-ring}`, terracotta outline, 6.07:1/5.28:1 contrast) on every interactive element across all 4 surfaces — currently unspecified/inconsistent in the live app.
+UX-DR10: Add `role="alert"` + `aria-live="polite"` to `cart/page.tsx`'s 3 dynamic error/warning messages (checkout error, pickup-times-fetch-failure, "no longer available — remove to continue") — currently plain `<p>` text with no screen-reader announcement, despite gating checkout completion.
+UX-DR11: **Regression guard, not new work** — preserve existing accessibility patterns during the reskin: `ProductCard.tsx`'s `aria-disabled`/`aria-describedby` sold-out pattern, the cart stepper's native `disabled` + `aria-live="polite"` quantity announcement, and the pickup-option's real `<fieldset>`/`<legend>`/radio-input group (2+ options) — the visual mocks must not tempt an implementer into replacing any of these with non-interactive styled divs.
+UX-DR12: Desktop-primary responsive web only (per `EXPERIENCE.md` Foundation) — no native mobile-specific interaction patterns. Standard `Tab`/`Enter`/`Space` keyboard reachability throughout; no carousels, auto-play, or hover-only affordances (per Interaction Primitives).
 
 ### FR Coverage Map
 
@@ -79,6 +97,7 @@ FR15: Epic 5 — checkout captures pickup-slot selection, Order links to it
 FR16: Epic 5 — pickup slot creation rejects a past start time
 FR17: Epic 6 — pickup-slot times interpreted relative to the vendor's own timezone
 FR18: Epic 7 — vendor's real timezone can be set (not permanently pinned to the schema default)
+FR19: Epic 8 — storefront visual redesign (Artisanal Warm direction)
 
 ## Epic List
 
@@ -110,6 +129,10 @@ A vendor's pickup-slot times are interpreted relative to that vendor's own confi
 ### Epic 7: Vendor Timezone Configuration
 A vendor's real timezone can actually be set, so `Vendor.timezone` reflects reality instead of every vendor being permanently pinned to the schema default (`America/New_York`) with no way to change it. Direct follow-up to Epic 6's code review (`deferred-work.md`, decided by Jeff 2026-08-28): keep `America/New_York` as the default, but the system must genuinely support vendors located elsewhere. Deliberately a new epic rather than a reopening of Epic 6 — Epic 6 closed with its original 1-story scope and a completed retrospective; Epic 6 already built the read-side timezone-aware machinery (`AddSlotForm`, `formatPickupWindow`, checkout/storefront display), so this epic is specifically the write-side gap it left open.
 **FRs covered:** FR18
+
+### Epic 8: Storefront Visual Redesign
+Customers browsing and ordering from the storefront see a polished, cohesive "Artisanal Warm" visual design — credible for a production demo — instead of the current plain, inconsistent styling. Sourced from the finalized `bmad-ux` spine pair (`_bmad-output/planning-artifacts/ux-designs/ux-local-food-2026-08-29/DESIGN.md` + `EXPERIENCE.md`), approved by Jeff after reviewing 4 rendered directions, 2 repaint variants, and a real-photography pass. Visual-only — no schema/API changes, cart/checkout/pickup-slot behavior unchanged. Standalone — no dependency on Epics 1-7; vendor dashboard and admin panel untouched.
+**FRs covered:** FR19
 
 ## Epic 1: Accurate Stock & Cart
 
@@ -442,3 +465,141 @@ So that `Vendor.timezone` reflects where the vendor actually operates instead of
 **Then** the request is rejected server-side with a validation error before any write, reusing `isValidTimeZone()` rather than duplicating that check inline in the schema
 
 *(FR18. Scope decision made during story creation (Jeff, 2026-08-28): admin-set field only — no new vendor-facing self-service settings surface. Matches this app's existing pattern (admin already owns vendor onboarding per Epic 2); vendors have no self-service settings page anywhere in this app today, and building the first one was explicitly out of scope for this epic.)*
+
+## Epic 8: Storefront Visual Redesign
+
+Customers browsing and ordering from the storefront see a polished, cohesive "Artisanal Warm" visual design — credible for a production demo — instead of the current plain, inconsistent styling. Sourced from the finalized `bmad-ux` spine pair (`_bmad-output/planning-artifacts/ux-designs/ux-local-food-2026-08-29/DESIGN.md` + `EXPERIENCE.md`, status: final), approved by Jeff after reviewing 4 rendered directions, 2 repaint variants, and a real-photography pass. Visual-only — no schema/API changes, cart/checkout/pickup-slot behavior unchanged (per `EXPERIENCE.md#Foundation`). Vendor dashboard and admin panel are out of scope. Standalone — no dependency on Epics 1-7.
+
+### Story 8.1: Design-token foundation and shared components
+
+As a customer,
+I want the site's persistent header, icons, and every interactive element to reflect the new Artisanal Warm visual identity,
+So that the site feels cohesive and polished from the first thing I see on any page, not just on individual redesigned screens.
+
+**Acceptance Criteria:**
+
+**Given** the current Tailwind config (`tailwind.config.ts`) defines only a single `brand` color with no typography, spacing, radius, or shadow scale
+**When** this story ships
+**Then** the token layer defines the full `DESIGN.md` frontmatter token set (Terracotta & Olive colors, Georgia/system-sans typography roles, rounded/spacing/shadow scales) so every later story references named tokens instead of ad-hoc hex/px values — see `DESIGN.md#Colors`, `#Typography`, `#Layout & Spacing`, `#Shapes`, `#Elevation & Depth`
+
+**Given** `src/components/Navbar.tsx`'s cart link today renders bare "Cart" text plus an unlabeled count `<span>`, with no `aria-label` on the link
+**When** this story ships
+**Then** it's replaced with `DESIGN.md`'s `header-cart-pill` component (hand-drawn basket icon, cream pill, terracotta count badge) — see `DESIGN.md#Components`
+**And** the link gains `aria-label="Cart, {count} items"` and the icon gains `aria-hidden="true"` — this is new accessibility work being added, not an existing pattern being preserved (per `EXPERIENCE.md#Accessibility Floor`)
+
+**Given** emoji glyphs (🛒 🕐 🍞 🥕, confetti/celebration emoji) appear nowhere in the approved direction — Jeff explicitly rejected them during UX discovery
+**When** this story ships
+**Then** a reusable set of hand-drawn-style inline-SVG icon components exists, matching `DESIGN.md`'s `icon-line` token (basket, clock, wheat, leaf, checkmark)
+**And** `ProductCard.tsx`'s existing no-image fallback icon is confirmed or updated to match this same stroke-based line-art style, so no two icon styles coexist in the app
+
+**Given** no interactive element in the app currently has a documented focus-visible treatment
+**When** this story ships
+**Then** a reusable `focus-ring` utility (terracotta outline, per `DESIGN.md#Components`) exists and is applied to the header cart-pill link built in this story
+**And** later stories (8.2-8.5) apply the same utility to their own interactive elements as they're built — this story only needs to prove the utility works on one real element, not retrofit the whole app
+
+**Given** `DESIGN.md#Do's and Don'ts` documents two known mock-drift spots (a near-duplicate `sold-out-bg` hex value, and a couple pixels of spacing drift between the vendor page and cart mocks)
+**When** this story ships
+**Then** the token layer defines only the canonical values from `DESIGN.md`'s frontmatter — the drifted mock values are never carried into code
+
+*(FR19, UX-DR1, UX-DR2, UX-DR7, UX-DR8, UX-DR9 (token). Foundation story — 8.2 through 8.5 depend on the token layer and shared components this story builds, but this story itself depends on nothing else in this epic.)*
+
+### Story 8.2: Homepage redesign
+
+As a customer visiting the homepage,
+I want to see vendor cards in the new Artisanal Warm style with the whole card clickable,
+So that browsing feels inviting and I don't have to aim for a small button just to view a vendor's menu.
+
+**Acceptance Criteria:**
+
+**Given** `VendorCard.tsx` today already wraps name/description/item-count in one `<Link>` to the vendor page
+**When** this story ships
+**Then** it's restyled per `DESIGN.md#Components`'s `vendor-card` definition (card-panel base, accent panel, "View menu" visual label, hover state) while preserving the existing whole-card-is-a-link behavior
+**And** no `<button>` or other separate interactive element is introduced inside the card — the "View menu" text is presentational only, matching `EXPERIENCE.md#Component Patterns`'s explicit "no dead decorative buttons" rule
+
+**Given** `Vendor` has no category/type field in the data model (Decided 2026-08-30, see `deferred-work.md`: a real `Vendor.category` field is deferred to a future epic, out of scope for this visual-only epic)
+**When** any vendor card renders, regardless of what that vendor sells
+**Then** it uses one universal accent-panel treatment (same gradient, same accent icon) — no per-vendor category differentiation, since there's no real data to differentiate on
+
+**Given** the homepage's persistent header (built in Story 8.1) and the card's own interactive link
+**When** a keyboard user tabs through the page
+**Then** every vendor card and the header cart-pill are reachable via `Tab` and activatable via `Enter`, with the `focus-ring` utility visible on each — no hover-only affordances (per `EXPERIENCE.md#Interaction Primitives`)
+
+*(FR19, UX-DR3.)*
+
+### Story 8.3: Vendor page redesign
+
+As a customer viewing a vendor's storefront page,
+I want to see the vendor's menu presented with real visual warmth — a hero photo, a clear pickup-time banner, and inviting product listings,
+So that the page feels like a real bakery's own menu, not a generic template.
+
+**Acceptance Criteria:**
+
+**Given** `src/app/vendors/[slug]/page.tsx` today renders a plain heading, description, and a flat list of product rows
+**When** this story ships
+**Then** the page is restyled per `DESIGN.md#Components`: a hero photo section with `caption-plate` (deterministic-contrast caption chip, not relying on gradient/shadow alone), the `pickup-banner` (terracotta gradient, hand-drawn clock icon), the `squiggle-divider`, and product rows using `circular-thumb` placeholders — see `DESIGN.md#Components`
+
+**Given** a product's `stockQuantity <= 0` (out of stock)
+**When** its row renders
+**Then** the existing sold-out treatment (disabled "Add to cart", grayscale thumb) is preserved and restyled to match `button-pill-disabled` and `badge-negative` "Sold Out" — the underlying availability logic (`isInStock()`) is unchanged, only its visual presentation
+
+**Given** the vendor's `deletedAt` is set (deactivated vendor, per Story 2.3's existing behavior — the route still returns a real 200, not a 404)
+**When** a customer visits that vendor's page
+**Then** the "This vendor is no longer available" message renders in the new typography (`DESIGN.md`'s `display-lg` heading style) rather than plain unstyled text — behavior is unchanged, only presentation
+
+**Given** the page's interactive elements (Add to cart buttons)
+**When** a keyboard user tabs through the page
+**Then** each is reachable and shows the `focus-ring` utility from Story 8.1
+
+*(FR19, UX-DR4.)*
+
+### Story 8.4: Cart and checkout redesign
+
+As a customer reviewing my cart and checking out,
+I want the cart page laid out clearly with my items, total, and the checkout form easy to complete,
+So that finishing my order feels straightforward rather than like scrolling through one long plain form.
+
+**Acceptance Criteria:**
+
+**Given** `src/app/cart/page.tsx` today renders one long single-column stack (items, then total, then name/phone/pickup-time/checkout)
+**When** this story ships
+**Then** the page splits into the two-column layout from `DESIGN.md#Layout & Spacing` (items + total on the left, a grouped contact/pickup-time/checkout panel on the right) — no change to what data is collected or when checkout is enabled
+
+**Given** the existing quantity stepper (`−`/count/`+` buttons) and "remove" link
+**When** this story ships
+**Then** they're restyled per `DESIGN.md#Components` (pill-shaped stepper, `field-border` token) while preserving their existing behavior exactly: `−` disabled at qty 1, `+` disabled at `stockQuantity`, `aria-live="polite"` on the quantity value — this is a **regression guard**, not new work; the visual mock must not tempt a rebuild of these as non-interactive styled divs
+
+**Given** the pickup-time picker's existing states (loading, error, empty, one slot auto-selected, 2+ slots as a real `<fieldset>`/`<legend>`/radio-input group, a full slot disabled)
+**When** this story ships
+**Then** each state is restyled per `EXPERIENCE.md#State Patterns` and `DESIGN.md`'s `pickup-option` component, preserving the real `<fieldset>`/`<legend>`/radio-input group for 2+ options — no state is replaced with styled non-interactive divs
+
+**Given** `cart/page.tsx`'s three dynamic error/warning messages (checkout error, pickup-times-fetch-failure, "no longer available — remove to continue") render today as plain `<p>` text with no announcement mechanism
+**When** this story ships
+**Then** all three gain `role="alert"` and `aria-live="polite"` — this is new work this story adds, per `EXPERIENCE.md#Accessibility Floor`, since all three can gate or block checkout and a screen-reader user currently gets no notification when one appears
+
+**Given** the name and mobile-number input fields
+**When** this story ships
+**Then** they're restyled per `DESIGN.md`'s `input-field` component (`field-border`, `placeholder-text` tokens) — no new client-side validation is added; checkout stays gated on both fields being non-empty exactly as today
+
+*(FR19, UX-DR5, UX-DR9 (applied), UX-DR10, UX-DR11.)*
+
+### Story 8.5: Checkout-success redesign
+
+As a customer who just completed an order,
+I want a warm, clear confirmation that my order went through,
+So that I know tomorrow's pickup is handled without having to parse a plain, generic "thank you" page.
+
+**Acceptance Criteria:**
+
+**Given** `src/app/checkout/success/page.tsx` today renders a plain centered heading, one paragraph, and a text link
+**When** this story ships
+**Then** it's restyled per `DESIGN.md#Components`: the `confirm-card` panel, the `check-badge` (olive-gradient circle with a hand-drawn checkmark), and a low-opacity scattered squiggle-divider flourish behind the card — never confetti, never an animated burst (per `EXPERIENCE.md#Interaction Primitives`)
+
+**Given** this page is a stateless "thank you" with no access to real order details (the actual order record is created server-side by a Stripe webhook, independent of whether the customer's browser ever reaches this page — per `EXPERIENCE.md#Foundation`)
+**When** this story ships
+**Then** the page continues to render only the static confirmation message and a "Back to vendors" link — no order-summary content is added, since this page structurally cannot know if the webhook has processed yet
+
+**Given** the "Back to vendors" link
+**When** this story ships
+**Then** it's restyled as a `button-pill-primary` and remains keyboard-reachable with the `focus-ring` utility visible
+
+*(FR19, UX-DR6.)*

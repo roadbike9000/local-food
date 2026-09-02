@@ -57,6 +57,13 @@ export function EditVendorTimezoneControl({
   const [timezone, setTimezone] = useState(currentTimezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped to force the <select> to remount on confirm-cancel. The native
+  // element already shows the just-picked option by the time onChange
+  // fires (that's how it dispatches the event), so if `timezone` state
+  // never changes - which it doesn't on cancel, since we return before
+  // touching it - React has nothing to re-render and the DOM is left
+  // showing the cancelled option instead of the real current one.
+  const [selectKey, setSelectKey] = useState(0);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The value to revert to if the eventual commit fails or is declined -
   // captured once when a new burst of changes starts, not re-captured on
@@ -77,6 +84,7 @@ export function EditVendorTimezoneControl({
         `${vendorName} has existing pickup slots. Changing the timezone won't move their scheduled time, but it will change how that time is *displayed* everywhere - including to customers who may already have a confirmation quoting the old time. Continue?`,
       )
     ) {
+      setSelectKey((key) => key + 1);
       setTimezone(revertValue.current);
       return;
     }
@@ -148,6 +156,7 @@ export function EditVendorTimezoneControl({
   return (
     <div>
       <select
+        key={selectKey}
         aria-label={`Timezone for ${vendorName}`}
         value={timezone}
         disabled={submitting}
