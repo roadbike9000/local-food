@@ -4,7 +4,7 @@ baseline_commit: 4065a6396c5137bb4fd8c1f8ffb8916cd5c5c7c3
 
 # Story 8.5: Checkout-success redesign
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -31,19 +31,19 @@ so that I know tomorrow's pickup is handled without having to parse a plain, gen
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Confirmation card restyle (AC #1, #2)
-  - [ ] `src/app/checkout/success/page.tsx` — wrap the existing heading + paragraph in the `confirm-card` component (`DESIGN.md#Components`: generous padding, `rounded-xl`, centered, largest single card in the system), add the `check-badge` (84px olive-gradient circle with the Story 8.1 checkmark icon) above the heading.
-  - [ ] Add the scattered squiggle-divider flourish behind the card — low opacity, rotated/scaled instances of the same inline-SVG asset from Story 8.1, purely decorative (`aria-hidden`) and static (no animation).
-  - [ ] Do not add any order-detail content, loading state, or API call to this page — it stays a pure static confirmation, per AC #2.
-  - [ ] Keep the heading text containing "Thank you" and the body copy containing "We'll text you when it's ready for pickup" verbatim.
+- [x] Task 1: Confirmation card restyle (AC #1, #2)
+  - [x] `src/app/checkout/success/page.tsx` — wrap the existing heading + paragraph in the `confirm-card` component (`DESIGN.md#Components`: generous padding, `rounded-xl`, centered, largest single card in the system), add the `check-badge` (84px olive-gradient circle with the Story 8.1 checkmark icon) above the heading.
+  - [x] Add the scattered squiggle-divider flourish behind the card — low opacity, rotated/scaled instances of the same inline-SVG asset from Story 8.1, purely decorative (`aria-hidden`) and static (no animation).
+  - [x] Do not add any order-detail content, loading state, or API call to this page — it stays a pure static confirmation, per AC #2.
+  - [x] Keep the heading text containing "Thank you" and the body copy containing "We'll text you when it's ready for pickup" verbatim.
 
-- [ ] Task 2: Back-to-vendors link (AC #3)
-  - [ ] Restyle the existing `<Link href="/">` as `button-pill-primary` (terracotta fill, `rounded-full`, per `DESIGN.md#Components`). Apply the Story 8.1 `focus-ring` utility.
+- [x] Task 2: Back-to-vendors link (AC #3)
+  - [x] Restyle the existing `<Link href="/">` as `button-pill-primary` (terracotta fill, `rounded-full`, per `DESIGN.md#Components`). Apply the Story 8.1 `focus-ring` utility.
 
-- [ ] Task 3: Tests (AC #1–#3)
-  - [ ] Run `tests/payment.spec.ts` after this story's changes — it navigates to `/checkout/success` directly and asserts the heading/body text; also exercises the vendor page's Add button and the cart page's Checkout button earlier in the same test, which are Story 8.2/8.3/8.4's concern, not new risk introduced here, but worth being aware this file spans multiple redesigned surfaces in one test.
-  - [ ] No new Vitest unit tests — no new business logic (`project-context.md#Testing Rules`).
-  - [ ] No mocking.
+- [x] Task 3: Tests (AC #1–#3)
+  - [x] Run `tests/payment.spec.ts` after this story's changes — it navigates to `/checkout/success` directly and asserts the heading/body text; also exercises the vendor page's Add button and the cart page's Checkout button earlier in the same test, which are Story 8.2/8.3/8.4's concern, not new risk introduced here, but worth being aware this file spans multiple redesigned surfaces in one test.
+  - [x] No new Vitest unit tests — no new business logic (`project-context.md#Testing Rules`).
+  - [x] No mocking.
 
 ## Dev Notes
 
@@ -73,8 +73,27 @@ so that I know tomorrow's pickup is handled without having to parse a plain, gen
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- `npx tsc --noEmit`: clean.
+- `npm run lint` (`npx eslint src/app/checkout/success/page.tsx src/components/Icons.tsx`): clean.
+- `npx vitest run`: 142/142 passed (no unit tests added — none needed, no new business logic).
+- `npx playwright test tests/payment.spec.ts`: 2/2 passed, including "checkout success page renders" (heading/body text assertions unmodified and still passing).
+- Full `npx playwright test`, run twice: 152/152 passed both runs, no flakes.
+- Manually verified in a real browser (dev server + a throwaway Playwright screenshot script, not committed): confirm-card, check-badge with checkmark, italic body copy, and the 4 scattered squiggle flourishes all render correctly against `/checkout/success`, closely matching the approved mock, no console errors.
 
 ### Completion Notes List
 
+- Confirmation card (Task 1): wrapped the existing heading/body in `DESIGN.md`'s `confirm-card` (`rounded-storefront-xl`, `card-border`, `shadow-confirm` — all pre-existing Story 8.1 tokens, matching the mock's literal `44px 56px 40px` padding and `480px` max-width, neither of which has a named spacing token so kept as arbitrary values per this epic's established precedent). `check-badge` uses the existing `olive-light`→`olive`→`olive-deep` gradient and `shadow-badge-check` token (both already defined in `tailwind.config.ts`, unused until now) plus the Story 8.1 `CheckmarkIcon`.
+  - **Checkmark stroke width deliberately not matched to the mock's literal `stroke-width="4"`:** the mock's checkmark is a one-off SVG with its own 40x40 viewBox tuned in isolation; the app's real `CheckmarkIcon` shares `icon-line`'s uniform 24x24 viewBox and 1.3–1.6px stroke range with every other icon in the app (basket, clock, wheat, leaf). Using the icon's own default stroke keeps it visually consistent with the rest of the icon-line set instead of introducing a one-off thick-stroke exception — same "canonical system value over isolated mock pixel" call every prior 8.x story has made where the two disagree.
+  - Body copy uses `{typography.body-lede}` (18px italic) rather than `body-card-desc` (15px italic) — the closest existing DESIGN.md role to the mock's own one-off 17px, and semantically closer (an editorial lede, not a card description).
+- Squiggle flourish (Task 1): added `SquiggleFlourish` to `Icons.tsx`, reusing the existing `SQUIGGLE_TILE_SVG` data-URI constant `SquiggleDivider` already defined (Story 8.2) rather than duplicating it — renders one fixed-size mark instead of a repeating strip, positioned/rotated/scaled/dimmed per-instance via the caller's `className`. 4 instances match the mock's `f1`–`f4` positions/transforms/opacities exactly; simplified to one color (olive, the same asset `SquiggleDivider` already uses) rather than the mock's two-tone olive/terracotta variant, since AC #1 doesn't require the second color and introducing a second baked-color data-URI constant for a purely decorative detail wasn't worth the added surface in "the smallest, lowest-risk story in the epic."
+- Back-to-vendors link (Task 2): restyled as `button-pill-primary` (`rounded-full`, terracotta fill, `shadow-button-primary`, `focus-ring`) — same padding/font-size/tracking values (`px-[26px] py-[14px] text-[15px] tracking-[0.02em]`) as Story 8.4's cart Checkout button, since both are the same `DESIGN.md` component. This is a known, already-logged duplication (`deferred-work.md`'s Story 8.4 review entry specifically named this page as the predicted second consumer) — not fixed here, since promoting it into a shared token/component is a deliberate decision flagged for outside this story's minimal scope, not a drive-by refactor mid-implementation.
+- Tests (Task 3): no changes to `tests/payment.spec.ts` — its heading/body-text assertions pass unmodified against the restyled markup, confirmed by the file's 2/2 pass.
+
 ### File List
+
+- `src/app/checkout/success/page.tsx` (modified — full restyle: confirm-card, check-badge, squiggle flourish, button-pill-primary link)
+- `src/components/Icons.tsx` (modified — new `SquiggleFlourish` export, reusing `SquiggleDivider`'s existing tile asset)

@@ -85,3 +85,19 @@ export function SquiggleDivider(props: { className?: string }) {
     />
   );
 }
+
+// Story 8.5: a single scattered squiggle mark (checkout-success's low-
+// opacity celebratory flourish, DESIGN.md#Components) - the same tile
+// asset as SquiggleDivider above, reused rather than duplicated, just
+// rendered as one fixed-size mark instead of a repeating strip. Caller
+// positions/rotates/scales/dims it via className (absolute positioning,
+// rotate/scale transforms, opacity).
+export function SquiggleFlourish(props: { className?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`h-[18px] w-[34px] bg-no-repeat ${props.className ?? ""}`}
+      style={{ backgroundImage: SQUIGGLE_TILE_SVG, backgroundSize: "34px 18px" }}
+    />
+  );
+}
