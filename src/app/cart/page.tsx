@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCart } from "@/components/CartProvider";
+import { NegativeBadge } from "@/components/NegativeBadge";
 import { formatPickupWindow, formatPrice } from "@/lib/utils";
 import { isValidTimeZone } from "@/lib/timezone";
 
@@ -17,6 +18,11 @@ type PickupSlotOption = {
   location: string | null;
   available: boolean;
 };
+
+// Shared by the stepper's decrease/increase buttons so their styling can't
+// drift out of sync (Story 8.4 review).
+const STEPPER_BUTTON_CLASS =
+  "focus-ring flex h-[30px] w-[30px] items-center justify-center bg-cream font-sans font-bold text-terracotta disabled:cursor-not-allowed disabled:opacity-40";
 
 // The cart + checkout page. Collects customer contact info, then calls our
 // /api/checkout route which creates a Stripe Checkout session and redirects.
@@ -168,7 +174,7 @@ export default function CartPage() {
                         disabled={i.quantity <= 1}
                         onClick={() => updateQuantity(i.productId, -1)}
                         type="button"
-                        className="focus-ring flex h-[30px] w-[30px] items-center justify-center bg-cream font-sans font-bold text-terracotta disabled:cursor-not-allowed disabled:opacity-40"
+                        className={STEPPER_BUTTON_CLASS}
                       >
                         −
                       </button>
@@ -184,7 +190,7 @@ export default function CartPage() {
                         disabled={i.quantity >= i.stockQuantity}
                         onClick={() => updateQuantity(i.productId, 1)}
                         type="button"
-                        className="focus-ring flex h-[30px] w-[30px] items-center justify-center bg-cream font-sans font-bold text-terracotta disabled:cursor-not-allowed disabled:opacity-40"
+                        className={STEPPER_BUTTON_CLASS}
                       >
                         +
                       </button>
@@ -206,11 +212,10 @@ export default function CartPage() {
                   </span>
                 </div>
                 {i.stockQuantity <= 0 && (
-                  <p
-                    role="alert"
-                    aria-live="polite"
-                    className="mt-1 font-sans text-ui-sm text-red-600"
-                  >
+                  // role="alert" already implies an assertive live region -
+                  // an explicit aria-live="polite" here would override that
+                  // and silently downgrade the announcement (ARIA spec).
+                  <p role="alert" className="mt-1 font-sans text-ui-sm text-red-600">
                     No longer available — remove to continue.
                   </p>
                 )}
@@ -255,7 +260,10 @@ export default function CartPage() {
           </div>
 
           <div>
-            <p className="mb-tight text-label-caps-tight font-sans uppercase text-olive">
+            <p
+              id="pickup-time-heading"
+              className="mb-tight text-label-caps-tight font-sans uppercase text-olive"
+            >
               Pickup Time
             </p>
 
@@ -266,11 +274,7 @@ export default function CartPage() {
             )}
 
             {slotsLoaded && slotsError && (
-              <p
-                role="alert"
-                aria-live="polite"
-                className="font-sans text-body-ui text-red-600"
-              >
+              <p role="alert" className="font-sans text-body-ui text-red-600">
                 Could not load pickup times. Try refreshing the page.
               </p>
             )}
@@ -287,15 +291,16 @@ export default function CartPage() {
                 {formatPickupWindow(new Date(slots[0].startsAt), new Date(slots[0].endsAt), vendorTimezone)}
                 {slots[0].location ? ` · ${slots[0].location}` : ""}
                 {!slots[0].available && (
-                  <span className="ml-2 inline-block rounded-full bg-sold-out-bg px-2.5 py-[3px] font-sans text-badge-label uppercase text-ink-soft">
-                    Full
-                  </span>
+                  <NegativeBadge className="ml-2 inline-block">Full</NegativeBadge>
                 )}
               </p>
             )}
 
             {slotsLoaded && !slotsError && slots.length >= 2 && (
-              <fieldset className="flex flex-col gap-2.5">
+              <fieldset
+                aria-labelledby="pickup-time-heading"
+                className="flex flex-col gap-2.5"
+              >
                 <legend className="sr-only">Pickup time</legend>
                 {slots.map((slot) => (
                   <label
@@ -321,11 +326,7 @@ export default function CartPage() {
                       {formatPickupWindow(new Date(slot.startsAt), new Date(slot.endsAt), vendorTimezone)}
                       {slot.location ? ` · ${slot.location}` : ""}
                     </span>
-                    {!slot.available && (
-                      <span className="rounded-full bg-sold-out-bg px-2.5 py-[3px] font-sans text-badge-label uppercase text-ink-soft">
-                        Full
-                      </span>
-                    )}
+                    {!slot.available && <NegativeBadge>Full</NegativeBadge>}
                   </label>
                 ))}
               </fieldset>
@@ -333,11 +334,7 @@ export default function CartPage() {
           </div>
 
           {error && (
-            <p
-              role="alert"
-              aria-live="polite"
-              className="font-sans text-body-ui text-red-600"
-            >
+            <p role="alert" className="font-sans text-body-ui text-red-600">
               {error}
             </p>
           )}

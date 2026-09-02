@@ -4,7 +4,7 @@ baseline_commit: 4065a6396c5137bb4fd8c1f8ffb8916cd5c5c7c3
 
 # Story 8.4: Cart and checkout redesign
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -74,6 +74,20 @@ so that finishing my order feels straightforward rather than like scrolling thro
   - [x] No new Vitest unit tests — no new business logic (`project-context.md#Testing Rules`).
   - [x] No mocking.
 
+### Review Findings
+
+**Code review (`/code-review opus`, Story 8.4 diff `dcdccff..HEAD`, 2026-09-02)** — 10 finder agents ran against this diff, manually triaged and cross-referenced (same process as Story 8.3's review, since the orchestrator's own consolidation is unreliable).
+
+- [x] [Review][Patch] `role="alert"` combined with an explicit `aria-live="polite"` on all 3 new alert messages silently downgrades the announcement priority — `role="alert"` already implies an assertive live region; the explicit `aria-live="polite"` overrides that per the ARIA spec, contradicting the intent of adding `role="alert"` in the first place (AC #5's whole point). Removed the redundant `aria-live="polite"` from all 3; `role="alert"` alone is correct. [src/app/cart/page.tsx]
+- [x] [Review][Patch] The pickup-time `<fieldset>`'s visible label was a disconnected plain `<p>` outside the fieldset with no programmatic link back to it (the `<legend>` itself was made `sr-only`, a new implementer decision this round, not requested by any AC). Added `aria-labelledby="pickup-time-heading"` on the `<fieldset>`, referencing the heading `<p>`'s new `id`. [src/app/cart/page.tsx]
+- [x] [Review][Patch] The "Full"/"Sold Out" status-badge className string was duplicated 3 times across 2 files (2 new in this diff, 1 pre-existing in `ProductCard.tsx`) — flagged independently by 3 finder agents. Extracted to `src/components/NegativeBadge.tsx`, used at all 3 call sites. [src/app/cart/page.tsx, src/components/ProductCard.tsx, src/components/NegativeBadge.tsx (new)]
+- [x] [Review][Patch] The stepper's decrease/increase buttons had an identical className string typed out twice in the same block — flagged by 2 finder agents. Hoisted to a `STEPPER_BUTTON_CLASS` constant. [src/app/cart/page.tsx]
+- [x] [Review][Defer] The two-column grid (`grid-cols-[1.55fr_1fr]`) has no responsive breakpoint, unlike this codebase's own `sm:grid-cols-2` precedent (`src/app/page.tsx`). [src/app/cart/page.tsx] — deferred to `deferred-work.md`: genuinely ambiguous given `DESIGN.md`'s literal spec and the epic's "desktop-primary" scoping (UX-DR12) — needs a decision, not a reflexive patch that deviates from the approved mock.
+- [x] [Review][Defer] `DESIGN.md`'s `button-pill-primary`/`card-row` component specs are hand-typed as arbitrary values rather than promoted into the token layer, and the cart item row's padding has already drifted slightly from `ProductCard.tsx`'s sibling usage. [src/app/cart/page.tsx] — deferred to `deferred-work.md`, flagged for Story 8.5's own scoping (it reuses `button-pill-primary`).
+- [x] [Review][Defer] Two simplification opportunities (the 5-branch pickup-state conditional chain, the nested-ternary slot-label className) — real readability improvements, not bugs, not cross-confirmed by a second agent, deferred given this page's outsized regression surface. [src/app/cart/page.tsx]
+
+All patches verified: `npx tsc --noEmit` clean, `npm run lint` clean, `npx vitest run` 142/142, `npx playwright test tests/storefront-cart.spec.ts` 16/16, full `npx playwright test` run twice (1 different-run failure in `dashboard.spec.ts`'s pickup-slots-isolation test, isolation-clean, matching the same pre-existing parallel-execution flake class already documented in Story 8.3's own review, unrelated to this diff — second run clean 152/152).
+
 ## Dev Notes
 
 **Depends on Story 8.1** (token layer, `focus-ring` utility, icon set if pickup-option needs an icon).
@@ -132,4 +146,6 @@ Claude Sonnet 5 (claude-sonnet-5)
 
 ### File List
 
-- `src/app/cart/page.tsx` (modified — two-column layout, cart-row/stepper restyle, pickup-option restyle, 3 new role="alert"/aria-live additions, input-field restyle; no logic/state changes)
+- `src/app/cart/page.tsx` (modified — two-column layout, cart-row/stepper restyle, pickup-option restyle, 3 new role="alert" additions, input-field restyle; no logic/state changes; review round: dropped redundant aria-live="polite", fieldset aria-labelledby, NegativeBadge/STEPPER_BUTTON_CLASS reuse)
+- `src/components/ProductCard.tsx` (modified, review round — "Sold Out" badge now uses shared `NegativeBadge`)
+- `src/components/NegativeBadge.tsx` (new, review round — shared badge-negative component, replaces 3 duplicated copies)

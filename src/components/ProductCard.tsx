@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useCart } from "./CartProvider";
+import { NegativeBadge } from "./NegativeBadge";
 import { formatPrice } from "@/lib/utils";
 import { isInStock } from "@/lib/availability";
 import { ImagePlaceholderIcon } from "./Icons";
@@ -96,12 +97,9 @@ export function ProductCard({ vendorId, vendorSlug, product }: ProductCardProps)
           {formatPrice(product.priceCents)}
         </p>
         {!inStock && (
-          <span
-            id={outOfStockId}
-            className="mt-1 inline-block rounded-full bg-sold-out-bg px-2.5 py-[3px] font-sans text-badge-label uppercase text-ink-soft"
-          >
+          <NegativeBadge id={outOfStockId} className="mt-1 inline-block">
             Sold Out
-          </span>
+          </NegativeBadge>
         )}
       </div>
       <button
